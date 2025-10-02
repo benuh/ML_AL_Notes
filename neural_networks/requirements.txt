@@ -1,0 +1,42 @@
+# Neural Networks Tutorial - Dependencies
+# Python 3.8+ required
+
+# Core Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+
+# Alternative framework (optional)
+# tensorflow>=2.13.0
+# keras>=2.13.0
+
+# Scientific Computing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Data Processing
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.17.0
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+
+# Jupyter
+jupyter>=1.0.0
+notebook>=7.0.0
+ipywidgets>=8.1.0
+
+# Progress bars
+tqdm>=4.66.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Optional: Advanced visualization
+tensorboard>=2.13.0

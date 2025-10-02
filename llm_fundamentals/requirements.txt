@@ -1,0 +1,39 @@
+# LLM Fundamentals Tutorial - Dependencies
+# Python 3.8+ required
+
+# Core ML/DL Libraries
+torch>=2.0.0
+transformers>=4.35.0
+tiktoken>=0.5.1
+
+# NLP Tools
+sentencepiece>=0.1.99
+tokenizers>=0.15.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.17.0
+
+# Jupyter
+jupyter>=1.0.0
+notebook>=7.0.0
+ipywidgets>=8.1.0
+
+# Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Optional: LLM APIs
+openai>=1.3.0
+anthropic>=0.7.0
+cohere>=4.37
+
+# Optional: Advanced tools
+accelerate>=0.25.0
+bitsandbytes>=0.41.0
+peft>=0.7.0
+
+# Utilities
+tqdm>=4.66.0
+python-dotenv>=1.0.0
