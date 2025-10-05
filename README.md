@@ -22,6 +22,23 @@
 
 ---
 
+## 🆕 Recent Enhancements (October 2024)
+
+### **New: Comprehensive Visualization Guide**
+**[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete ML/AI visualization toolkit with 200+ lines of production-ready code covering:
+
+- **Neural Network Architectures** - Visualize CNNs, Transformers, and custom architectures
+- **Training Dynamics** - Monitor loss curves, learning rates, gradient norms in real-time
+- **Attention Mechanisms** - Heatmaps and flow diagrams for transformer models
+- **Embeddings** - t-SNE, UMAP, and interactive 3D visualizations
+- **Model Interpretation** - Grad-CAM, SHAP values, feature importance plots
+- **Performance Metrics** - Confusion matrices, ROC curves, precision-recall curves
+- **Interactive Dashboards** - Real-time training monitoring with Plotly Dash
+
+All code is runnable, well-documented, and ready for research papers, presentations, and production monitoring systems.
+
+---
+
 ## 📚 Learning Curriculum
 
 ### 🎯 **Core Notebooks** (Start Here!)
@@ -363,16 +380,18 @@
 2. Deep dives: All core notebooks (01-06)
 3. Advanced: [07 - Ensemble Methods](./interactive_demos/07_advanced_ensemble_methods.ipynb)
 4. Production: [08 - Interpretability](./interactive_demos/08_model_interpretability.ipynb)
-5. Practice: Implement algorithms from scratch
-6. Mock interviews: Use questions in notebook 00
+5. **Visualization**: [VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md) - Present models effectively
+6. Practice: Implement algorithms from scratch
+7. Mock interviews: Use questions in notebook 00
 
 ### 💼 **Production ML Engineer Path** (6-8 weeks)
 1. Foundations: Notebooks 02-03 (Math & Stats)
 2. Data Engineering: [04 - Data Processing](./interactive_demos/04_data_processing.ipynb)
 3. Modeling: Notebooks 05-07 (Classical ML + Ensemble)
 4. Deployment: [08 - Interpretability](./interactive_demos/08_model_interpretability.ipynb)
-5. Advanced: Deep Learning (Notebook 06)
-6. Build: Production pipelines and projects
+5. **Monitoring**: [VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md) - Dashboards & monitoring
+6. Advanced: Deep Learning (Notebook 06)
+7. Build: Production pipelines and projects
 
 ---
 
@@ -456,6 +475,12 @@ lime>=0.2.0            # Local explanations
 ---
 
 ## 📚 Recommended Study Resources
+
+### Essential Guides (In This Repository)
+- **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete visualization toolkit for ML/AI
+- **[LEARNING_GUIDE.md](./LEARNING_GUIDE.md)** - How to use this curriculum effectively
+- **[CODE_TEMPLATES.md](./CODE_TEMPLATES.md)** - Production-ready code snippets
+- **[DATASETS_AND_TOOLS.md](./DATASETS_AND_TOOLS.md)** - Curated datasets and tools
 
 ### Books Referenced
 - **Mathematics:** *Mathematics for Machine Learning* - Deisenroth, Faisal, Ong (2020)

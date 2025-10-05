@@ -483,6 +483,157 @@ This curriculum contains **8 comprehensive Jupyter notebooks** covering everythi
 
 ---
 
+## 📋 Quick Reference Guide
+
+### **Algorithm Selection Cheat Sheet**
+
+| Problem Type | Best Algorithm | When to Use | Avoid When |
+|-------------|----------------|-------------|------------|
+| **Linear Separable** | Logistic Regression | Fast, interpretable needed | Non-linear patterns |
+| **Tabular Data** | XGBoost/LightGBM | Most cases, competitions | Very small datasets |
+| **High-dim Sparse** | Linear models + L1 | Text classification | Need non-linearity |
+| **Small Dataset** | Random Forest | <10k samples | Big data (slow) |
+| **Need Interpretability** | Decision Tree, Linear | Regulated industries | Accuracy critical |
+| **Images** | CNN (ResNet, EfficientNet) | Computer vision | Tabular data |
+| **Sequences/Text** | Transformers (BERT, GPT) | NLP tasks | Short text, small data |
+| **Imbalanced Data** | Weighted loss, SMOTE + RF | Fraud detection | Balanced datasets |
+
+### **Common ML Formulas**
+
+```
+Bias-Variance Tradeoff:
+Expected Error = Bias² + Variance + Irreducible Error
+
+Gradient Descent:
+θ = θ - α · ∇J(θ)
+
+Cross Entropy Loss:
+L = -Σ y_i · log(ŷ_i)
+
+L1 Regularization (Lasso):
+Loss = MSE + λ · Σ|w_i|
+
+L2 Regularization (Ridge):
+Loss = MSE + λ · Σw_i²
+
+Precision:
+P = TP / (TP + FP)
+
+Recall:
+R = TP / (TP + FN)
+
+F1 Score:
+F1 = 2 · (P · R) / (P + R)
+```
+
+### **Hyperparameter Tuning Priority**
+
+**XGBoost/LightGBM (in order of importance):**
+1. `n_estimators` (100-1000)
+2. `learning_rate` (0.01-0.3)
+3. `max_depth` (3-10)
+4. `min_child_weight` (1-10)
+5. `subsample` (0.6-1.0)
+6. `colsample_bytree` (0.6-1.0)
+
+**Random Forest:**
+1. `n_estimators` (100-500)
+2. `max_depth` (None, 10, 20)
+3. `min_samples_split` (2, 5, 10)
+4. `max_features` ('sqrt', 'log2', None)
+
+**Neural Networks:**
+1. Learning rate (1e-4 to 1e-2)
+2. Batch size (32, 64, 128)
+3. Architecture (layers, units)
+4. Dropout rate (0.1-0.5)
+5. Optimizer (Adam, SGD+momentum)
+
+### **Data Preprocessing Checklist**
+
+- [ ] **Load data** - Check shape, dtypes, memory usage
+- [ ] **Explore** - Head, describe, info, missing values
+- [ ] **Handle missing data** - Drop, impute (mean/median/mode), or flag
+- [ ] **Outlier detection** - IQR, Z-score, domain knowledge
+- [ ] **Feature types** - Separate numerical, categorical, datetime
+- [ ] **Encode categoricals** - One-hot (<10 categories), target encoding (>10)
+- [ ] **Scale features** - StandardScaler (most cases), MinMaxScaler (bounded)
+- [ ] **Split data** - Train/val/test BEFORE any processing
+- [ ] **Create pipeline** - Prevent data leakage
+- [ ] **Feature engineering** - Domain features, interactions, aggregations
+
+### **Model Evaluation Metrics - When to Use**
+
+| Metric | Use Case | Formula |
+|--------|----------|---------|
+| **Accuracy** | Balanced classes | (TP+TN) / Total |
+| **Precision** | Minimize false positives (spam) | TP / (TP+FP) |
+| **Recall** | Minimize false negatives (disease) | TP / (TP+FN) |
+| **F1 Score** | Balance precision/recall | 2·P·R / (P+R) |
+| **ROC-AUC** | Overall classifier quality | Area under ROC |
+| **PR-AUC** | Imbalanced data | Area under PR curve |
+| **MAE** | Regression, interpretable | Σ\|y-ŷ\| / n |
+| **MSE** | Regression, penalize large errors | Σ(y-ŷ)² / n |
+| **R²** | Regression, % variance explained | 1 - SS_res/SS_tot |
+
+### **Interview Answer Templates**
+
+**"What is [algorithm]?"**
+1. **Definition**: One sentence description
+2. **How it works**: Key mechanism (2-3 sentences)
+3. **Strengths**: 2-3 advantages
+4. **Weaknesses**: 2-3 limitations
+5. **Use case**: When you'd use it
+
+**"Compare Algorithm A vs B"**
+1. **Similarities**: What they have in common
+2. **Key differences**: Main distinguishing factors
+3. **Performance**: Speed, accuracy tradeoffs
+4. **Use cases**: When to use each
+
+**"Tell me about a project"**
+1. **Problem**: Business objective (1 sentence)
+2. **Data**: Size, features, challenges
+3. **Approach**: Algorithm choice and why
+4. **Results**: Metrics, impact
+5. **Learnings**: What you'd do differently
+
+### **Common Pitfalls & Solutions**
+
+| Problem | Symptom | Solution |
+|---------|---------|----------|
+| **Data Leakage** | Train acc 99%, test acc 60% | Check preprocessing, feature creation |
+| **Overfitting** | Train >> Test accuracy | Regularization, more data, simpler model |
+| **Underfitting** | Both train/test low | More features, complex model, remove regularization |
+| **Class Imbalance** | High acc but poor recall | Weighted loss, SMOTE, undersample majority |
+| **Vanishing Gradients** | NN won't train | ReLU activation, batch norm, ResNet |
+| **Exploding Gradients** | Loss = NaN | Gradient clipping, lower learning rate |
+
+### **Essential Visualizations**
+
+**During Training:**
+- Loss curves (train vs val)
+- Accuracy curves
+- Learning rate schedule
+- Gradient norms
+
+**After Training:**
+- Confusion matrix
+- ROC curve / PR curve
+- Feature importance
+- Prediction distribution
+- Residual plots (regression)
+
+**For Stakeholders:**
+- SHAP summary plot
+- Feature importance bar chart
+- Business metrics dashboard
+- Example predictions
+
+See **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** for complete code examples.
+
+---
+
 **Remember:**  Machine Learning is a marathon, not a sprint. Consistency beats intensity!
 
 **Good luck on your ML journey! 🚀**
