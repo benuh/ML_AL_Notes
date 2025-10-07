@@ -414,27 +414,51 @@ ML meaning: Which direction to move parameters to increase loss
 
 **Gradient Descent**:
 ```python
-def gradient_descent(f, grad_f, x0, learning_rate=0.1, num_iterations=100):
+def gradient_descent(f, grad_f, x0, learning_rate=0.1, num_iterations=100,
+                    tolerance=1e-6, verbose=False):
     """
     Minimize function f using gradient descent
 
+    Parameters:
+    -----------
     f: function to minimize
     grad_f: gradient of f
-    x0: initial point
+    x0: initial point (numpy array)
+    learning_rate: step size α (also called learning rate)
+    tolerance: convergence threshold
+
+    Convergence Conditions (for convex f with L-Lipschitz gradient):
+    - If α ≤ 1/L: Guaranteed convergence to global minimum
+    - Convergence rate: O(1/k) where k is iteration number
+
+    For strongly convex functions (with parameter μ):
+    - Convergence rate improves to O(exp(-k·μ/L))
     """
     x = x0.copy()
     history = [x.copy()]
+    grad_norms = []
 
     for i in range(num_iterations):
         # Compute gradient
         grad = grad_f(x)
+        grad_norm = np.linalg.norm(grad)
+        grad_norms.append(grad_norm)
 
-        # Update: move opposite to gradient
+        # Check convergence
+        if grad_norm < tolerance:
+            if verbose:
+                print(f"Converged at iteration {i}, gradient norm: {grad_norm:.2e}")
+            break
+
+        # Update: x^(k+1) = x^(k) - α∇f(x^(k))
         x = x - learning_rate * grad
 
         history.append(x.copy())
 
-    return x, np.array(history)
+        if verbose and i % 10 == 0:
+            print(f"Iter {i}: f(x) = {f(x):.6f}, ||∇f|| = {grad_norm:.2e}")
+
+    return x, np.array(history), np.array(grad_norms)
 
 # Example: Minimize f(x,y) = x² + y²
 f = lambda x: x[0]**2 + x[1]**2
@@ -700,12 +724,32 @@ P(spam | contains "FREE") = P(spam ∩ contains "FREE") / P(contains "FREE")
 ```
 P(A|B) = P(B|A) × P(A) / P(B)
 
+Where:
+- P(A|B): Posterior probability (what we want to compute)
+- P(B|A): Likelihood (probability of observing B given A)
+- P(A): Prior probability (initial belief about A)
+- P(B): Evidence or marginal likelihood (normalization constant)
+
 In ML terms:
-P(hypothesis | data) = P(data | hypothesis) × P(hypothesis) / P(data)
+P(θ | D) = P(D | θ) × P(θ) / P(D)
 
 Posterior = Likelihood × Prior / Evidence
 
+Where:
+- θ: Model parameters (hypothesis)
+- D: Observed data
+- P(θ | D): Posterior distribution over parameters given data
+- P(D | θ): Likelihood of data given parameters
+- P(θ): Prior distribution over parameters
+- P(D) = ∫ P(D | θ) P(θ) dθ: Marginal likelihood (often intractable)
+
 This is the foundation of Bayesian machine learning!
+
+Key Properties:
+1. Law of Total Probability: P(B) = Σ P(B|A_i) P(A_i)
+2. Bayes' Rule is exact, not an approximation
+3. Prior × Likelihood = Unnormalized Posterior
+4. Conjugate priors simplify posterior computation
 ```
 
 **Example: Medical Diagnosis**:
@@ -1398,21 +1442,49 @@ for i, score in enumerate(mi_scores):
 ## 📚 Further Reading
 
 **Books**:
-1. "Mathematics for Machine Learning" by Deisenroth, Faisal, and Ong
-2. "Deep Learning" by Goodfellow, Bengio, and Courville (Part I)
-3. "Pattern Recognition and Machine Learning" by Bishop
-4. "The Elements of Statistical Learning" by Hastie, Tibshirani, and Friedman
+1. **Deisenroth, M. P., Faisal, A. A., & Ong, C. S.** (2020). *Mathematics for Machine Learning*. Cambridge University Press. Available free at: https://mml-book.github.io/
+2. **Goodfellow, I., Bengio, Y., & Courville, A.** (2016). *Deep Learning*. MIT Press. Available at: https://www.deeplearningbook.org/
+3. **Bishop, C. M.** (2006). *Pattern Recognition and Machine Learning*. Springer.
+4. **Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer. Available free at: https://hastie.su.stanford.edu/ElemStatLearn/
+5. **Strang, G.** (2016). *Introduction to Linear Algebra* (5th ed.). Wellesley-Cambridge Press.
+6. **Boyd, S., & Vandenberghe, L.** (2004). *Convex Optimization*. Cambridge University Press. Available free at: https://web.stanford.edu/~boyd/cvxbook/
+
+**Seminal Papers**:
+1. **Rumelhart, D. E., Hinton, G. E., & Williams, R. J.** (1986). "Learning representations by back-propagating errors." *Nature*, 323(6088), 533-536.
+2. **Robbins, H., & Monro, S.** (1951). "A stochastic approximation method." *The Annals of Mathematical Statistics*, 22(3), 400-407.
+3. **Kingma, D. P., & Ba, J.** (2015). "Adam: A method for stochastic optimization." *ICLR 2015*. arXiv:1412.6980
 
 **Online Resources**:
-- 3Blue1Brown (YouTube): Visual explanations of linear algebra and calculus
-- Khan Academy: Foundations of probability and statistics
-- MIT OpenCourseWare: Linear Algebra (Gilbert Strang)
+- **3Blue1Brown** (YouTube): Visual explanations of linear algebra and calculus
+  - "Essence of Linear Algebra" series
+  - "Essence of Calculus" series
+- **Khan Academy**: Foundations of probability and statistics
+- **MIT OpenCourseWare**:
+  - 18.06 Linear Algebra (Gilbert Strang)
+  - 18.01 Single Variable Calculus
+- **Stanford CS229**: Machine Learning (Andrew Ng)
+  - Linear Algebra and Calculus review notes
 
 **Practice**:
 - Implement algorithms from scratch using only NumPy
 - Derive gradients by hand before using automatic differentiation
 - Visualize mathematical concepts with matplotlib
 - Solve problems on Project Euler and Brilliant.org
+- Work through exercises in the books listed above
+
+---
+
+## 📖 References
+
+Key concepts and formulations in this guide are based on:
+
+- **Linear Algebra**: Strang (2016), Deisenroth et al. (2020, Chapter 2)
+- **Calculus & Optimization**: Boyd & Vandenberghe (2004), Goodfellow et al. (2016, Chapter 4)
+- **Probability Theory**: Bishop (2006, Chapter 1-2), Deisenroth et al. (2020, Chapter 6)
+- **Statistics**: Hastie et al. (2009, Chapter 2), James et al. (2021)
+- **Information Theory**: Cover & Thomas (2006), Goodfellow et al. (2016, Chapter 3)
+- **Backpropagation**: Rumelhart et al. (1986), Goodfellow et al. (2016, Chapter 6)
+- **Gradient Descent**: Robbins & Monro (1951), Bottou (2010)
 
 ---
 

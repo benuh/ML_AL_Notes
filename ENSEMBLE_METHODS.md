@@ -20,9 +20,44 @@ Learn how to combine multiple models to achieve superior performance.
 
 **Core Principle:** Combine multiple weak learners to create a strong learner.
 
-**Bias-Variance Tradeoff:**
-- **High Bias Models** (underfitting) → Use **Boosting**
-- **High Variance Models** (overfitting) → Use **Bagging**
+**Theoretical Foundation:**
+
+**Bias-Variance Decomposition:**
+For regression, expected prediction error can be decomposed:
+```
+E[(y - f̂(x))²] = Bias²[f̂(x)] + Var[f̂(x)] + σ²
+
+Where:
+- Bias²[f̂(x)] = (E[f̂(x)] - f(x))²: How far off is the average prediction?
+- Var[f̂(x)] = E[(f̂(x) - E[f̂(x)])²]: How much do predictions vary?
+- σ²: Irreducible error (noise in data)
+```
+
+**Ensemble Effect on Bias-Variance:**
+- **Bagging**: Reduces variance, keeps bias constant
+  - Var[avg of M models] ≈ Var[single model] / M (if uncorrelated)
+- **Boosting**: Reduces both bias and variance
+  - Sequential focus on errors reduces bias
+  - Regularization controls variance
+
+**Statistical Learning Theory:**
+For an ensemble of M classifiers with error rate ε < 0.5 (better than random):
+```
+P(ensemble error) = Σ(k=⌈M/2⌉ to M) C(M,k) × ε^k × (1-ε)^(M-k)
+
+This decreases exponentially with M if ε < 0.5!
+```
+
+**Diversity-Accuracy Tradeoff:**
+Ensemble error bounded by:
+```
+E_ensemble ≤ Ē - λ·D̄
+
+Where:
+- Ē: Average individual model error
+- D̄: Average pairwise diversity
+- λ: Weight depending on problem
+```
 
 ```python
 # Single model performance
@@ -30,12 +65,25 @@ single_model_accuracy = 0.85
 
 # Ensemble of 5 models
 ensemble_accuracy = 0.92  # +7% improvement!
+
+# Theoretical bound (assuming independent errors)
+import math
+def ensemble_bound(individual_accuracy, n_models):
+    """Upper bound on ensemble error"""
+    p_error = 1 - individual_accuracy
+    # Probability that majority is wrong
+    bound = sum(math.comb(n_models, k) * p_error**k * (1-p_error)**(n_models-k)
+                for k in range(n_models//2 + 1, n_models + 1))
+    return 1 - bound
+
+print(f"Theoretical bound: {ensemble_bound(0.85, 5):.3f}")
 ```
 
 **When Ensembles Work Best:**
 - Models make different types of errors (diversity)
-- Each model performs better than random
-- Not all models are perfect on the same samples
+- Each model performs better than random (ε < 0.5)
+- Models are not perfectly correlated
+- Sufficient training data for multiple models
 
 ---
 
@@ -279,6 +327,30 @@ class SimpleAdaBoost:
 ### Gradient Boosting
 
 **Strategy:** Sequentially fit models to residuals (errors) of previous models.
+
+**Mathematical Framework:**
+```
+Goal: Minimize loss L(y, F(x))
+
+Gradient Boosting Algorithm:
+1. Initialize: F_0(x) = argmin_γ Σ L(y_i, γ)
+2. For m = 1 to M:
+   a) Compute pseudo-residuals: r_im = -[∂L(y_i, F(x_i))/∂F(x_i)]_{F=F_{m-1}}
+   b) Fit base learner h_m(x) to pseudo-residuals r_im
+   c) Find step size: γ_m = argmin_γ Σ L(y_i, F_{m-1}(x_i) + γ·h_m(x_i))
+   d) Update: F_m(x) = F_{m-1}(x) + γ_m·h_m(x)
+
+Final model: F_M(x) = F_0(x) + Σ γ_m·h_m(x)
+
+Key Insight: Gradient boosting performs gradient descent in function space!
+```
+
+**Common Loss Functions:**
+- Squared loss (regression): L(y,F) = (y - F)²/2
+  - Pseudo-residual: r = y - F(x) (simple residual)
+- Logistic loss (classification): L(y,F) = log(1 + exp(-y·F))
+  - Pseudo-residual: r = y/(1 + exp(y·F))
+- Exponential loss (AdaBoost): L(y,F) = exp(-y·F)
 
 ```python
 from sklearn.ensemble import GradientBoostingClassifier
@@ -1244,3 +1316,56 @@ def compare_ensemble_methods(X_train, y_train, X_test, y_test):
 - Experiment with different base models for diversity
 - Try stacking with neural network meta-learner
 - Measure uncertainty in predictions
+
+---
+
+## 📚 References
+
+**Key Papers:**
+
+1. **Breiman, L.** (1996). "Bagging predictors." *Machine Learning*, 24(2), 123-140.
+   - Original bagging algorithm
+
+2. **Breiman, L.** (2001). "Random forests." *Machine Learning*, 45(1), 5-32.
+   - Random Forest algorithm
+
+3. **Freund, Y., & Schapire, R. E.** (1997). "A decision-theoretic generalization of on-line learning and an application to boosting." *Journal of Computer and System Sciences*, 55(1), 119-139.
+   - AdaBoost algorithm
+
+4. **Friedman, J. H.** (2001). "Greedy function approximation: A gradient boosting machine." *Annals of Statistics*, 29(5), 1189-1232.
+   - Gradient boosting framework
+
+5. **Chen, T., & Guestrin, C.** (2016). "XGBoost: A scalable tree boosting system." *Proceedings of the 22nd ACM SIGKDD*, 785-794.
+   - XGBoost algorithm
+
+6. **Ke, G., Meng, Q., Finley, T., et al.** (2017). "LightGBM: A highly efficient gradient boosting decision tree." *NIPS 2017*, 3146-3154.
+   - LightGBM algorithm
+
+7. **Prokhorenkova, L., Gusev, G., Vorobev, A., et al.** (2018). "CatBoost: Unbiased boosting with categorical features." *NeurIPS 2018*, 6638-6648.
+   - CatBoost algorithm
+
+8. **Wolpert, D. H.** (1992). "Stacked generalization." *Neural Networks*, 5(2), 241-259.
+   - Stacking ensemble method
+
+9. **Dietterich, T. G.** (2000). "Ensemble methods in machine learning." *Multiple Classifier Systems*, 1-15.
+   - Comprehensive ensemble methods overview
+
+10. **Kuncheva, L. I., & Whitaker, C. J.** (2003). "Measures of diversity in classifier ensembles and their relationship with the ensemble accuracy." *Machine Learning*, 51(2), 181-207.
+    - Diversity measures in ensembles
+
+**Books:**
+
+1. **Zhou, Z. H.** (2012). *Ensemble Methods: Foundations and Algorithms*. CRC Press.
+   - Comprehensive textbook on ensemble learning
+
+2. **Hastie, T., Tibshirani, R., & Friedman, J.** (2009). *The Elements of Statistical Learning* (2nd ed.). Springer.
+   - Chapters 8, 10, 15, 16 on ensemble methods
+
+3. **Géron, A.** (2019). *Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow* (2nd ed.). O'Reilly.
+   - Practical ensemble implementations
+
+**Online Resources:**
+- XGBoost documentation: https://xgboost.readthedocs.io/
+- LightGBM documentation: https://lightgbm.readthedocs.io/
+- CatBoost documentation: https://catboost.ai/docs/
+- scikit-learn ensemble module: https://scikit-learn.org/stable/modules/ensemble.html

@@ -32,15 +32,45 @@ Master the art of training agents to make optimal decisions through trial and er
 **Mathematical Framework:**
 
 ```
-Markov Decision Process (MDP):
-- States: S
-- Actions: A
-- Transition: P(s'|s,a)
-- Reward: R(s,a,s')
-- Discount: γ ∈ [0,1]
+Markov Decision Process (MDP): (S, A, P, R, γ)
+- States: S (state space)
+- Actions: A (action space)
+- Transition: P(s'|s,a) - probability of reaching s' from s via action a
+- Reward: R(s,a,s') - immediate reward for transition
+- Discount: γ ∈ [0,1] - future reward discount factor
 
-Goal: Find optimal policy π* that maximizes:
-  E[Σ γ^t * r_t | π]
+Markov Property: P(s_{t+1}|s_t, a_t, s_{t-1}, ..., s_0) = P(s_{t+1}|s_t, a_t)
+(Future depends only on present, not past)
+
+Goal: Find optimal policy π* that maximizes expected cumulative discounted reward:
+  J(π) = E_π[Σ_{t=0}^∞ γ^t · r_t] = E_π[G_0]
+
+where G_t = Σ_{k=0}^∞ γ^k · r_{t+k} is the return from time t
+
+**Bellman Equations:**
+
+Value Function V^π(s): Expected return starting from state s following policy π
+  V^π(s) = E_π[G_t | s_t = s]
+         = E_π[r_t + γ·V^π(s_{t+1}) | s_t = s]  (Bellman Expectation Equation)
+
+Optimal Value Function:
+  V*(s) = max_π V^π(s)
+        = max_a E[r + γ·V*(s') | s, a]  (Bellman Optimality Equation)
+
+Q-Function Q^π(s,a): Expected return starting from (s,a) following π
+  Q^π(s,a) = E_π[G_t | s_t = s, a_t = a]
+           = E[r + γ·V^π(s') | s, a]
+
+Optimal Q-Function (Bellman Optimality for Q):
+  Q*(s,a) = E[r + γ·max_a' Q*(s',a') | s, a]
+
+Policy from Q-Function:
+  π*(s) = argmax_a Q*(s,a)
+
+**Key Relationships:**
+- V^π(s) = Σ_a π(a|s) Q^π(s,a)
+- Q^π(s,a) = Σ_s' P(s'|s,a)[R(s,a,s') + γ·V^π(s')]
+- Advantage Function: A^π(s,a) = Q^π(s,a) - V^π(s)
 ```
 
 ### Simple RL Environment
@@ -113,7 +143,32 @@ while not done:
 **Q-Learning Update:**
 ```
 Q(s,a) ← Q(s,a) + α[r + γ max_a' Q(s',a') - Q(s,a)]
+
+where:
+- α: learning rate (step size)
+- r: immediate reward
+- γ: discount factor
+- max_a' Q(s',a'): maximum Q-value at next state (bootstrap estimate)
+- [r + γ max_a' Q(s',a') - Q(s,a)]: TD error
+
+Temporal Difference (TD) Learning: Update Q toward TD target
+  TD target = r + γ max_a' Q(s',a')
+  TD error = TD target - Q(s,a)
 ```
+
+**Convergence Guarantees:**
+Q-Learning converges to Q* with probability 1 if:
+1. All state-action pairs are visited infinitely often
+2. Learning rate satisfies Robbins-Monro conditions:
+   - Σ α_t = ∞ (learning never stops completely)
+   - Σ α_t² < ∞ (learning rate decreases sufficiently)
+   - Example: α_t = 1/t satisfies these conditions
+
+**Key Properties:**
+- Off-policy: Learns Q* regardless of behavior policy
+- Model-free: No need for transition model P(s'|s,a)
+- Bootstrapping: Uses estimate to update estimate
+- Sample-based: Updates from single sample, not full expectation
 
 ```python
 class QLearning:
@@ -901,6 +956,222 @@ class DDPG:
 
 ---
 
+### Soft Actor-Critic (SAC)
+
+**Key Innovation:** Maximum entropy RL for better exploration and stability.
+
+**Objective:** Maximize expected return + entropy
+```
+J(π) = Σ_t E[(r_t + α·H(π(·|s_t)))]
+
+where H(π(·|s)) = -Σ_a π(a|s) log π(a|s) is policy entropy
+α: temperature parameter (controls exploration vs exploitation)
+```
+
+```python
+class SACCritic(nn.Module):
+    """Twin Q-networks for SAC"""
+
+    def __init__(self, state_dim, action_dim):
+        super().__init__()
+
+        # Q1 network
+        self.q1 = nn.Sequential(
+            nn.Linear(state_dim + action_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+
+        # Q2 network (twin)
+        self.q2 = nn.Sequential(
+            nn.Linear(state_dim + action_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+
+    def forward(self, state, action):
+        sa = torch.cat([state, action], dim=1)
+        return self.q1(sa), self.q2(sa)
+
+class SACActor(nn.Module):
+    """Gaussian policy for continuous actions"""
+
+    def __init__(self, state_dim, action_dim, max_action):
+        super().__init__()
+        self.max_action = max_action
+
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU()
+        )
+
+        self.mean = nn.Linear(256, action_dim)
+        self.log_std = nn.Linear(256, action_dim)
+
+    def forward(self, state):
+        features = self.network(state)
+        mean = self.mean(features)
+        log_std = self.log_std(features)
+        log_std = torch.clamp(log_std, -20, 2)  # Stabilize training
+        return mean, log_std
+
+    def sample(self, state):
+        """Sample action from policy"""
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+
+        # Reparameterization trick
+        normal = torch.distributions.Normal(mean, std)
+        x = normal.rsample()  # Sample with reparameterization
+
+        # Tanh squashing for bounded actions
+        action = torch.tanh(x) * self.max_action
+
+        # Compute log probability (with correction for tanh squashing)
+        log_prob = normal.log_prob(x)
+        log_prob -= torch.log(self.max_action * (1 - action.pow(2)) + 1e-6)
+        log_prob = log_prob.sum(1, keepdim=True)
+
+        return action, log_prob
+
+class SAC:
+    """Soft Actor-Critic"""
+
+    def __init__(self, state_dim, action_dim, max_action, lr=3e-4,
+                 gamma=0.99, tau=0.005, alpha=0.2):
+        # Actor
+        self.actor = SACActor(state_dim, action_dim, max_action)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
+
+        # Twin Q-networks
+        self.critic = SACCritic(state_dim, action_dim)
+        self.critic_target = SACCritic(state_dim, action_dim)
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr)
+
+        # Hyperparameters
+        self.max_action = max_action
+        self.gamma = gamma
+        self.tau = tau
+        self.alpha = alpha  # Temperature parameter
+
+        # Replay buffer
+        self.memory = ReplayBuffer(capacity=1000000)
+
+    def select_action(self, state, evaluate=False):
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+
+        if evaluate:
+            # Deterministic action (mean) for evaluation
+            with torch.no_grad():
+                mean, _ = self.actor(state_tensor)
+                action = torch.tanh(mean) * self.max_action
+        else:
+            # Stochastic action for training
+            with torch.no_grad():
+                action, _ = self.actor.sample(state_tensor)
+
+        return action.cpu().numpy()[0]
+
+    def train_step(self, batch_size=256):
+        if len(self.memory) < batch_size:
+            return
+
+        # Sample batch
+        states, actions, rewards, next_states, dones = self.memory.sample(batch_size)
+
+        with torch.no_grad():
+            # Sample next actions from current policy
+            next_actions, next_log_probs = self.actor.sample(next_states)
+
+            # Compute target Q-values (minimum of twin Q-networks)
+            q1_next, q2_next = self.critic_target(next_states, next_actions)
+            q_next = torch.min(q1_next, q2_next)
+
+            # Add entropy term
+            q_target = rewards.unsqueeze(1) + (1 - dones.unsqueeze(1)) * self.gamma * \
+                      (q_next - self.alpha * next_log_probs)
+
+        # Critic loss
+        q1, q2 = self.critic(states, actions)
+        critic_loss = nn.MSELoss()(q1, q_target) + nn.MSELoss()(q2, q_target)
+
+        # Update critics
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Actor loss
+        new_actions, log_probs = self.actor.sample(states)
+        q1_new, q2_new = self.critic(states, new_actions)
+        q_new = torch.min(q1_new, q2_new)
+
+        # Maximize Q - α·log_prob (equivalent to minimizing negative)
+        actor_loss = (self.alpha * log_probs - q_new).mean()
+
+        # Update actor
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        # Soft update target networks
+        for param, target_param in zip(self.critic.parameters(),
+                                       self.critic_target.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+        return {
+            'critic_loss': critic_loss.item(),
+            'actor_loss': actor_loss.item()
+        }
+
+# Usage
+env = gym.make('HalfCheetah-v2')  # Continuous control environment
+agent = SAC(
+    state_dim=env.observation_space.shape[0],
+    action_dim=env.action_space.shape[0],
+    max_action=float(env.action_space.high[0]),
+    lr=3e-4,
+    gamma=0.99,
+    alpha=0.2
+)
+
+# Training loop
+for episode in range(1000):
+    state = env.reset()
+    episode_reward = 0
+
+    for step in range(1000):
+        action = agent.select_action(state)
+        next_state, reward, done, _ = env.step(action)
+
+        agent.memory.push(state, action, reward, next_state, float(done))
+        agent.train_step(batch_size=256)
+
+        state = next_state
+        episode_reward += reward
+
+        if done:
+            break
+
+    if episode % 10 == 0:
+        print(f"Episode {episode}, Reward: {episode_reward:.2f}")
+```
+
+**SAC Advantages:**
+- **Stable training** via twin Q-networks (reduces overestimation)
+- **Better exploration** via entropy maximization
+- **Off-policy** learning from replay buffer
+- **Sample efficient** compared to on-policy methods
+- **Automatic temperature tuning** possible (α becomes learnable parameter)
+
+---
+
 ## Advanced Topics
 
 ### Multi-Agent RL
@@ -1079,3 +1350,99 @@ rewards = agent.train(env, episodes=500)
 - Experiment with multi-agent RL
 - Apply RL to real-world problems (robotics, trading, games)
 - Read original papers (DQN, PPO, SAC)
+
+---
+
+## 📚 References
+
+**Foundational Books:**
+
+1. **Sutton, R. S., & Barto, A. G.** (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press.
+   - The definitive textbook on RL. Available free at: http://incompleteideas.net/book/
+
+2. **Bertsekas, D. P.** (2019). *Reinforcement Learning and Optimal Control*. Athena Scientific.
+   - Rigorous mathematical treatment of RL
+
+3. **Szepesvári, C.** (2010). *Algorithms for Reinforcement Learning*. Morgan & Claypool.
+   - Concise introduction to RL algorithms
+
+**Seminal Papers:**
+
+**Value-Based Methods:**
+
+1. **Watkins, C. J., & Dayan, P.** (1992). "Q-learning." *Machine Learning*, 8(3-4), 279-292.
+   - Original Q-learning paper with convergence proof
+
+2. **Mnih, V., Kavukcuoglu, K., Silver, D., et al.** (2015). "Human-level control through deep reinforcement learning." *Nature*, 518(7540), 529-533.
+   - DQN playing Atari games
+
+3. **Van Hasselt, H., Guez, A., & Silver, D.** (2016). "Deep reinforcement learning with double Q-learning." *AAAI 2016*.
+   - Double DQN addressing overestimation bias
+
+4. **Wang, Z., Schaul, T., Hessel, M., et al.** (2016). "Dueling network architectures for deep reinforcement learning." *ICML 2016*.
+   - Dueling DQN architecture
+
+**Policy Gradient Methods:**
+
+5. **Williams, R. J.** (1992). "Simple statistical gradient-following algorithms for connectionist reinforcement learning." *Machine Learning*, 8(3-4), 229-256.
+   - REINFORCE algorithm
+
+6. **Sutton, R. S., McAllester, D., Singh, S., & Mansour, Y.** (2000). "Policy gradient methods for reinforcement learning with function approximation." *NIPS 2000*.
+   - Policy gradient theorem
+
+7. **Schulman, J., Levine, S., Abbeel, P., et al.** (2015). "Trust region policy optimization." *ICML 2015*.
+   - TRPO algorithm
+
+8. **Schulman, J., Wolski, F., Dhariwal, P., et al.** (2017). "Proximal policy optimization algorithms." *arXiv:1707.06347*.
+   - PPO algorithm (most widely used today)
+
+**Actor-Critic Methods:**
+
+9. **Mnih, V., Badia, A. P., Mirza, M., et al.** (2016). "Asynchronous methods for deep reinforcement learning." *ICML 2016*.
+   - A3C algorithm
+
+10. **Lillicrap, T. P., Hunt, J. J., Pritzel, A., et al.** (2016). "Continuous control with deep reinforcement learning." *ICLR 2016*.
+    - DDPG for continuous control
+
+11. **Haarnoja, T., Zhou, A., Abbeel, P., & Levine, S.** (2018). "Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor." *ICML 2018*.
+    - SAC algorithm
+
+12. **Fujimoto, S., van Hoof, H., & Meger, D.** (2018). "Addressing function approximation error in actor-critic methods." *ICML 2018*.
+    - TD3 algorithm
+
+**Advanced Topics:**
+
+13. **Schaul, T., Quan, J., Antonoglou, I., & Silver, D.** (2016). "Prioritized experience replay." *ICLR 2016*.
+    - Improved experience replay
+
+14. **Hessel, M., Modayil, J., Van Hasselt, H., et al.** (2018). "Rainbow: Combining improvements in deep reinforcement learning." *AAAI 2018*.
+    - Combining multiple DQN improvements
+
+15. **Lowe, R., Wu, Y., Tamar, A., et al.** (2017). "Multi-agent actor-critic for mixed cooperative-competitive environments." *NIPS 2017*.
+    - MADDPG for multi-agent settings
+
+**Online Resources:**
+
+- **OpenAI Spinning Up in Deep RL**: https://spinningup.openai.com/
+  - Excellent educational resource with code implementations
+
+- **DeepMind x UCL RL Lecture Series**: https://www.deepmind.com/learning-resources
+  - Video lectures from leading researchers
+
+- **CS285 at UC Berkeley**: Deep Reinforcement Learning (Sergey Levine)
+  - Course materials and lectures
+
+- **Gymnasium (formerly OpenAI Gym)**: https://gymnasium.farama.org/
+  - Standard RL environments
+
+- **Stable Baselines3**: https://stable-baselines3.readthedocs.io/
+  - High-quality implementations of RL algorithms
+
+**Key Conferences:**
+- ICML, NeurIPS, ICLR (Machine Learning)
+- AAAI, IJCAI (Artificial Intelligence)
+- CoRL (Conference on Robot Learning)
+
+---
+
+*For more details on these algorithms, consult Sutton & Barto (2018) and the original papers listed above.*

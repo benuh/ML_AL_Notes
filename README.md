@@ -22,7 +22,7 @@
 
 ---
 
-## 🆕 Recent Enhancements (October 2024)
+## 🆕 Recent Enhancements (October 2025)
 
 ### **New: Comprehensive Visualization Guide**
 **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete ML/AI visualization toolkit with 200+ lines of production-ready code covering:
@@ -568,9 +568,9 @@ If this helped you, please star the repository! It helps others find these resou
 
 ## 📞 Contact & Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ML_AL_Notes/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ML_AL_Notes/discussions)
-- **Email:** your.email@example.com
+- **Issues:** [GitHub Issues](https://github.com/benjaminhu/ML_AL_Notes/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/benjaminhu/ML_AL_Notes/discussions)
+- For questions and discussions, please use GitHub Issues or Discussions
 
 ---
 
@@ -585,9 +585,9 @@ If this helped you, please star the repository! It helps others find these resou
 - [ ] AutoML and Neural Architecture Search
 
 ### Roadmap
-- Q2 2024: Advanced Deep Learning architectures
-- Q3 2024: Production ML case studies
-- Q4 2024: Research paper implementations
+- Q4 2025: Advanced Deep Learning architectures (Transformers, Diffusion Models)
+- Q1 2026: Production ML case studies and MLOps best practices
+- Q2 2026: Research paper implementations (SOTA models)
 
 ---
 
@@ -599,6 +599,6 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: October 2025*
 *Maintained by: Benjamin Hu*
-*Version: 2.0*
+*Version: 2.1*
