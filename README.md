@@ -24,7 +24,34 @@
 
 ## 🆕 Recent Enhancements (October 2025)
 
-### **New: Comprehensive Visualization Guide**
+### **Latest: Research-Grade Mathematical Enhancements** ⭐ **NEW**
+
+**Enhanced Theoretical Foundations Across Repository:**
+- ✅ **Complete convergence proofs** for gradient descent variants with O-notation analysis
+- ✅ **Neural network initialization theory** (Xavier/Glorot, He) with variance preservation proofs
+- ✅ **Attention mechanism mathematics** with complete multi-head attention derivations
+- ✅ **Variational Inference theory** with ELBO derivation and reparameterization trick
+- ✅ **Collaborative filtering mathematics** with ALS, SGD, and convergence analysis
+- ✅ **126+ academic references** added across all major guides
+
+**NEW: Algorithm Complexity Reference**
+**[ALGORITHM_COMPLEXITY_REFERENCE.md](./ALGORITHM_COMPLEXITY_REFERENCE.md)** - Complete Big-O analysis for 100+ algorithms:
+- Training and inference complexity for all major ML algorithms
+- Detailed FLOPs calculations for deep learning models
+- Memory requirements and space complexity
+- Practical complexity comparisons with empirical estimates
+- Decision trees for algorithm selection based on constraints
+
+**NEW: Loss Functions Comprehensive Guide**
+**[LOSS_FUNCTIONS_GUIDE.md](./LOSS_FUNCTIONS_GUIDE.md)** - Mathematical foundations with convergence properties:
+- Complete derivations from first principles
+- Convergence rate analysis (O(1/k), O(1/√k), exponential)
+- Statistical interpretations (MLE connections)
+- Gradient formulas with detailed computations
+- Loss function selection guide with practical recommendations
+- Custom loss implementation templates
+
+### **Comprehensive Visualization Guide**
 **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete ML/AI visualization toolkit with 200+ lines of production-ready code covering:
 
 - **Neural Network Architectures** - Visualize CNNs, Transformers, and custom architectures
@@ -477,6 +504,31 @@ lime>=0.2.0            # Local explanations
 ## 📚 Recommended Study Resources
 
 ### Essential Guides (In This Repository)
+
+#### **New Comprehensive Reference Guides (2025)** 🆕
+- **[ALGORITHM_COMPLEXITY_REFERENCE.md](./ALGORITHM_COMPLEXITY_REFERENCE.md)** ⭐ **NEW**
+  - Complete Big-O complexity analysis for 100+ ML algorithms
+  - Classical ML (Linear Regression, SVM, Decision Trees, KNN)
+  - Deep Learning (CNNs, RNNs, Transformers with detailed FLOPs)
+  - Ensemble Methods (Random Forest, XGBoost, LightGBM)
+  - NLP Models (Word2Vec, BERT, GPT complexity breakdown)
+  - Computer Vision (ResNet, EfficientNet, YOLO, Mask R-CNN)
+  - Recommendation Systems (CF, Matrix Factorization, NCF)
+  - Reinforcement Learning (DQN, PPO, SAC)
+  - Training time estimates and practical complexity comparisons
+
+- **[LOSS_FUNCTIONS_GUIDE.md](./LOSS_FUNCTIONS_GUIDE.md)** ⭐ **NEW**
+  - Mathematical foundations with complete derivations
+  - Regression losses (MSE, MAE, Huber, Quantile) with convergence proofs
+  - Classification losses (Cross-Entropy, Focal, Hinge) with gradients
+  - Probabilistic losses (KL Divergence, Wasserstein Distance)
+  - Ranking and metric learning (Triplet, Contrastive)
+  - Generative model losses (ELBO for VAE, WGAN-GP)
+  - Convergence properties and rates for each loss
+  - Loss function selection guide with decision trees
+  - Custom loss implementation templates (PyTorch & TensorFlow)
+
+#### **Visualization and Tooling**
 - **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete visualization toolkit for ML/AI
 - **[LEARNING_GUIDE.md](./LEARNING_GUIDE.md)** - How to use this curriculum effectively
 - **[CODE_TEMPLATES.md](./CODE_TEMPLATES.md)** - Production-ready code snippets
