@@ -96,6 +96,44 @@ transformer_params = {
 
 ## Search Strategies
 
+**Theoretical Framework:**
+
+**Hyperparameter Optimization as Black-Box Function:**
+```
+Problem: Find θ* = argmin_θ L(A_θ, D_val)
+
+where:
+- θ: Hyperparameter configuration
+- A_θ: Model/algorithm with hyperparameters θ
+- D_val: Validation dataset
+- L: Loss/objective function
+
+Challenges:
+1. Non-convex, non-differentiable objective
+2. Expensive function evaluations (training takes time)
+3. High-dimensional search space
+4. Noisy observations (stochastic training)
+5. Mixed variable types (continuous, discrete, categorical)
+```
+
+**Search Space Complexity:**
+```
+Grid Search Complexity:
+If each hyperparameter has k values and there are d hyperparameters:
+Total configurations: k^d (exponential!)
+
+Example:
+- 5 hyperparameters
+- 10 values each
+- Total: 10^5 = 100,000 configurations
+
+At 1 hour per training → 11.4 years of compute!
+
+Solution: Smart search strategies (Random, Bayesian, etc.)
+```
+
+---
+
 ### 1. Manual Search
 
 **When to use:** Starting point, small search space, domain expertise.
@@ -452,14 +490,179 @@ optuna.visualization.plot_param_importances(study).show()
 optuna.visualization.plot_parallel_coordinate(study).show()
 ```
 
-**How Bayesian Optimization Works:**
-1. **Surrogate model** (usually Gaussian Process) models objective function
-2. **Acquisition function** (e.g., Expected Improvement) suggests next point to try
-3. **Update** surrogate with new observation
-4. **Repeat** until budget exhausted
+**Mathematical Foundation of Bayesian Optimization:**
 
-**Pros:** Sample efficient, handles noisy objectives
-**Cons:** Overhead per iteration, can get stuck in local optima
+**Problem Formulation:**
+```
+Find: θ* = argmin_θ∈Θ f(θ)
+
+where:
+- f: ℝ^d → ℝ is expensive, black-box objective function
+- Θ: Feasible hyperparameter space (bounded)
+- d: Dimensionality of hyperparameter space
+
+Constraints:
+- f has no closed form
+- ∇f is unavailable (non-differentiable)
+- Each evaluation f(θ) is expensive (hours of training)
+- Evaluations may be noisy: y = f(θ) + ε, ε ~ N(0, σ²_noise)
+```
+
+**Bayesian Optimization Algorithm:**
+
+**1. Surrogate Model - Gaussian Process (GP):**
+```
+Model f as a random function with prior:
+f ~ GP(μ(θ), k(θ, θ'))
+
+where:
+- μ(θ): Prior mean function (often μ(θ) = 0)
+- k(θ, θ'): Covariance/kernel function
+
+Common kernels:
+a) Squared Exponential (RBF):
+   k(θ, θ') = σ²·exp(-||θ - θ'||²/(2ℓ²))
+
+b) Matérn 5/2:
+   k(θ, θ') = σ²(1 + √5r/ℓ + 5r²/3ℓ²)·exp(-√5r/ℓ)
+   where r = ||θ - θ'||
+
+After observing D_n = {(θ_i, y_i)}^n_{i=1}, posterior is also GP:
+
+f | D_n ~ GP(μ_n(θ), k_n(θ, θ'))
+
+Posterior mean:
+μ_n(θ) = k^T(K + σ²_noise I)^(-1)y
+
+Posterior variance:
+σ²_n(θ) = k(θ,θ) - k^T(K + σ²_noise I)^(-1)k
+
+where:
+- K_ij = k(θ_i, θ_j): n×n Gram matrix
+- k = [k(θ, θ_1), ..., k(θ, θ_n)]^T: n×1 vector
+- y = [y_1, ..., y_n]^T: observed values
+```
+
+**2. Acquisition Function α(θ | D_n):**
+
+**a) Expected Improvement (EI):**
+```
+α_EI(θ) = E[max(f_min - f(θ), 0) | D_n]
+
+where f_min = min{y_1, ..., y_n}
+
+Closed form (assuming GP posterior):
+α_EI(θ) = (f_min - μ_n(θ))·Φ(Z) + σ_n(θ)·φ(Z)
+
+where:
+- Z = (f_min - μ_n(θ))/σ_n(θ) if σ_n(θ) > 0, else 0
+- Φ: Standard normal CDF
+- φ: Standard normal PDF
+
+Intuition:
+- High μ_n(θ): Exploit (likely good performance)
+- High σ_n(θ): Explore (high uncertainty)
+```
+
+**b) Upper Confidence Bound (UCB):**
+```
+α_UCB(θ) = μ_n(θ) - κ·σ_n(θ)  (for minimization)
+         = μ_n(θ) + κ·σ_n(θ)  (for maximization)
+
+where κ > 0 controls exploration-exploitation tradeoff
+
+Typical: κ = √(2·log(n·π²/6δ)) for δ-PAC guarantee
+
+Bounds (Srinivas et al., 2010):
+With probability ≥ 1-δ, cumulative regret is:
+R_n ≤ O(√(n·γ_n·log(n/δ)))
+where γ_n is maximum information gain
+```
+
+**c) Probability of Improvement (PI):**
+```
+α_PI(θ) = P(f(θ) < f_min - ξ | D_n)
+        = Φ((f_min - ξ - μ_n(θ))/σ_n(θ))
+
+where ξ ≥ 0 is improvement threshold
+```
+
+**3. Optimization Loop:**
+```
+Algorithm: Bayesian Optimization
+Input: f, Θ, T (budget), α (acquisition function)
+Output: θ*
+
+1. Initialize D_0 = {(θ_i, f(θ_i))}^n_0_{i=1}  (random or LHS)
+2. Fit initial GP to D_0
+3. For t = 1 to T:
+   a) Find next point: θ_t = argmax_θ∈Θ α(θ | D_{t-1})
+   b) Evaluate: y_t = f(θ_t)
+   c) Augment data: D_t = D_{t-1} ∪ {(θ_t, y_t)}
+   d) Update GP posterior with D_t
+4. Return: θ* = argmin_{θ∈D_T} f(θ)
+
+Computational Complexity per iteration:
+- GP posterior: O(n³) for matrix inversion (n = number of observations)
+- Acquisition optimization: Depends on method (gradient-free, multi-start)
+- Total per iteration: O(n³ + m·d) where m = acquisition optimization evals
+```
+
+**Convergence Properties:**
+
+**Theorem (GP-UCB, Srinivas et al., 2010):**
+```
+Under regularity conditions on k, with GP-UCB acquisition:
+
+Cumulative Regret: R_T = Σ^T_{t=1} (f(θ_t) - f(θ*))
+
+Bound: R_T ≤ O(√(T·γ_T·log T))
+
+where γ_T is maximum information gain:
+- For SE kernel in d dimensions: γ_T = O((log T)^(d+1))
+- For Matérn kernel (ν > 1): γ_T = O(T^(d(d+1)/(2ν+d(d+1))) (log T)^(2))
+
+This implies: R_T = O(poly(log T)) → sublinear regret!
+```
+
+**Practical Considerations:**
+
+**Kernel Selection:**
+- SE/RBF: Smooth functions, infinite differentiability
+- Matérn 3/2, 5/2: Less smooth, more robust
+- Choice affects both fit and convergence rate
+
+**Hyperparameter Learning:**
+- Kernel hyperparameters θ_k = {σ², ℓ, ...} learned via MLE:
+  θ_k* = argmax_θ_k p(y | X, θ_k) = argmax_θ_k N(y | 0, K_θ_k + σ²I)
+
+- Often optimized alongside BO (empirical Bayes)
+
+**Scaling to High Dimensions:**
+- Standard GP: O(n³) → infeasible for n > 10,000
+- Solutions:
+  * Sparse GPs: O(nm²) with m inducing points
+  * Random features: O(nm) approximation
+  * Deep kernel learning: Use DNN feature extractor
+
+**Pros:**
+- Sample efficient (few evaluations needed)
+- Principled uncertainty quantification
+- Handles noisy objectives
+- Works with mixed variable types
+- No-regret guarantees
+
+**Cons:**
+- O(n³) computational cost per iteration
+- Struggles in very high dimensions (d > 20)
+- Kernel/acquisition choice matters
+- Can get stuck if GP misspecifies f
+
+**When to Use:**
+- Expensive function evaluations (>1 min per eval)
+- Budget < 1000 evaluations
+- Dimensions d < 20
+- Need sample efficiency over wall-clock time
 
 ---
 
@@ -1207,3 +1410,61 @@ final_model = tuner.create_model(best_config)
 - Visualize hyperparameter importance
 - Build a hyperparameter database for transfer learning
 - Automate tuning in your ML pipeline
+
+
+---
+
+## 📚 References
+
+**Hyperparameter Optimization:**
+
+1. **Bergstra, J., & Bengio, Y.** (2012). "Random search for hyper-parameter optimization." *Journal of Machine Learning Research*, 13(1), 281-305.
+   - Random search beats grid search
+
+2. **Bergstra, J., Bardenet, R., Bengio, Y., & Kégl, B.** (2011). "Algorithms for hyper-parameter optimization." *NIPS 2011*.
+   - Tree-structured Parzen estimator (TPE)
+
+**Bayesian Optimization:**
+
+3. **Snoek, J., Larochelle, H., & Adams, R. P.** (2012). "Practical Bayesian optimization of machine learning algorithms." *NIPS 2012*.
+   - BO for ML hyperparameters
+
+4. **Srinivas, N., Krause, A., Kakade, S. M., & Seeger, M.** (2010). "Gaussian process optimization in the bandit setting: No regret and experimental design." *ICML 2010*.
+   - GP-UCB algorithm and regret bounds
+
+5. **Shahriari, B., Swersky, K., Wang, Z., et al.** (2016). "Taking the human out of the loop: A review of Bayesian optimization." *Proceedings of the IEEE*, 104(1), 148-175.
+   - Comprehensive BO survey
+
+6. **Frazier, P. I.** (2018). "A tutorial on Bayesian optimization." *arXiv:1807.02811*.
+   - Excellent tutorial paper
+
+**Gaussian Processes:**
+
+7. **Rasmussen, C. E., & Williams, C. K. I.** (2006). *Gaussian Processes for Machine Learning*. MIT Press.
+   - Definitive GP textbook. Free: http://www.gaussianprocess.org/gpml/
+
+**Advanced Methods:**
+
+8. **Li, L., Jamieson, K., DeSalvo, G., et al.** (2017). "Hyperband: A novel bandit-based approach to hyperparameter optimization." *JMLR*, 18(1), 6765-6816.
+   - Hyperband algorithm
+
+9. **Akiba, T., Sano, S., Yanase, T., et al.** (2019). "Optuna: A next-generation hyperparameter optimization framework." *KDD 2019*.
+   - Optuna framework
+
+10. **Liaw, R., Liang, E., Nishihara, R., et al.** (2018). "Tune: A research platform for distributed model selection and training." *arXiv:1807.05118*.
+    - Ray Tune framework
+
+**AutoML:**
+
+11. **Feurer, M., & Hutter, F.** (2019). "Hyperparameter optimization." In *Automated Machine Learning* (pp. 3-33). Springer.
+    - AutoML chapter on HPO
+
+**Online Resources:**
+- Optuna: https://optuna.org/
+- Ray Tune: https://docs.ray.io/en/latest/tune/
+- Hyperopt: http://hyperopt.github.io/hyperopt/
+- scikit-optimize: https://scikit-optimize.github.io/
+
+---
+
+*Hyperparameter tuning is crucial for model performance. Use Bayesian optimization for expensive evaluations!*

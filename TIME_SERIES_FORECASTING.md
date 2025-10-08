@@ -112,12 +112,133 @@ stationary_series = ts_analyzer.make_stationary()
 
 ### ARIMA (AutoRegressive Integrated Moving Average)
 
-**Formula:**
+**Mathematical Foundation:**
+
+**ARIMA(p, d, q) Model:**
 ```
-ARIMA(p, d, q)
-- p: AR order (autoregressive)
-- d: Differencing order
-- q: MA order (moving average)
+Definition: ARIMA combines three components
+
+1. AR(p) - AutoRegressive of order p:
+   y_t = c + φ_1·y_{t-1} + φ_2·y_{t-2} + ... + φ_p·y_{t-p} + ε_t
+
+2. I(d) - Integrated of order d:
+   Apply differencing d times to achieve stationarity
+   ∇y_t = y_t - y_{t-1}  (first difference)
+   ∇²y_t = ∇y_t - ∇y_{t-1}  (second difference)
+
+3. MA(q) - Moving Average of order q:
+   y_t = μ + ε_t + θ_1·ε_{t-1} + θ_2·ε_{t-2} + ... + θ_q·ε_{t-q}
+
+Combined ARIMA(p,d,q):
+∇^d y_t = c + Σ^p_{i=1} φ_i·∇^d y_{t-i} + Σ^q_{j=1} θ_j·ε_{t-j} + ε_t
+
+where:
+- y_t: Observed value at time t
+- ∇^d: d-th order difference operator
+- φ_i: AR coefficients (autoregressive parameters)
+- θ_j: MA coefficients (moving average parameters)
+- ε_t ~ N(0, σ²): White noise error term
+- c: Constant term (drift)
+```
+
+**Stationarity Requirements:**
+
+**Weak Stationarity (Required for ARIMA):**
+```
+A time series {y_t} is weakly stationary if:
+
+1. Constant Mean: E[y_t] = μ for all t
+2. Constant Variance: Var(y_t) = σ² for all t
+3. Autocovariance depends only on lag:
+   Cov(y_t, y_{t+k}) = γ_k for all t
+
+If non-stationary, apply differencing until stationary.
+```
+
+**Augmented Dickey-Fuller (ADF) Test:**
+```
+Test for unit root (non-stationarity):
+
+Null Hypothesis H_0: Unit root exists (non-stationary)
+Alternative H_1: No unit root (stationary)
+
+Test Statistic:
+Δy_t = α + βt + γy_{t-1} + Σ^p_{i=1} δ_i·Δy_{t-i} + ε_t
+
+If γ = 0 → unit root → non-stationary
+Test: t-statistic for γ
+
+Decision Rule:
+- p-value < 0.05: Reject H_0, series is stationary
+- p-value ≥ 0.05: Fail to reject H_0, series is non-stationary
+
+Critical Values (at 95% confidence):
+- -3.43 (1% significance)
+- -2.86 (5% significance)
+- -2.57 (10% significance)
+```
+
+**Model Selection Criteria:**
+
+**Akaike Information Criterion (AIC):**
+```
+AIC = -2·log(L) + 2k
+
+where:
+- L: Maximum likelihood of the model
+- k: Number of parameters (p + q + 1)
+
+Lower AIC → Better model
+Penalizes complexity to prevent overfitting
+```
+
+**Bayesian Information Criterion (BIC):**
+```
+BIC = -2·log(L) + k·log(n)
+
+where:
+- n: Number of observations
+- k: Number of parameters
+
+BIC penalizes complexity more heavily than AIC
+Preferred for larger datasets
+```
+
+**Box-Jenkins Methodology:**
+```
+1. Identification: Use ACF/PACF to determine p, q
+   - ACF cuts off at lag q → MA(q)
+   - PACF cuts off at lag p → AR(p)
+   - Both decay → ARMA(p,q)
+
+2. Estimation: Fit model parameters using MLE
+   Maximize: L(φ, θ, σ²) = Π^n_{t=1} f(y_t | y_{t-1}, ..., y_1)
+
+3. Diagnostic Checking:
+   - Residuals should be white noise
+   - Ljung-Box test: H_0: residuals are uncorrelated
+   - Q = n(n+2) Σ^h_{k=1} ρ²_k/(n-k) ~ χ²_h
+
+4. Forecasting:
+   ŷ_{t+h|t} = E[y_{t+h} | y_t, y_{t-1}, ...]
+
+   Forecast intervals (95%):
+   ŷ_{t+h|t} ± 1.96·σ_h
+
+   where σ²_h = Var(y_{t+h} - ŷ_{t+h|t})
+```
+
+**Theoretical Properties:**
+
+**Wold Decomposition Theorem:**
+```
+Any covariance-stationary process can be written as:
+
+y_t = μ + Σ^∞_{j=0} ψ_j·ε_{t-j}
+
+where Σ^∞_{j=0} ψ²_j < ∞
+
+This justifies using ARMA models for stationary time series.
 ```
 
 ```python
@@ -939,3 +1060,55 @@ class StreamingForecaster:
 - Experiment with Transformer architectures
 - Deploy real-time forecasting API
 - Build ensemble of classical + DL methods
+
+
+---
+
+## 📚 References
+
+**Time Series Foundations:**
+
+1. **Box, G. E. P., Jenkins, G. M., Reinsel, G. C., & Ljung, G. M.** (2015). *Time Series Analysis: Forecasting and Control* (5th ed.). Wiley.
+   - Classic textbook on ARIMA methodology
+
+2. **Hamilton, J. D.** (1994). *Time Series Analysis*. Princeton University Press.
+   - Rigorous mathematical treatment
+
+3. **Hyndman, R. J., & Athanasopoulos, G.** (2021). *Forecasting: Principles and Practice* (3rd ed.). OTexts.
+   - Free online: https://otexts.com/fpp3/
+
+**ARIMA & Statistical Methods:**
+
+4. **Dickey, D. A., & Fuller, W. A.** (1979). "Distribution of the estimators for autoregressive time series with a unit root." *Journal of the American Statistical Association*, 74(366a), 427-431.
+   - ADF test for stationarity
+
+5. **Ljung, G. M., & Box, G. E. P.** (1978). "On a measure of lack of fit in time series models." *Biometrika*, 65(2), 297-303.
+   - Ljung-Box test for residuals
+
+6. **Akaike, H.** (1974). "A new look at the statistical model identification." *IEEE Transactions on Automatic Control*, 19(6), 716-723.
+   - AIC for model selection
+
+**Deep Learning for Time Series:**
+
+7. **Salinas, D., Flunkert, V., Gasthaus, J., & Januschowski, T.** (2020). "DeepAR: Probabilistic forecasting with autoregressive recurrent networks." *International Journal of Forecasting*, 36(3), 1181-1191.
+   - DeepAR for probabilistic forecasting
+
+8. **Lim, B., Arık, S. Ö., Loeff, N., & Pfister, T.** (2021). "Temporal Fusion Transformers for interpretable multi-horizon time series forecasting." *International Journal of Forecasting*, 37(4), 1748-1764.
+   - TFT architecture
+
+9. **Oreshkin, B. N., Carpov, D., Chapados, N., & Bengio, Y.** (2020). "N-BEATS: Neural basis expansion analysis for interpretable time series forecasting." *ICLR 2020*.
+   - N-BEATS architecture
+
+**Prophet & Practical Methods:**
+
+10. **Taylor, S. J., & Letham, B.** (2018). "Forecasting at scale." *The American Statistician*, 72(1), 37-45.
+    - Facebook Prophet algorithm
+
+**Online Resources:**
+- statsmodels documentation: https://www.statsmodels.org/
+- Facebook Prophet: https://facebook.github.io/prophet/
+- GluonTS (Amazon): https://ts.gluon.ai/
+
+---
+
+*Time series forecasting combines classical statistics with modern deep learning for robust predictions.*
