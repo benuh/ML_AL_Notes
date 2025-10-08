@@ -101,20 +101,103 @@ Solution: Optimized models (quantized, pruned, distilled)
 
 **Concept:** Reduce numerical precision of weights and activations
 
+**Mathematical Foundation:**
+
+**Uniform Quantization (Symmetric):**
+```
+q = round(x / s)
+x̂ = s · q
+
+where:
+- x ∈ ℝ: Original floating-point value
+- q ∈ ℤ: Quantized integer value in range [-2^(b-1), 2^(b-1) - 1]
+- s ∈ ℝ: Scale factor
+- b: Number of bits (e.g., b=8 for INT8)
+- x̂: Dequantized value (approximation of x)
+
+Scale factor: s = max(|x|) / (2^(b-1) - 1)
+
+Quantization error: ε = |x - x̂| = |x - s · round(x/s)|
+```
+
+**Affine Quantization (Asymmetric):**
+```
+q = round(x / s) + z
+x̂ = s · (q - z)
+
+where:
+- z ∈ ℤ: Zero-point offset
+- s = (x_max - x_min) / (2^b - 1)
+- z = round(-x_min / s)
+
+More accurate for asymmetric distributions (e.g., ReLU activations ∈ [0, ∞))
+```
+
+**Numerical Precision Comparison:**
+
 ```python
+import numpy as np
+
 # Full Precision (FP32)
-weight = 0.123456789  # 32 bits, very precise
+# IEEE 754 single precision: 1 sign + 8 exponent + 23 mantissa bits
+weight_fp32 = np.float32(0.123456789)  # 32 bits
+print(f"FP32: {weight_fp32:.10f}")  # 0.1234567910
+# Range: ±1.18e-38 to ±3.40e38
+# Precision: ~7 decimal digits
 
 # Half Precision (FP16)
-weight = 0.1235  # 16 bits, 2x smaller
+# IEEE 754 half precision: 1 sign + 5 exponent + 10 mantissa bits
+weight_fp16 = np.float16(0.123456789)  # 16 bits, 2x smaller
+print(f"FP16: {weight_fp16:.10f}")  # 0.1234588623
+# Range: ±6.10e-5 to ±6.55e4
+# Precision: ~3 decimal digits
 
 # 8-bit Integer (INT8)
-weight = 31  # 8 bits, 4x smaller
-# Represents: 31/127 ≈ 0.244
+# Range: [-128, 127] for signed, [0, 255] for unsigned
+scale = 0.01  # Scale factor
+weight_fp32_val = 0.123456789
+weight_int8 = np.round(weight_fp32_val / scale).astype(np.int8)  # 12
+weight_dequant = weight_int8 * scale  # 0.12
+print(f"INT8: {weight_int8}, Dequantized: {weight_dequant:.10f}")
+# Quantization error: |0.123456789 - 0.12| = 0.003456789
 
-# Binary (1-bit)
-weight = 1  # 1 bit, 32x smaller
-# Represents: +1 or -1
+# Binary/Binarized (1-bit)
+# Sign function: {-1, +1}
+weight_binary = np.sign(weight_fp32_val)  # +1
+print(f"Binary: {weight_binary}")
+# Maximum error: up to |x| for values between -1 and 1
+
+# Size comparison (1M parameters)
+n_params = 1_000_000
+size_fp32 = n_params * 4 / (1024**2)  # 3.81 MB
+size_fp16 = n_params * 2 / (1024**2)  # 1.91 MB
+size_int8 = n_params * 1 / (1024**2)  # 0.95 MB
+size_binary = n_params * (1/8) / (1024**2)  # 0.12 MB
+
+print(f"\nModel size (1M params):")
+print(f"FP32: {size_fp32:.2f} MB (baseline)")
+print(f"FP16: {size_fp16:.2f} MB ({size_fp32/size_fp16:.1f}x reduction)")
+print(f"INT8: {size_int8:.2f} MB ({size_fp32/size_int8:.1f}x reduction)")
+print(f"Binary: {size_binary:.2f} MB ({size_fp32/size_binary:.1f}x reduction)")
+```
+
+**Quantization Error Analysis:**
+
+Expected quantization error for uniform quantization:
+```
+E[ε²] = s² / 12  (for uniformly distributed quantization noise)
+
+Signal-to-Quantization-Noise Ratio (SQNR):
+SQNR = 10 · log₁₀(σ²_x / σ²_ε) ≈ 6.02b + 1.76 dB
+
+where:
+- σ²_x: Variance of input signal
+- σ²_ε: Variance of quantization error
+- b: Number of bits
+
+Example:
+- 8-bit quantization: SQNR ≈ 49.92 dB
+- 4-bit quantization: SQNR ≈ 25.84 dB
 ```
 
 ### Types of Quantization
@@ -1496,3 +1579,67 @@ print(f"Compression: {baseline_size/final_size:.1f}x")
 ---
 
 **Remember: Optimization is about tradeoffs. Always measure, experiment, and validate on your specific use case!**
+---
+
+## 📚 References
+
+**Quantization:**
+
+1. **Jacob, B., Kligys, S., Chen, B., et al.** (2018). "Quantization and training of neural networks for efficient integer-arithmetic-only inference." *CVPR 2018*.
+   - INT8 quantization for inference
+
+2. **Krishnamoorthi, R.** (2018). "Quantizing deep convolutional networks for efficient inference: A whitepaper." *arXiv:1806.08342*.
+   - Comprehensive quantization survey
+
+3. **Hubara, I., Courbariaux, M., Soudry, D., et al.** (2016). "Binarized neural networks." *NIPS 2016*.
+   - 1-bit quantization
+
+**Pruning:**
+
+4. **Han, S., Pool, J., Tran, J., & Dally, W. J.** (2015). "Learning both weights and connections for efficient neural networks." *NIPS 2015*.
+   - Magnitude-based pruning
+
+5. **Frankle, J., & Carbin, M.** (2019). "The lottery ticket hypothesis: Finding sparse, trainable neural networks." *ICLR 2019*.
+   - Lottery ticket hypothesis
+
+6. **He, Y., Zhang, X., & Sun, J.** (2017). "Channel pruning for accelerating very deep neural networks." *ICCV 2017*.
+   - Structured pruning
+
+**Knowledge Distillation:**
+
+7. **Hinton, G., Vinyals, O., & Dean, J.** (2015). "Distilling the knowledge in a neural network." *NIPS 2015 Workshop*.
+   - Original knowledge distillation paper
+
+8. **Romero, A., Ballas, N., Kahou, S. E., et al.** (2015). "FitNets: Hints for thin deep nets." *ICLR 2015*.
+   - Feature-based distillation
+
+**Neural Architecture Search:**
+
+9. **Tan, M., & Le, Q. V.** (2019). "EfficientNet: Rethinking model scaling for convolutional neural networks." *ICML 2019*.
+   - Compound scaling method
+
+10. **Howard, A. G., Zhu, M., Chen, B., et al.** (2017). "MobileNets: Efficient convolutional neural networks for mobile vision applications." *arXiv:1704.04861*.
+    - Depthwise separable convolutions
+
+**Inference Optimization:**
+
+11. **Paszke, A., Gross, S., Massa, F., et al.** (2019). "PyTorch: An imperative style, high-performance deep learning library." *NeurIPS 2019*.
+    - PyTorch framework
+
+12. **NVIDIA.** (2021). "NVIDIA TensorRT: Programmable Inference Accelerator."
+    - TensorRT documentation
+
+**Books:**
+
+- **Géron, A.** (2019). *Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow* (2nd ed.). O'Reilly.
+  - Chapter on model optimization
+
+**Online Resources:**
+- PyTorch Quantization: https://pytorch.org/docs/stable/quantization.html
+- TensorFlow Model Optimization: https://www.tensorflow.org/model_optimization
+- ONNX Runtime: https://onnxruntime.ai/
+- Neural Network Distiller (Intel): https://github.com/IntelLabs/distiller
+
+---
+
+*For production deployment, always validate optimized models on your specific hardware and use case!*

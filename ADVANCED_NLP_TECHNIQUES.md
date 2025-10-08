@@ -27,15 +27,37 @@ import math
 class FlashAttention(nn.Module):
     """
     Flash Attention - Memory-efficient attention computation
-    Implements tiling and recomputation for O(1) memory complexity
+
+    Mathematical Foundation:
+    Standard Attention: Attention(Q, K, V) = softmax(QK^T / √d_k) V
+
+    Standard Complexity:
+    - Time: O(n² · d) where n = seq_len, d = model_dim
+    - Space: O(n²) for attention matrix (bottleneck!)
+
+    Flash Attention Innovation:
+    - Tiling: Divide Q, K, V into blocks that fit in SRAM
+    - Recomputation: Don't store full attention matrix
+    - Online softmax: Compute softmax incrementally
+
+    Optimized Complexity:
+    - Time: O(n² · d) (same, but faster wall-clock time)
+    - Space: O(n) (down from O(n²)!) - enables 10-100x longer sequences
+
+    Speed Improvement:
+    - 2-4x faster on A100 GPU due to memory hierarchy optimization
+    - Reduces HBM (slow) accesses, increases SRAM (fast) usage
+
+    Reference: Dao et al., "FlashAttention: Fast and Memory-Efficient Exact
+    Attention with IO-Awareness", NeurIPS 2022
     """
 
     def __init__(self, dim, num_heads, dropout=0.0):
         super().__init__()
-        assert dim % num_heads == 0
+        assert dim % num_heads == 0, f"dim {dim} must be divisible by num_heads {num_heads}"
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim ** -0.5  # 1/√d_k for scaled dot-product attention
         self.dropout = dropout
 
     def forward(self, q, k, v, attention_mask=None):
@@ -73,11 +95,48 @@ class FlashAttention(nn.Module):
 class RotaryPositionalEmbedding(nn.Module):
     """
     Rotary Position Embedding (RoPE) from RoFormer
-    Encodes position information through rotation in complex space
+
+    Mathematical Foundation:
+
+    Traditional absolute position encoding:
+    x_i = x_i + PE(i)  (additive, position i)
+
+    RoPE (multiplicative in complex space):
+    For query q and key k at positions m and n:
+
+    f_q(x_m, m) = R_θ,m · W_q · x_m
+    f_k(x_n, n) = R_θ,n · W_k · x_n
+
+    where R_θ,m is 2D rotation matrix:
+    R_θ,m = [cos(mθ)  -sin(mθ)]
+            [sin(mθ)   cos(mθ)]
+
+    For dimension d, θ_i = 10000^(-2i/d) for i = 0, 1, ..., d/2-1
+
+    Key Properties:
+    1. Relative position encoding:
+       <f_q(x_m, m), f_k(x_n, n)> = g(x_m, x_n, m-n)
+       Inner product only depends on relative distance m-n!
+
+    2. Decays with distance:
+       Attention between tokens naturally decreases with distance
+
+    3. Efficient extrapolation:
+       Can handle sequences longer than training length
+
+    Advantages over learned position embeddings:
+    - ✓ No learned parameters for positions
+    - ✓ Better relative position modeling
+    - ✓ Extends to arbitrary sequence lengths
+    - ✓ Used in GPT-Neo, GPT-J, LLaMA, PaLM
+
+    Reference: Su et al., "RoFormer: Enhanced Transformer with Rotary
+    Position Embedding", arXiv:2104.09864, 2021
     """
 
     def __init__(self, dim, max_seq_len=2048, base=10000):
         super().__init__()
+        # Compute inverse frequencies: θ_i = base^(-2i/d)
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer('inv_freq', inv_freq)
         self.max_seq_len = max_seq_len

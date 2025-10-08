@@ -116,23 +116,82 @@ Classical statistical approaches for anomaly detection.
 
 ### Z-Score Method
 
+**Statistical Foundation:**
+
+**Z-Score (Standard Score):**
+```
+z = (x - μ) / σ
+
+where:
+- x: Observed value
+- μ: Population mean (estimated from data)
+- σ: Population standard deviation (estimated from data)
+- z: Number of standard deviations from mean
+
+Under normal distribution N(μ, σ²):
+- |z| > 2: ~95% confidence (5% false positive rate)
+- |z| > 3: ~99.7% confidence (0.3% false positive rate)
+- |z| > 4: ~99.994% confidence (0.006% false positive rate)
+
+Probability of observing |z| > k in standard normal:
+P(|Z| > k) = 2 · (1 - Φ(k))
+
+where Φ is the cumulative distribution function (CDF) of N(0,1)
+```
+
+**Assumptions:**
+1. Data follows normal distribution (Gaussian)
+2. Independence of observations
+3. Mean and variance are well-defined and stable
+
+**Limitations:**
+- ⚠️ Sensitive to outliers (mean and std are not robust)
+- ⚠️ Assumes normality (fails for skewed distributions)
+- ⚠️ Fixed threshold may not work for all contexts
+- ⚠️ Not suitable for multimodal distributions
+
+**Solution for Non-Normal Data:**
+Use Modified Z-Score with Median Absolute Deviation (MAD):
+```
+Modified Z-Score: M_i = 0.6745 · (x_i - x̃) / MAD
+
+where:
+- x̃: Median (robust to outliers)
+- MAD = median(|x_i - x̃|)
+- 0.6745: Constant to make MAD consistent with σ for normal distribution
+
+Threshold: |M_i| > 3.5 (recommended by Iglewicz & Hoaglin, 1993)
+```
+
 ```python
 class ZScoreDetector:
-    """Z-score based anomaly detection"""
+    """Z-score based anomaly detection with robust variant"""
 
-    def __init__(self, threshold=3.0):
+    def __init__(self, threshold=3.0, method='standard'):
         """
         Args:
             threshold: Number of standard deviations for anomaly
+                      - standard: typically 2-3
+                      - modified: typically 3.5
+            method: 'standard' or 'modified' (robust to outliers)
         """
         self.threshold = threshold
+        self.method = method
         self.mean = None
         self.std = None
+        self.median = None
+        self.mad = None
 
     def fit(self, data):
         """Fit the detector on normal data"""
-        self.mean = np.mean(data)
-        self.std = np.std(data)
+        if self.method == 'standard':
+            self.mean = np.mean(data)
+            self.std = np.std(data, ddof=1)  # Sample std (unbiased)
+        elif self.method == 'modified':
+            self.median = np.median(data)
+            self.mad = np.median(np.abs(data - self.median))
+        else:
+            raise ValueError("method must be 'standard' or 'modified'")
 
     def predict(self, data):
         """
@@ -141,17 +200,77 @@ class ZScoreDetector:
         Returns:
             Binary array (1 = anomaly, 0 = normal)
         """
-        z_scores = np.abs((data - self.mean) / self.std)
-        anomalies = (z_scores > self.threshold).astype(int)
+        scores = self.anomaly_scores(data)
+        anomalies = (scores > self.threshold).astype(int)
         return anomalies
 
     def anomaly_scores(self, data):
-        """Return anomaly scores (z-scores)"""
-        return np.abs((data - self.mean) / self.std)
+        """Return anomaly scores (z-scores or modified z-scores)"""
+        if self.method == 'standard':
+            # Standard z-score
+            if self.std == 0:
+                return np.zeros_like(data)  # No variance, no anomalies
+            return np.abs((data - self.mean) / self.std)
+        else:
+            # Modified z-score (robust)
+            if self.mad == 0:
+                return np.zeros_like(data)
+            return 0.6745 * np.abs((data - self.median) / self.mad)
 
-# Example
+    def p_values(self, data):
+        """
+        Return p-values for each data point
+
+        P-value: Probability of observing value this extreme under null hypothesis
+        Small p-value (< 0.05) suggests anomaly
+        """
+        from scipy import stats
+
+        if self.method == 'standard':
+            z_scores = (data - self.mean) / self.std
+            # Two-tailed test
+            p_vals = 2 * (1 - stats.norm.cdf(np.abs(z_scores)))
+            return p_vals
+        else:
+            # For modified z-score, approximate using standard normal
+            m_scores = self.anomaly_scores(data)
+            # Convert modified z-score to approximate p-value
+            z_equiv = m_scores / 0.6745
+            p_vals = 2 * (1 - stats.norm.cdf(z_equiv))
+            return p_vals
+
+# Example usage
 data = np.random.normal(0, 1, 1000)
 data[100] = 5  # Anomaly
+
+# Standard Z-Score
+detector_std = ZScoreDetector(threshold=3.0, method='standard')
+detector_std.fit(data)
+anomalies_std = detector_std.predict(data)
+print(f"Standard Z-Score: {anomalies_std.sum()} anomalies detected")
+
+# Modified Z-Score (robust)
+detector_mod = ZScoreDetector(threshold=3.5, method='modified')
+detector_mod.fit(data)
+anomalies_mod = detector_mod.predict(data)
+print(f"Modified Z-Score: {anomalies_mod.sum()} anomalies detected")
+
+# P-values
+p_vals = detector_std.p_values(data)
+print(f"Anomalies with p < 0.001: {(p_vals < 0.001).sum()}")
+```
+
+**Computational Complexity:**
+```
+Time Complexity:
+- fit(): O(n) for mean/std or O(n log n) for median/MAD
+- predict(): O(n) for computing scores
+- p_values(): O(n) for CDF lookups
+
+Space Complexity: O(1) (only store mean/std or median/MAD)
+
+where n = number of samples
+```
 data[500] = -4.5  # Anomaly
 
 detector = ZScoreDetector(threshold=3.0)
@@ -1329,3 +1448,71 @@ Anomaly detection identifies unusual patterns in data:
 - Equipment failure prediction
 - Quality control
 - Health monitoring
+
+
+---
+
+## 📚 References
+
+**Statistical Methods:**
+
+1. **Iglewicz, B., & Hoaglin, D. C.** (1993). "How to detect and handle outliers." *The ASQC Basic References in Quality Control: Statistical Techniques*, Vol. 16.
+   - Modified Z-score with MAD
+
+2. **Grubbs, F. E.** (1969). "Procedures for detecting outlying observations in samples." *Technometrics*, 11(1), 1-21.
+   - Grubbs' test for outliers
+
+3. **Tukey, J. W.** (1977). *Exploratory Data Analysis*. Addison-Wesley.
+   - IQR method for outliers
+
+**Machine Learning Methods:**
+
+4. **Liu, F. T., Ting, K. M., & Zhou, Z. H.** (2008). "Isolation forest." *ICDM 2008*, 413-422.
+   - Isolation Forest algorithm
+
+5. **Schölkopf, B., Williamson, R. C., Smola, A. J., et al.** (2000). "Support vector method for novelty detection." *NIPS 2000*, 582-588.
+   - One-Class SVM
+
+6. **Breunig, M. M., Kriegel, H. P., Ng, R. T., & Sander, J.** (2000). "LOF: Identifying density-based local outliers." *SIGMOD 2000*, 93-104.
+   - Local Outlier Factor
+
+**Deep Learning Methods:**
+
+7. **Sakurada, M., & Yairi, T.** (2014). "Anomaly detection using autoencoders with nonlinear dimensionality reduction." *MLSDA Workshop, ACM SIGKDD 2014*.
+   - Autoencoder for anomaly detection
+
+8. **An, J., & Cho, S.** (2015). "Variational autoencoder based anomaly detection using reconstruction probability." *SNU Data Mining Center Technical Report*.
+   - VAE for anomaly detection
+
+9. **Malhotra, P., Vig, L., Shroff, G., & Agarwal, P.** (2015). "Long short term memory networks for anomaly detection in time series." *ESANN 2015*.
+   - LSTM for time series anomalies
+
+**Time Series:**
+
+10. **Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I.** (1990). "STL: A seasonal-trend decomposition procedure based on LOESS." *Journal of Official Statistics*, 6(1), 3-73.
+    - STL decomposition
+
+**Evaluation:**
+
+11. **Davis, J., & Goadrich, M.** (2006). "The relationship between Precision-Recall and ROC curves." *ICML 2006*, 233-240.
+    - PR curves for imbalanced data
+
+12. **Emmott, A. F., Das, S., Dietterich, T., et al.** (2013). "Systematic construction of anomaly detection benchmarks from real data." *ACM SIGKDD Workshop on Outlier Detection and Description*, 16-21.
+    - Benchmark evaluation
+
+**Books:**
+
+- **Aggarwal, C. C.** (2017). *Outlier Analysis* (2nd ed.). Springer.
+  - Comprehensive textbook on anomaly detection
+
+- **Chandola, V., Banerjee, A., & Kumar, V.** (2009). "Anomaly detection: A survey." *ACM Computing Surveys*, 41(3), 1-58.
+  - Survey of anomaly detection methods
+
+**Online Resources:**
+- scikit-learn Novelty and Outlier Detection: https://scikit-learn.org/stable/modules/outlier_detection.html
+- PyOD (Python Outlier Detection): https://pyod.readthedocs.io/
+- Anomaly Detection Learning Resources: https://github.com/yzhao062/anomaly-detection-resources
+
+---
+
+*Anomaly detection is context-dependent. Always validate methods on domain-specific data and adjust thresholds based on business requirements.*

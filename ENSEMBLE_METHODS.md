@@ -168,18 +168,76 @@ accuracy = bagging.score(X_test, y_test)
 
 **Key Innovation:** Bagging + random feature selection at each split.
 
+**Algorithm:**
+```
+Random Forest Training:
+1. For b = 1 to B (number of trees):
+   a) Draw bootstrap sample Z*_b of size n from training data
+   b) Grow tree T_b on Z*_b with modification:
+      - At each node, randomly select m features from p total features
+      - Choose best split among these m features only
+      - Split node using best feature/threshold
+      - Repeat until min_samples_leaf reached
+2. Output ensemble: {T_b}^B_b=1
+
+Prediction:
+- Classification: Majority vote
+  ĈRF(x) = majority vote of {T_b(x)}^B_b=1
+
+- Regression: Average
+  f̂_RF(x) = (1/B) Σ^B_b=1 T_b(x)
+
+Key Parameter:
+- m = √p for classification (default)
+- m = p/3 for regression (default)
+- Smaller m → more diversity, less correlation
+```
+
+**Theoretical Properties:**
+
+**Out-of-Bag (OOB) Error Estimate:**
+```
+For each observation (x_i, y_i):
+- ~63.2% of bootstrap samples include it (1 - (1-1/n)^n ≈ 1 - e^(-1))
+- ~36.8% don't include it (OOB samples)
+
+OOB Prediction for x_i:
+ŷ_i^OOB = aggregate predictions from trees not trained on (x_i, y_i)
+
+OOB Error:
+OOB_err = (1/n) Σ^n_i=1 L(y_i, ŷ_i^OOB)
+
+This provides unbiased estimate of test error without separate validation set!
+```
+
+**Computational Complexity:**
+```
+Training: O(B · n · p · log n)
+- B: Number of trees
+- n: Number of samples
+- p: Number of features
+- log n: Tree depth (balanced tree)
+
+Prediction: O(B · log n)
+- Evaluate B trees, each O(log n) depth
+
+Space: O(B · n_nodes · p)
+- Store B trees with average n_nodes nodes per tree
+```
+
 ```python
 from sklearn.ensemble import RandomForestClassifier
 
 # Random Forest
 rf = RandomForestClassifier(
-    n_estimators=100,
-    max_depth=20,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    max_features='sqrt',  # sqrt(n_features) for each split
-    bootstrap=True,
-    n_jobs=-1,
+    n_estimators=100,  # B = 100 trees
+    max_depth=20,  # Maximum tree depth
+    min_samples_split=5,  # Minimum samples to split node
+    min_samples_leaf=2,  # Minimum samples in leaf
+    max_features='sqrt',  # m = sqrt(p) for each split
+    bootstrap=True,  # Use bootstrap sampling
+    oob_score=True,  # Compute OOB error estimate
+    n_jobs=-1,  # Parallel training
     random_state=42
 )
 
