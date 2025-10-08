@@ -1183,6 +1183,224 @@ plt.show()
 # w_new = w_old - learning_rate × gradient
 ```
 
+#### Convergence Theory for Gradient Descent Variants
+
+**Mathematical Framework:**
+
+**Assumptions and Definitions:**
+```
+L-Lipschitz Continuous Gradient:
+||∇f(x) - ∇f(y)|| ≤ L·||x - y|| for all x, y
+
+Convexity:
+f(y) ≥ f(x) + ∇f(x)^T(y - x) for all x, y
+
+Strong Convexity (with parameter μ > 0):
+f(y) ≥ f(x) + ∇f(x)^T(y - x) + (μ/2)||y - x||² for all x, y
+
+Smoothness implies: f(y) ≤ f(x) + ∇f(x)^T(y - x) + (L/2)||y - x||²
+```
+
+**Theorem 1: Gradient Descent Convergence for Smooth Convex Functions**
+```
+Problem: min_{x∈ℝ^d} f(x), where f is convex and L-smooth
+
+Algorithm: x_{k+1} = x_k - α·∇f(x_k)
+
+Step Size: α ≤ 1/L
+
+Convergence Rate:
+f(x_k) - f(x*) ≤ (2L·||x_0 - x*||²) / (k + 4)
+             = O(1/k)
+
+Result: Sublinear convergence, need O(1/ε) iterations for ε-accuracy
+```
+
+**Proof Sketch:**
+```
+Key Lemma (Descent Lemma):
+For α ≤ 1/L and L-smooth f:
+f(x_{k+1}) ≤ f(x_k) - (α/2)||∇f(x_k)||²
+
+Proof of Lemma:
+1. By L-smoothness:
+   f(x_{k+1}) ≤ f(x_k) + ∇f(x_k)^T(x_{k+1} - x_k) + (L/2)||x_{k+1} - x_k||²
+
+2. Substitute x_{k+1} = x_k - α·∇f(x_k):
+   f(x_{k+1}) ≤ f(x_k) - α·||∇f(x_k)||² + (Lα²/2)||∇f(x_k)||²
+              = f(x_k) - α(1 - Lα/2)||∇f(x_k)||²
+
+3. If α ≤ 1/L, then 1 - Lα/2 ≥ 1/2:
+   f(x_{k+1}) ≤ f(x_k) - (α/2)||∇f(x_k)||²  ✓
+
+Main Convergence Proof:
+1. By convexity: f(x_k) - f(x*) ≤ ∇f(x_k)^T(x_k - x*)
+
+2. Expand ||x_{k+1} - x*||²:
+   ||x_{k+1} - x*||² = ||x_k - α·∇f(x_k) - x*||²
+                     = ||x_k - x*||² - 2α·∇f(x_k)^T(x_k - x*) + α²||∇f(x_k)||²
+
+3. Rearrange:
+   2α·∇f(x_k)^T(x_k - x*) = ||x_k - x*||² - ||x_{k+1} - x*||² + α²||∇f(x_k)||²
+                           ≥ ||x_k - x*||² - ||x_{k+1} - x*||²  (drop positive term)
+
+4. Therefore:
+   f(x_k) - f(x*) ≤ (||x_k - x*||² - ||x_{k+1} - x*||²) / (2α)
+
+5. Sum from k=0 to K-1:
+   Σ_{k=0}^{K-1} [f(x_k) - f(x*)] ≤ (||x_0 - x*||² - ||x_K - x*||²) / (2α)
+                                   ≤ ||x_0 - x*||² / (2α)
+
+6. Since f(x_k) is decreasing (by Descent Lemma):
+   K·[f(x_K) - f(x*)] ≤ Σ_{k=0}^{K-1} [f(x_k) - f(x*)] ≤ ||x_0 - x*||² / (2α)
+
+7. Final bound:
+   f(x_K) - f(x*) ≤ ||x_0 - x*||² / (2αK)
+
+   With α = 1/L:
+   f(x_K) - f(x*) ≤ L·||x_0 - x*||² / (2K) = O(1/K)  ✓
+```
+
+**Theorem 2: Gradient Descent for Strongly Convex Functions**
+```
+Problem: min f(x), where f is μ-strongly convex and L-smooth
+
+Step Size: α ≤ 2/(μ + L) (or simply α = 1/L)
+
+Convergence Rate:
+||x_k - x*||² ≤ (1 - μ/L)^k · ||x_0 - x*||²
+f(x_k) - f(x*) ≤ (L/2)(1 - μ/L)^k · ||x_0 - x*||²
+
+Result: Linear (exponential) convergence!
+Need O(log(1/ε)) iterations for ε-accuracy
+```
+
+**Proof Sketch:**
+```
+Key Property: For μ-strongly convex and L-smooth f:
+||∇f(x)||² ≥ 2μ[f(x) - f(x*)]
+
+Proof:
+1. By strong convexity at x*:
+   f(x) ≥ f(x*) + ∇f(x*)^T(x - x*) + (μ/2)||x - x*||²
+        = f(x*) + (μ/2)||x - x*||²  (since ∇f(x*) = 0)
+
+2. By smoothness at x:
+   f(x*) ≥ f(x) + ∇f(x)^T(x* - x) - (L/2)||x* - x||²
+
+3. Combine:
+   ||∇f(x)||² = ||∇f(x) - ∇f(x*)||² ≥ μL·||x - x*||²  (PL inequality)
+              ≥ 2μ[f(x) - f(x*)]  ✓
+
+Main Convergence:
+1. Start with:
+   ||x_{k+1} - x*||² = ||x_k - x*||² - 2α·∇f(x_k)^T(x_k - x*) + α²||∇f(x_k)||²
+
+2. By strong convexity:
+   ∇f(x_k)^T(x_k - x*) ≥ f(x_k) - f(x*) + (μ/2)||x_k - x*||²
+
+3. Substitute α = 1/L:
+   ||x_{k+1} - x*||² ≤ ||x_k - x*||²[1 - μ/L] + (1/L²)||∇f(x_k)||²[1 - μ/L]
+                     ≤ (1 - μ/L)||x_k - x*||²
+
+4. Iterate:
+   ||x_k - x*||² ≤ (1 - μ/L)^k · ||x_0 - x*||²  ✓
+
+Condition Number: κ = L/μ
+- If κ is small (well-conditioned): Fast convergence
+- If κ is large (ill-conditioned): Slow convergence
+```
+
+**Theorem 3: Stochastic Gradient Descent (SGD) Convergence**
+```
+Problem: min f(x) = E_{ξ}[f(x; ξ)]
+         Where ξ represents random data samples
+
+Algorithm: x_{k+1} = x_k - α_k·∇f(x_k; ξ_k)
+          ∇f(x_k; ξ_k) is unbiased: E[∇f(x_k; ξ_k)] = ∇f(x_k)
+
+Robbins-Monro Conditions (for learning rate α_k):
+1. Σ_{k=1}^∞ α_k = ∞        (step sizes sum to infinity)
+2. Σ_{k=1}^∞ α_k² < ∞       (step sizes squared sum is finite)
+
+Example: α_k = α_0/√k satisfies both conditions
+
+Convergence Result (for convex f):
+E[f(x_k)] - f(x*) = O(1/√k)
+
+Result: Slower than batch GD (O(1/k)), but much cheaper per iteration!
+```
+
+**Proof Intuition:**
+```
+Key Inequality:
+E[||x_{k+1} - x*||²] = E[||x_k - α_k·g_k - x*||²]
+                     = ||x_k - x*||² - 2α_k·∇f(x_k)^T(x_k - x*) + α_k²·E[||g_k||²]
+
+where g_k = ∇f(x_k; ξ_k) is stochastic gradient with variance σ²
+
+Trade-off:
+- Term 1: -2α_k·∇f(x_k)^T(x_k - x*) → Progress towards optimum
+- Term 2: +α_k²·σ² → Variance from stochastic gradient
+
+As k → ∞:
+- α_k → 0 makes variance term → 0 (condition 2)
+- But Σα_k = ∞ ensures we reach optimum (condition 1)
+```
+
+**Theorem 4: Momentum Convergence (Nesterov Accelerated Gradient)**
+```
+Algorithm:
+v_{k+1} = β·v_k + ∇f(x_k)
+x_{k+1} = x_k - α·v_{k+1}
+
+Convergence for Convex L-smooth:
+f(x_k) - f(x*) = O(1/k²)  (compared to O(1/k) for vanilla GD!)
+
+Convergence for Strongly Convex:
+||x_k - x*|| = O((1 - √(μ/L))^k)  (improved constant)
+
+Result: Optimal first-order method for smooth convex optimization
+```
+
+**Theorem 5: Adam Convergence (Sketch)**
+```
+Algorithm:
+m_k = β_1·m_{k-1} + (1-β_1)·g_k         (first moment)
+v_k = β_2·v_{k-1} + (1-β_2)·g_k²        (second moment)
+m̂_k = m_k / (1 - β_1^k)                 (bias correction)
+v̂_k = v_k / (1 - β_2^k)                 (bias correction)
+x_{k+1} = x_k - α·m̂_k / (√v̂_k + ε)
+
+Typical values: β_1 = 0.9, β_2 = 0.999, ε = 10^(-8)
+
+Convergence (for convex case):
+Regret bound: R_T = O(√T)
+Average convergence: (1/T)Σ_{k=1}^T [f(x_k) - f(x*)] = O(1/√T)
+
+Note: Adam may NOT converge for some convex problems!
+Fix: AMSGrad variant with max(v_1, ..., v_k) instead of v_k
+```
+
+**Summary Table: Convergence Rates**
+```
+Algorithm        | Convex      | Strongly Convex    | Per-iteration Cost
+-----------------|-------------|--------------------|-----------------
+GD               | O(1/k)      | O(exp(-μk/L))     | O(nd)
+SGD              | O(1/√k)     | O(1/k)            | O(d)
+Momentum (NAG)   | O(1/k²)     | O(exp(-√μ/L·k))   | O(nd)
+Adam/RMSprop     | O(1/√k)     | O(1/√k)           | O(d)
+Newton           | O(1/k²)     | Quadratic         | O(nd²+d³)
+
+Where:
+- n: dataset size
+- d: dimension
+- k: iteration number
+- μ: strong convexity parameter
+- L: smoothness parameter
+- κ = L/μ: condition number
+```
+
 **Newton's Method** (uses second derivative):
 ```python
 def newtons_method(f, grad_f, hess_f, x0, num_iterations=10):
@@ -1395,6 +1613,400 @@ print("Mutual information scores:")
 for i, score in enumerate(mi_scores):
     print(f"  Feature {i}: {score:.4f}")
 # Features 0 and 1 should have highest MI with target
+```
+
+---
+
+## 🧠 Neural Network Initialization Theory
+
+Proper weight initialization is critical for successful neural network training. Poor initialization can lead to vanishing/exploding gradients, slow convergence, or complete training failure.
+
+### The Initialization Problem
+
+**Why Initialization Matters:**
+```
+Problem: Neural networks are highly non-convex
+- Different initializations → different local minima
+- Bad initialization → vanishing/exploding gradients
+- Good initialization → faster convergence, better final performance
+
+Key Insight: Initialize weights to preserve signal variance across layers
+```
+
+**Naive Approaches (Don't Do This!):**
+```python
+# ❌ All zeros: Symmetry problem
+W = np.zeros((n_out, n_in))
+# All neurons learn the same function!
+# Gradient for all neurons is identical
+# Network effectively has only one neuron per layer
+
+# ❌ All same value: Same problem
+W = np.ones((n_out, n_in)) * 0.5
+
+# ❌ Too large values
+W = np.random.randn(n_out, n_in) * 10
+# Output variance explodes: Var(output) = (n_in × 10²) × Var(input)
+# Gradients explode
+
+# ❌ Too small values
+W = np.random.randn(n_out, n_in) * 0.001
+# Output variance vanishes: Var(output) ≈ 0
+# Gradients vanish
+```
+
+### Xavier/Glorot Initialization (2010)
+
+**Mathematical Foundation:**
+
+**Goal:** Preserve variance of activations and gradients across layers
+
+**Assumption:** Linear activation (or near-linear like tanh around 0)
+
+**Forward Pass Analysis:**
+```
+Layer computation: y = W·x + b
+
+For one neuron: y_i = Σ_{j=1}^{n_in} w_{ij} x_j
+
+Assumptions:
+1. x_j are i.i.d. with mean 0 and variance σ²_x
+2. w_{ij} are i.i.d. with mean 0 and variance σ²_w
+3. x and w are independent
+
+Variance of output:
+Var(y_i) = Var(Σ_j w_{ij} x_j)
+         = Σ_j Var(w_{ij} x_j)           (independence)
+         = Σ_j E[w_{ij}²] E[x_j²]         (independence)
+         = Σ_j Var(w_{ij}) Var(x_j)       (mean 0)
+         = n_in · σ²_w · σ²_x
+
+To preserve variance (Var(y_i) = σ²_x):
+n_in · σ²_w = 1
+σ²_w = 1 / n_in
+```
+
+**Backward Pass Analysis:**
+```
+Gradient backprop: ∂L/∂x = W^T · ∂L/∂y
+
+By similar analysis:
+Var(∂L/∂x_j) = n_out · σ²_w · Var(∂L/∂y)
+
+To preserve gradient variance:
+n_out · σ²_w = 1
+σ²_w = 1 / n_out
+```
+
+**Xavier/Glorot Compromise:**
+```
+Problem: Forward wants σ²_w = 1/n_in, backward wants σ²_w = 1/n_out
+
+Solution: Average them!
+σ²_w = 2 / (n_in + n_out)
+
+Xavier Uniform:
+W ~ U[-√(6/(n_in + n_out)), √(6/(n_in + n_out))]
+
+Xavier Normal:
+W ~ N(0, 2/(n_in + n_out))
+
+Note: U[-a, a] has variance a²/3, so a = √(3·2/(n_in+n_out)) = √(6/(n_in+n_out))
+```
+
+**Implementation:**
+```python
+def xavier_uniform(n_in, n_out):
+    """
+    Xavier/Glorot uniform initialization
+
+    Used for: tanh, sigmoid activations
+    """
+    limit = np.sqrt(6.0 / (n_in + n_out))
+    return np.random.uniform(-limit, limit, size=(n_out, n_in))
+
+def xavier_normal(n_in, n_out):
+    """
+    Xavier/Glorot normal initialization
+
+    Used for: tanh, sigmoid activations
+    """
+    std = np.sqrt(2.0 / (n_in + n_out))
+    return np.random.randn(n_out, n_in) * std
+```
+
+### He Initialization (2015)
+
+**Motivation:** Xavier assumes linear activation, but ReLU is non-linear!
+
+**ReLU Analysis:**
+```
+ReLU(x) = max(0, x)
+
+Property: Kills half the neurons (negative values → 0)
+
+Effect on variance:
+- Input variance: σ²
+- After ReLU: σ²/2 (approximately, for zero-mean input)
+
+Derivation:
+For x ~ N(0, σ²):
+E[ReLU(x)] = E[x | x > 0] · P(x > 0) = (σ/√(2π)) · 0.5
+
+Var(ReLU(x)) = E[ReLU(x)²] - E[ReLU(x)]²
+             = E[x² | x > 0] · P(x > 0) - (σ/√(2π) · 0.5)²
+             = σ²/2 - small term
+             ≈ σ²/2
+
+So ReLU halves the variance!
+```
+
+**He Initialization:**
+```
+Forward pass with ReLU:
+Var(y_i) = n_in · σ²_w · σ²_x / 2  (ReLU kills half)
+
+To preserve variance (Var(y_i) = σ²_x):
+n_in · σ²_w / 2 = 1
+σ²_w = 2 / n_in
+
+He Normal (most common):
+W ~ N(0, 2/n_in)
+
+He Uniform:
+W ~ U[-√(6/n_in), √(6/n_in)]
+```
+
+**Implementation:**
+```python
+def he_normal(n_in, n_out):
+    """
+    He initialization (Kaiming initialization)
+
+    Used for: ReLU, Leaky ReLU, PReLU activations
+
+    Reference: He et al., "Delving Deep into Rectifiers: Surpassing
+    Human-Level Performance on ImageNet Classification", ICCV 2015
+    """
+    std = np.sqrt(2.0 / n_in)
+    return np.random.randn(n_out, n_in) * std
+
+def he_uniform(n_in, n_out):
+    """He uniform initialization"""
+    limit = np.sqrt(6.0 / n_in)
+    return np.random.uniform(-limit, limit, size=(n_out, n_in))
+```
+
+### Comparison and Guidelines
+
+**Initialization Summary:**
+```
+Activation       | Forward Preserve | Backward Preserve | Recommended
+-----------------|------------------|-------------------|-------------
+Linear/None      | Var = 1/n_in    | Var = 1/n_out    | Xavier
+tanh             | Var = 1/n_in    | Var = 1/n_out    | Xavier
+sigmoid          | Var = 1/n_in    | Var = 1/n_out    | Xavier
+ReLU             | Var = 2/n_in    | Var = 2/n_out    | He
+Leaky ReLU       | Var ≈ 2/n_in    | Var ≈ 2/n_out    | He
+ELU              | Var ≈ 1.5/n_in  | Var ≈ 1.5/n_out  | He or Xavier
+SELU             | Special         | Special          | LeCun*
+
+*LeCun Normal: W ~ N(0, 1/n_in)
+```
+
+**Modern PyTorch/TensorFlow Defaults:**
+```python
+import torch.nn as nn
+
+# Linear layer
+nn.Linear(n_in, n_out)
+# Default: Xavier uniform (Glorot)
+
+# Conv2D layer
+nn.Conv2d(in_channels, out_channels, kernel_size)
+# Default: He (Kaiming) uniform for ReLU
+
+# LSTM/GRU
+nn.LSTM(input_size, hidden_size)
+# Default: Xavier uniform (Glorot)
+```
+
+**Complete Initialization Example:**
+```python
+class NeuralNetwork:
+    """Neural network with proper initialization"""
+
+    def __init__(self, layers, activation='relu'):
+        """
+        Args:
+            layers: [n_input, n_hidden1, n_hidden2, ..., n_output]
+            activation: 'relu', 'tanh', 'sigmoid'
+        """
+        self.weights = []
+        self.biases = []
+
+        for i in range(len(layers) - 1):
+            n_in, n_out = layers[i], layers[i+1]
+
+            # Initialize weights
+            if activation == 'relu':
+                # He initialization
+                W = np.random.randn(n_out, n_in) * np.sqrt(2.0 / n_in)
+            elif activation in ['tanh', 'sigmoid']:
+                # Xavier initialization
+                W = np.random.randn(n_out, n_in) * np.sqrt(2.0 / (n_in + n_out))
+            else:
+                # Default: small random
+                W = np.random.randn(n_out, n_in) * 0.01
+
+            # Initialize biases to zero (common practice)
+            b = np.zeros((n_out, 1))
+
+            self.weights.append(W)
+            self.biases.append(b)
+
+    def forward(self, x, activation='relu'):
+        """Forward pass with specified activation"""
+        a = x
+        for W, b in zip(self.weights[:-1], self.biases[:-1]):
+            z = W @ a + b
+            if activation == 'relu':
+                a = np.maximum(0, z)
+            elif activation == 'tanh':
+                a = np.tanh(z)
+            elif activation == 'sigmoid':
+                a = 1 / (1 + np.exp(-z))
+
+        # Output layer (no activation for regression, or apply softmax for classification)
+        z = self.weights[-1] @ a + self.biases[-1]
+        return z
+
+# Example usage
+model = NeuralNetwork([784, 512, 256, 10], activation='relu')
+print(f"Layer 1 weights std: {model.weights[0].std():.4f}")
+print(f"Expected std: {np.sqrt(2.0/784):.4f}")
+```
+
+### Advanced Initialization Strategies
+
+**1. LSUV (Layer-Sequential Unit-Variance, 2016):**
+```python
+def lsuv_init(model, data_sample):
+    """
+    Initialize weights then adjust to unit variance
+
+    1. Initialize with orthogonal matrices
+    2. Forward pass with sample data
+    3. Scale weights to make output variance = 1
+    4. Repeat for each layer
+    """
+    x = data_sample
+
+    for layer in model.layers:
+        # Initialize with orthogonal matrix
+        W = np.linalg.qr(np.random.randn(layer.n_out, layer.n_in))[0]
+        layer.W = W
+
+        # Forward pass
+        z = layer.forward(x)
+
+        # Adjust to unit variance
+        std = z.std()
+        layer.W = layer.W / std
+
+        x = layer.activation(z)
+```
+
+**2. Fixup Initialization (2019):**
+```
+For very deep networks (ResNets):
+- Initialize most layers with He/Xavier
+- Scale residual branches by 1/√L (L = depth)
+- No batch normalization needed!
+```
+
+**3. Batch Normalization Alternative:**
+```
+Instead of careful initialization:
+- Use Batch Normalization after each layer
+- BN normalizes activations to mean=0, std=1
+- Makes network more robust to initialization
+- Trade-off: BN adds computation and complexity
+```
+
+### Theoretical Guarantees
+
+**Theorem (He et al., 2015):**
+```
+For ReLU networks with He initialization:
+- Forward signal does not vanish or explode
+- Backward gradient does not vanish or explode
+- Enables training of networks with 30+ layers
+
+Mathematically:
+E[||y^(l)||²] = E[||x^(0)||²]  (forward)
+E[||∂L/∂x^(0)||²] = E[||∂L/∂y^(L)||²]  (backward)
+
+where l = layer index, L = total layers
+```
+
+**Condition for Gradient Flow:**
+```
+For stable training:
+
+Forward: σ²_out = σ²_in  (variance preservation)
+Backward: σ²_grad = constant across layers
+
+This requires: σ²_w = O(1/n_in)
+
+Violation leads to:
+- σ²_w too large → exploding gradients
+- σ²_w too small → vanishing gradients
+```
+
+### Summary and Best Practices
+
+**Quick Reference:**
+```python
+import torch.nn as nn
+
+# For ReLU/Leaky ReLU (most common):
+nn.init.kaiming_normal_(layer.weight, mode='fan_in', nonlinearity='relu')
+nn.init.zeros_(layer.bias)
+
+# For tanh/sigmoid:
+nn.init.xavier_normal_(layer.weight)
+nn.init.zeros_(layer.bias)
+
+# For LSTM/GRU:
+nn.init.orthogonal_(layer.weight_ih)
+nn.init.orthogonal_(layer.weight_hh)
+nn.init.zeros_(layer.bias)
+
+# General tip: Biases usually initialized to zero
+# Exception: LSTM forget gate bias can be initialized to 1
+```
+
+**Key Insights:**
+```
+1. **Never initialize all weights to same value** (breaks symmetry)
+
+2. **Match initialization to activation:**
+   - ReLU family → He initialization
+   - tanh/sigmoid → Xavier initialization
+
+3. **Consider network depth:**
+   - Very deep networks (>50 layers): Use Fixup or normalization layers
+   - Moderate depth (10-30): He/Xavier sufficient
+
+4. **Empirical tuning:**
+   - Monitor activation/gradient statistics during training
+   - Activation std should stay ≈1 across layers
+   - Gradient norm should not explode or vanish
+
+5. **Modern best practice:**
+   - Use He/Xavier + Batch/Layer Normalization
+   - This combination is very robust
 ```
 
 ---

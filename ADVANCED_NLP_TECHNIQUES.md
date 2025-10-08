@@ -16,6 +16,230 @@
 
 State-of-the-art transformer variants and optimizations.
 
+### Attention Mechanism Mathematics
+
+**Mathematical Foundation:**
+
+**1. Scaled Dot-Product Attention**
+```
+Given:
+- Query: Q ∈ ℝ^(n×d_k)
+- Key: K ∈ ℝ^(m×d_k)
+- Value: V ∈ ℝ^(m×d_v)
+
+Attention(Q, K, V) = softmax(QK^T / √d_k) V
+
+Components:
+1. QK^T: Similarity scores ∈ ℝ^(n×m)
+   - Each entry (i,j): similarity between query i and key j
+
+2. 1/√d_k: Scaling factor
+   - Without scaling: QK^T has variance d_k (problematic for large d_k)
+   - Softmax becomes saturated → small gradients
+   - √d_k normalizes variance to 1
+
+3. softmax: Attention weights ∈ ℝ^(n×m)
+   - α_ij = exp(q_i·k_j/√d_k) / Σ_j exp(q_i·k_j/√d_k)
+   - Properties: Σ_j α_ij = 1, α_ij ≥ 0
+
+4. Final output: Weighted sum of values ∈ ℝ^(n×d_v)
+   - out_i = Σ_j α_ij · v_j
+
+Complexity:
+- Time: O(n·m·d_k + n²·d_v)
+  - QK^T: O(n·m·d_k)
+  - softmax(·)V: O(n·m·d_v)
+- Space: O(n·m) for attention matrix
+```
+
+**2. Multi-Head Attention**
+```
+Intuition: Different representation subspaces learn different patterns
+- Heads attend to different positions/relationships
+- Some heads: syntactic relationships (subject-verb)
+- Some heads: semantic relationships (coreference)
+- Some heads: positional patterns (local vs global)
+
+Mathematical Formulation:
+
+Single Head:
+head_i = Attention(QW^Q_i, KW^K_i, VW^V_i)
+
+where:
+- W^Q_i ∈ ℝ^(d_model × d_k): Query projection for head i
+- W^K_i ∈ ℝ^(d_model × d_k): Key projection for head i
+- W^V_i ∈ ℝ^(d_model × d_v): Value projection for head i
+- d_k = d_v = d_model / h (typically)
+- h: number of heads
+
+Multi-Head Attention:
+MultiHead(Q, K, V) = Concat(head_1, ..., head_h) W^O
+
+where W^O ∈ ℝ^(h·d_v × d_model): Output projection
+
+Parameter Count:
+- Query weights: h · d_model · d_k
+- Key weights: h · d_model · d_k
+- Value weights: h · d_model · d_v
+- Output weights: h·d_v · d_model
+- Total: 4·d_model² (when d_k = d_v = d_model/h)
+
+Complexity:
+- Time: h · O(n²·d_k)
+- Space: h · O(n²)
+
+Benefits:
+1. Parallel computation across heads
+2. Richer representations (ensemble of attention patterns)
+3. Better gradient flow (multiple paths)
+```
+
+**3. Self-Attention vs Cross-Attention**
+```
+Self-Attention:
+Q = K = V = X  (same sequence)
+
+Example: "The cat sat on the mat"
+- Each word attends to all words (including itself)
+- Learns contextual relationships within sequence
+- Used in: Encoder layers, Decoder masked self-attention
+
+Cross-Attention:
+Q ≠ K = V  (different sequences)
+
+Example: Translation (English → French)
+- Q: Decoder hidden states (French being generated)
+- K, V: Encoder hidden states (English source)
+- Decoder attends to relevant source words
+- Used in: Encoder-Decoder models (seq2seq, T5)
+
+Masked Self-Attention (Causal):
+Attention(Q, K, V) = softmax(mask(QK^T / √d_k)) V
+
+where mask sets future positions to -∞:
+mask_ij = {0 if j ≤ i, -∞ if j > i}
+
+Result: Position i can only attend to positions ≤ i
+Used in: Autoregressive generation (GPT, decoder)
+```
+
+**4. Attention Variants**
+
+**Additive Attention (Bahdanau):**
+```
+score(q, k) = v^T tanh(W_q q + W_k k)
+
+where:
+- W_q ∈ ℝ^(d_a × d_k)
+- W_k ∈ ℝ^(d_a × d_k)
+- v ∈ ℝ^d_a
+- d_a: attention dimension
+
+Complexity: O(n·m·d_a)
+Advantage: Can learn non-linear interactions
+Disadvantage: More parameters, slower
+```
+
+**Multiplicative Attention (Luong):**
+```
+score(q, k) = q^T W k  or  q^T k  (dot product)
+
+Complexity: O(n·m·d_k)
+Advantage: Faster, fewer parameters
+Used in: Modern transformers (scaled dot-product)
+```
+
+**5. Attention Interpretations**
+
+**Information Retrieval Perspective:**
+```
+Query: "What are you looking for?"
+Key: "What do I have?"
+Value: "What do I actually return?"
+
+Soft dictionary lookup:
+- Keys: Dictionary entries
+- Values: Associated content
+- Query: Search term
+- Attention weights: Soft match scores
+- Output: Weighted combination of relevant values
+```
+
+**Kernel Perspective:**
+```
+Attention as kernel smoothing:
+
+out_i = Σ_j k(q_i, k_j) v_j / Σ_j k(q_i, k_j)
+
+where k(q, k) = exp(q^T k / √d_k) is RBF-like kernel
+
+Properties:
+- Localization: High weights for similar q, k
+- Smoothness: Differentiable
+- Normalization: Softmax ensures Σ weights = 1
+```
+
+**6. Theoretical Properties**
+
+**Universal Approximation:**
+```
+Theorem (Yun et al., 2020):
+Transformers with sufficient depth can approximate any
+continuous sequence-to-sequence function arbitrarily well.
+
+Depth requirement: O(n) layers for length-n sequences
+(compared to O(n²) for CNNs/RNNs)
+```
+
+**Expressiveness:**
+```
+Single-head attention:
+- Rank ≤ min(d_k, n)
+- Limited expressiveness
+
+Multi-head attention:
+- Effective rank ≤ h·min(d_k, n)
+- Each head learns different subspace
+- Higher capacity
+```
+
+**7. Computational Complexity Summary**
+
+```
+Operation              | Time           | Space
+-----------------------|----------------|--------
+Standard Attention     | O(n² · d)      | O(n²)
+Multi-Head (h heads)   | O(h·n²·d)      | O(h·n²)
+Linear Attention       | O(n·d²)        | O(d²)
+Sparse Attention       | O(n·√n·d)      | O(n·√n)
+Flash Attention        | O(n²·d)        | O(n)    ← Memory efficient!
+
+where:
+- n: sequence length
+- d: model dimension
+- h: number of heads
+```
+
+**8. Gradient Flow in Attention**
+
+```
+Backpropagation through attention:
+
+∂L/∂V = A^T · ∂L/∂O
+∂L/∂Q = (∂L/∂A · V^T) · (1/√d_k) · K
+∂L/∂K = (∂L/∂A^T · V^T) · (1/√d_k) · Q
+
+where:
+- A = softmax(QK^T/√d_k): Attention weights
+- O: Output
+
+Key properties:
+1. Direct path from output to all inputs (V, Q, K)
+2. No gradient vanishing (unlike RNNs)
+3. Gradient magnitude controlled by softmax
+4. Enables training very deep models (GPT-3: 96 layers)
+```
+
 ### GPT Architecture with Flash Attention
 
 ```python

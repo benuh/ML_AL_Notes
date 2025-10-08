@@ -138,9 +138,92 @@ print(f"Recall@5: {metrics.recall_at_k(recommended, relevant, 5):.2f}")
 
 ## Collaborative Filtering
 
-Recommend items based on user similarity or item similarity.
+Recommend items based on user-item interaction patterns.
+
+**Mathematical Foundation:**
+
+**Problem Formulation:**
+```
+Given: User-item rating matrix R ∈ ℝ^(m×n)
+- m users, n items
+- R_ui: Rating of user u for item i
+- R is sparse: Most entries are missing
+
+Goal: Predict missing entries r̂_ui
+
+Approaches:
+1. Memory-based: Use user/item similarities
+2. Model-based: Learn latent factor models
+```
+
+**Similarity Measures:**
+
+**Cosine Similarity:**
+```
+sim(u, v) = cos(θ) = (r_u · r_v) / (||r_u|| · ||r_v||)
+
+where:
+- r_u, r_v: Rating vectors for users u and v
+- Range: [-1, 1], where 1 = identical preferences
+
+Centered Cosine (Pearson Correlation):
+sim(u, v) = Σ_i (r_ui - r̄_u)(r_vi - r̄_v) / √[Σ_i(r_ui - r̄_u)² · Σ_i(r_vi - r̄_v)²]
+
+where r̄_u = mean rating of user u
+```
+
+**Jaccard Similarity:**
+```
+J(A, B) = |A ∩ B| / |A ∪ B|
+
+For binary ratings (liked/not liked):
+sim(u, v) = |Items_u ∩ Items_v| / |Items_u ∪ Items_v|
+
+Range: [0, 1]
+```
+
+**Adjusted Cosine Similarity (for item-item):**
+```
+sim(i, j) = Σ_u (r_ui - r̄_u)(r_uj - r̄_u) / √[Σ_u(r_ui - r̄_u)² · Σ_u(r_uj - r̄_u)²]
+
+Adjusts for user rating bias (some users rate higher on average)
+```
 
 ### User-Based Collaborative Filtering
+
+**Prediction Formula:**
+```
+r̂_ui = r̄_u + [Σ_{v∈N(u)} sim(u,v) · (r_vi - r̄_v)] / [Σ_{v∈N(u)} |sim(u,v)|]
+
+where:
+- N(u): Set of k-nearest neighbors of user u who rated item i
+- r̄_u: Average rating of user u
+- sim(u,v): Similarity between users u and v
+
+Intuition:
+- Base prediction: User u's average rating r̄_u
+- Adjustment: Weighted average of neighbors' deviations from their means
+- Weights: Similarities to neighbors
+```
+
+**Algorithm Complexity:**
+```
+Similarity computation: O(m² · n) for all pairs
+- m users, n items
+- Pairwise comparison: O(m²)
+- Each comparison: O(n) items
+
+Prediction: O(m) for finding k neighbors
+Top-N recommendation: O(n log n) sorting
+
+Total for one user: O(m + n log n)
+```
+
+**Limitations:**
+- **Sparsity**: Few common ratings → unreliable similarities
+- **Scalability**: O(m²) similarity computation
+- **Cold start**: New users have no ratings
+- **Popularity bias**: Popular items dominate recommendations
 
 ```python
 class UserBasedCF:
@@ -389,7 +472,196 @@ class TextContentRecommender:
 
 ## Matrix Factorization
 
-Decompose user-item matrix into latent factor matrices.
+Decompose user-item matrix into low-rank latent factor matrices.
+
+**Mathematical Foundation:**
+
+**Low-Rank Matrix Factorization:**
+```
+Problem: Approximate sparse rating matrix R ∈ ℝ^(m×n)
+
+R ≈ P · Q^T
+
+where:
+- P ∈ ℝ^(m×k): User latent factor matrix (m users, k factors)
+- Q ∈ ℝ^(n×k): Item latent factor matrix (n items, k factors)
+- k << min(m, n): Number of latent factors (dimensionality)
+
+Prediction:
+r̂_ui = p_u · q_i^T = Σ^k_{f=1} p_uf · q_if
+
+where:
+- p_u: Latent factor vector for user u
+- q_i: Latent factor vector for item i
+```
+
+**Optimization Objective:**
+```
+Minimize: L = Σ_{(u,i)∈Ω} (r_ui - p_u · q_i^T)² + λ(||P||²_F + ||Q||²_F)
+
+where:
+- Ω: Set of observed (user, item) pairs
+- ||·||_F: Frobenius norm (sum of squared entries)
+- λ: Regularization parameter (prevents overfitting)
+
+With biases:
+L = Σ_{(u,i)∈Ω} (r_ui - μ - b_u - b_i - p_u · q_i^T)² + λ(||P||²_F + ||Q||²_F + ||b||²)
+
+where:
+- μ: Global average rating
+- b_u: User bias (user u's tendency to rate high/low)
+- b_i: Item bias (item i's tendency to receive high/low ratings)
+```
+
+**Singular Value Decomposition (SVD):**
+```
+For complete matrix R = U Σ V^T where:
+- U ∈ ℝ^(m×m): Left singular vectors (orthonormal)
+- Σ ∈ ℝ^(m×n): Diagonal matrix of singular values σ_1 ≥ σ_2 ≥ ... ≥ σ_r ≥ 0
+- V ∈ ℝ^(n×n): Right singular vectors (orthonormal)
+- r: Rank of R
+
+Low-rank approximation (keep top k singular values):
+R_k = U_k Σ_k V_k^T
+
+where U_k, Σ_k, V_k contain only k largest singular values
+
+Eckart-Young-Mirsky Theorem:
+R_k is the best rank-k approximation to R in Frobenius norm:
+R_k = argmin_{rank(X)≤k} ||R - X||_F
+
+Error bound:
+||R - R_k||_F = √(σ²_{k+1} + σ²_{k+2} + ... + σ²_r)
+```
+
+**Alternating Least Squares (ALS):**
+```
+Since L is non-convex in (P, Q) jointly, but convex in P (fixing Q) or Q (fixing P):
+
+Algorithm:
+1. Initialize P, Q randomly
+2. Repeat until convergence:
+   a) Fix Q, optimize P:
+      For each user u:
+      p_u = (Q^T Q + λI)^(-1) Q^T r_u
+
+      where r_u = [r_u1, r_u2, ..., r_un]^T (user u's ratings)
+
+   b) Fix P, optimize Q:
+      For each item i:
+      q_i = (P^T P + λI)^(-1) P^T r_i
+
+      where r_i = [r_1i, r_2i, ..., r_mi]^T (item i's ratings)
+
+3. Return P, Q
+
+Each subproblem has closed-form solution!
+
+Complexity per iteration:
+- User update: O(m · k² · n̄_u) where n̄_u = avg items rated per user
+- Item update: O(n · k² · m̄_i) where m̄_i = avg users per item
+- Total: O((m · n̄_u + n · m̄_i) · k²)
+
+Convergence:
+- Guaranteed to decrease objective L each iteration
+- Converges to local minimum
+- Typical convergence: 10-20 iterations
+```
+
+**Stochastic Gradient Descent (SGD) for MF:**
+```
+For each observed rating (u, i, r_ui):
+
+Prediction error:
+e_ui = r_ui - r̂_ui = r_ui - p_u · q_i^T
+
+Gradients:
+∂L/∂p_uf = -2 e_ui · q_if + 2λ · p_uf
+∂L/∂q_if = -2 e_ui · p_uf + 2λ · q_if
+
+SGD Updates:
+p_uf ← p_uf + α(e_ui · q_if - λ · p_uf)
+q_if ← q_if + α(e_ui · p_uf - λ · q_if)
+
+where α is learning rate
+
+With biases:
+∂L/∂μ = -2 e_ui
+∂L/∂b_u = -2 e_ui + 2λ · b_u
+∂L/∂b_i = -2 e_ui + 2λ · b_i
+
+Convergence:
+- Faster per iteration than ALS: O(k) vs O(k²)
+- More iterations needed for convergence
+- Susceptible to learning rate choice
+- Can use mini-batch or momentum variants
+```
+
+**Probabilistic Matrix Factorization (PMF):**
+```
+Bayesian formulation:
+
+Likelihood:
+p(R | P, Q, σ²) = Π_{(u,i)∈Ω} N(r_ui | p_u · q_i^T, σ²)
+
+Priors:
+p(P | σ²_P) = Π_u N(p_u | 0, σ²_P I)
+p(Q | σ²_Q) = Π_i N(q_i | 0, σ²_Q I)
+
+Posterior (MAP):
+max_{P,Q} p(P, Q | R) ∝ p(R | P, Q) · p(P) · p(Q)
+
+Taking negative log:
+L = (1/2σ²) Σ_{(u,i)∈Ω} (r_ui - p_u · q_i^T)² + (λ_P/2)||P||²_F + (λ_Q/2)||Q||²_F
+
+where λ_P = σ²/σ²_P, λ_Q = σ²/σ²_Q
+
+This is equivalent to regularized matrix factorization!
+```
+
+**Implicit Feedback Matrix Factorization:**
+```
+For implicit data (clicks, views, purchases):
+
+Confidence matrix C:
+c_ui = 1 + α · r_ui
+
+where r_ui = number of interactions
+
+Objective:
+L = Σ_u Σ_i c_ui(p_ui - p_u · q_i^T)² + λ(||P||²_F + ||Q||²_F)
+
+where:
+- p_ui = 1 if user u interacted with item i, 0 otherwise
+- c_ui: Confidence in preference p_ui
+
+ALS update (with confidence weighting):
+p_u = (Q^T C_u Q + λI)^(-1) Q^T C_u p_u
+
+where C_u = diag(c_u1, c_u2, ..., c_un)
+
+Complexity: O(k² · n) per user (can be optimized to O(k² · n̄_u + k³))
+```
+
+**Convergence Analysis:**
+```
+For convex subproblems (ALS):
+
+Theorem: ALS decreases objective monotonically
+Proof sketch:
+- At iteration t, fixing Q^(t), we solve:
+  P^(t+1) = argmin_P L(P, Q^(t))
+- By definition: L(P^(t+1), Q^(t)) ≤ L(P^(t), Q^(t))
+- Similarly for Q update
+- Therefore: L^(t+1) ≤ L^(t)
+
+Convergence rate: Sublinear in general, can be linear under strong convexity
+
+For SGD:
+- Under decreasing learning rate α_t = c/t:
+  E[||∇L||²] → 0 as t → ∞
+- Convergence to stationary point (local minimum)
+```
 
 ### SVD for Recommendations
 
@@ -1340,3 +1612,119 @@ Recommendation systems predict user preferences using various techniques:
 - A/B testing
 - Diversity and exploration
 - Real-time serving
+
+---
+
+## References
+
+### Collaborative Filtering Foundations
+
+1. **Resnick, P., Iacovou, N., Suchak, M., Bergstrom, P., & Riedl, J. (1994).** "GroupLens: An open architecture for collaborative filtering of netnews." *Proceedings of the 1994 ACM Conference on Computer Supported Cooperative Work*, pp. 175-186.
+   - Original collaborative filtering system
+
+2. **Sarwar, B., Karypis, G., Konstan, J., & Riedl, J. (2001).** "Item-based collaborative filtering recommendation algorithms." *Proceedings of the 10th International Conference on World Wide Web*, pp. 285-295.
+   - Item-based collaborative filtering methodology
+
+3. **Breese, J. S., Heckerman, D., & Kadie, C. (1998).** "Empirical analysis of predictive algorithms for collaborative filtering." *Proceedings of the Fourteenth Conference on Uncertainty in Artificial Intelligence*, pp. 43-52.
+   - Comprehensive analysis of CF algorithms
+
+### Matrix Factorization
+
+4. **Koren, Y., Bell, R., & Volinsky, C. (2009).** "Matrix factorization techniques for recommender systems." *Computer*, 42(8), 30-37.
+   - Comprehensive overview of MF for recommender systems
+
+5. **Salakhutdinov, R., & Mnih, A. (2008).** "Probabilistic matrix factorization." *Advances in Neural Information Processing Systems (NeurIPS)*, 20.
+   - Probabilistic formulation of matrix factorization (PMF)
+
+6. **Hu, Y., Koren, Y., & Volinsky, C. (2008).** "Collaborative filtering for implicit feedback datasets." *IEEE International Conference on Data Mining (ICDM)*, pp. 263-272.
+   - Matrix factorization for implicit feedback with confidence weighting
+
+7. **Zhou, Y., Wilkinson, D., Schreiber, R., & Pan, R. (2008).** "Large-scale parallel collaborative filtering for the Netflix Prize." *International Conference on Algorithmic Applications in Management*, pp. 337-348.
+   - ALS algorithm for large-scale collaborative filtering
+
+8. **Takács, G., Pilászy, I., Németh, B., & Tikk, D. (2009).** "Scalable collaborative filtering approaches for large recommender systems." *Journal of Machine Learning Research*, 10(3), 623-656.
+   - Scalability analysis of CF methods
+
+### Deep Learning for Recommendation Systems
+
+9. **He, X., Liao, L., Zhang, H., Nie, L., Hu, X., & Chua, T. S. (2017).** "Neural collaborative filtering." *Proceedings of the 26th International Conference on World Wide Web*, pp. 173-182.
+   - Neural Collaborative Filtering (NCF) framework
+
+10. **Cheng, H. T., Koc, L., Harmsen, J., Shaked, T., Chandra, T., Aradhye, H., ... & Shah, H. (2016).** "Wide & deep learning for recommender systems." *Proceedings of the 1st Workshop on Deep Learning for Recommender Systems*, pp. 7-10.
+    - Wide & Deep architecture (Google Play Store)
+
+11. **Guo, H., Tang, R., Ye, Y., Li, Z., & He, X. (2017).** "DeepFM: A factorization-machine based neural network for CTR prediction." *Proceedings of the 26th International Joint Conference on Artificial Intelligence*, pp. 1725-1731.
+    - DeepFM combining FM and deep learning
+
+12. **Huang, P. S., He, X., Gao, J., Deng, L., Acero, A., & Heck, L. (2013).** "Learning deep structured semantic models for web search using clickthrough data." *Proceedings of the 22nd ACM International Conference on Information and Knowledge Management*, pp. 2333-2338.
+    - Two-tower architecture foundations
+
+13. **Yi, X., Yang, J., Hong, L., Cheng, D. Z., Heldt, L., Kumthekar, A., ... & Chi, E. H. (2019).** "Sampling-bias-corrected neural modeling for large corpus item recommendations." *Proceedings of the 13th ACM Conference on Recommender Systems*, pp. 269-277.
+    - Two-tower models at scale (YouTube recommendations)
+
+### Factorization Machines
+
+14. **Rendle, S. (2010).** "Factorization machines." *IEEE International Conference on Data Mining (ICDM)*, pp. 995-1000.
+    - Original Factorization Machines paper
+
+15. **Rendle, S. (2012).** "Factorization machines with libFM." *ACM Transactions on Intelligent Systems and Technology (TIST)*, 3(3), 1-22.
+    - Practical implementation and extensions
+
+16. **Juan, Y., Zhuang, Y., Chin, W. S., & Lin, C. J. (2016).** "Field-aware factorization machines for CTR prediction." *Proceedings of the 10th ACM Conference on Recommender Systems*, pp. 43-50.
+    - Field-aware Factorization Machines (FFM)
+
+### Context-Aware and Sequential Recommendations
+
+17. **Hidasi, B., Karatzoglou, A., Baltrunas, L., & Tikk, D. (2016).** "Session-based recommendations with recurrent neural networks." *International Conference on Learning Representations (ICLR)*.
+    - RNN for session-based recommendations
+
+18. **Kang, W. C., & McAuley, J. (2018).** "Self-attentive sequential recommendation." *IEEE International Conference on Data Mining (ICDM)*, pp. 197-206.
+    - Self-attention for sequential recommendations
+
+19. **Sun, F., Liu, J., Wu, J., Pei, C., Lin, X., Ou, W., & Jiang, P. (2019).** "BERT4Rec: Sequential recommendation with bidirectional encoder representations from transformer." *Proceedings of the 28th ACM International Conference on Information and Knowledge Management*, pp. 1441-1450.
+    - BERT for sequential recommendations
+
+### Evaluation and Metrics
+
+20. **Herlocker, J. L., Konstan, J. A., Terveen, L. G., & Riedl, J. T. (2004).** "Evaluating collaborative filtering recommender systems." *ACM Transactions on Information Systems (TOIS)*, 22(1), 5-53.
+    - Comprehensive evaluation methodology
+
+21. **Järvelin, K., & Kekäläinen, J. (2002).** "Cumulated gain-based evaluation of IR techniques." *ACM Transactions on Information Systems (TOIS)*, 20(4), 422-446.
+    - NDCG metric for ranking evaluation
+
+### Diversity and Exploration
+
+22. **Carbonell, J., & Goldstein, J. (1998).** "The use of MMR, diversity-based reranking for reordering documents and producing summaries." *Proceedings of the 21st Annual International ACM SIGIR Conference*, pp. 335-336.
+    - Maximal Marginal Relevance for diversity
+
+23. **Ziegler, C. N., McNee, S. M., Konstan, J. A., & Lausen, G. (2005).** "Improving recommendation lists through topic diversification." *Proceedings of the 14th International Conference on World Wide Web*, pp. 22-32.
+    - Topic diversification in recommendations
+
+### Large-Scale Systems
+
+24. **Johnson, J., Douze, M., & Jégou, H. (2019).** "Billion-scale similarity search with GPUs." *IEEE Transactions on Big Data*, 7(3), 535-547.
+    - FAISS library for efficient similarity search
+
+25. **Covington, P., Adams, J., & Sargin, E. (2016).** "Deep neural networks for YouTube recommendations." *Proceedings of the 10th ACM Conference on Recommender Systems*, pp. 191-198.
+    - YouTube recommendation system architecture
+
+26. **Davidson, J., Liebald, B., Liu, J., Nandy, P., Van Vleet, T., Gargi, U., ... & Sampath, D. (2010).** "The YouTube video recommendation system." *Proceedings of the Fourth ACM Conference on Recommender Systems*, pp. 293-296.
+    - YouTube RecSys architecture and challenges
+
+### General Resources and Surveys
+
+27. **Ricci, F., Rokach, L., & Shapira, B. (2015).** *Recommender systems handbook* (2nd ed.). Springer.
+    - Comprehensive textbook on recommendation systems
+
+28. **Aggarwal, C. C. (2016).** *Recommender systems: The textbook.* Springer.
+    - Detailed textbook covering theory and practice
+
+29. **Zhang, S., Yao, L., Sun, A., & Tay, Y. (2019).** "Deep learning based recommender system: A survey and new perspectives." *ACM Computing Surveys (CSUR)*, 52(1), 1-38.
+    - Survey of deep learning methods for RecSys
+
+30. **Bobadilla, J., Ortega, F., Hernando, A., & Gutiérrez, A. (2013).** "Recommender systems survey." *Knowledge-Based Systems*, 46, 109-132.
+    - Comprehensive survey of traditional methods
+
+---
+
+This Recommendation Systems guide provides comprehensive coverage of collaborative filtering, matrix factorization, deep learning approaches, and production-ready implementations, all backed by rigorous academic foundations and 30+ seminal references.

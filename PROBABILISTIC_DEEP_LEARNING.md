@@ -391,7 +391,202 @@ class MCDropoutNN(nn.Module):
 
 ## Variational Inference
 
-Approximate intractable posterior distributions using optimization.
+Approximate intractable posterior distributions using optimization instead of sampling.
+
+**Mathematical Foundation:**
+
+**Bayesian Inference Problem:**
+```
+Given: Data x, latent variables z, parameters θ
+
+Goal: Compute posterior p(z | x, θ)
+
+Bayes' Rule:
+p(z | x) = p(x | z) p(z) / p(x)
+
+where:
+- p(x | z): Likelihood
+- p(z): Prior
+- p(x) = ∫ p(x | z) p(z) dz: Evidence (marginal likelihood)
+
+Problem: Computing p(x) requires intractable integral!
+```
+
+**Variational Inference (VI) Approach:**
+```
+Idea: Approximate p(z | x) with simpler distribution q_φ(z)
+
+Choose q_φ from tractable family (e.g., Gaussian):
+q_φ(z) = N(z | μ_φ, Σ_φ)
+
+Find best approximation by minimizing KL divergence:
+φ* = argmin_φ KL(q_φ(z) || p(z | x))
+
+where KL divergence:
+KL(q || p) = ∫ q(z) log[q(z)/p(z)] dz
+           = E_q[log q(z)] - E_q[log p(z)]
+           ≥ 0 (with equality iff q = p)
+```
+
+**Evidence Lower Bound (ELBO) Derivation:**
+```
+Problem: KL(q(z) || p(z|x)) requires p(z|x) which is intractable!
+
+Derivation:
+log p(x) = log ∫ p(x, z) dz
+         = log ∫ p(x, z) · [q(z)/q(z)] dz
+         = log E_q[p(x, z)/q(z)]
+         ≥ E_q[log p(x, z)/q(z)]    (Jensen's inequality)
+         = E_q[log p(x, z)] - E_q[log q(z)]
+         = ELBO(q)
+
+Therefore:
+log p(x) = ELBO(q) + KL(q(z) || p(z|x))
+
+Since log p(x) is constant w.r.t. q:
+Maximizing ELBO ⟺ Minimizing KL(q || p)
+
+ELBO = E_q[log p(x, z)] - E_q[log q(z)]
+     = E_q[log p(x | z)] + E_q[log p(z)] - E_q[log q(z)]
+     = E_q[log p(x | z)] - KL(q(z) || p(z))
+
+Components:
+1. E_q[log p(x | z)]: Reconstruction term (likelihood)
+2. -KL(q(z) || p(z)): Regularization term (prior matching)
+```
+
+**Mean-Field Variational Inference:**
+```
+Assume q factorizes:
+q(z) = Π^d_{j=1} q_j(z_j)
+
+Each factor q_j(z_j) is independent
+
+Optimal q*_j(z_j) has closed form:
+log q*_j(z_j) = E_{q_{-j}}[log p(x, z)] + const
+
+where q_{-j} = Π_{k≠j} q_k(z_k)
+
+Coordinate Ascent VI (CAVI) Algorithm:
+1. Initialize q_1, ..., q_d
+2. Repeat until convergence:
+   For j = 1 to d:
+     Update q_j(z_j) using formula above
+3. Return q
+
+Convergence: ELBO increases monotonically, converges to local optimum
+```
+
+**Stochastic Variational Inference (SVI):**
+```
+For large datasets, use stochastic optimization:
+
+ELBO = (N/M) Σ^M_{i=1} E_q[log p(x_i | z)] - KL(q(z) || p(z))
+
+where:
+- N: Total data points
+- M: Minibatch size
+- First term: Scaled reconstruction on minibatch
+
+Gradient of ELBO:
+∇_φ ELBO = ∇_φ E_q[log p(x | z)] - ∇_φ KL(q_φ(z) || p(z))
+```
+
+**Reparameterization Trick:**
+```
+Problem: Can't backprop through sampling z ~ q_φ(z)
+
+Solution: Reparameterize sampling:
+
+Instead of: z ~ q_φ(z)
+Use: z = g_φ(ε, x) where ε ~ p(ε)
+
+For Gaussian q_φ(z) = N(μ_φ, σ²_φ):
+z = μ_φ + σ_φ · ε, where ε ~ N(0, 1)
+
+Now gradient flows through μ_φ and σ_φ:
+∇_φ E_q[f(z)] = ∇_φ E_ε[f(g_φ(ε, x))]
+               = E_ε[∇_φ f(g_φ(ε, x))]    (swap derivative and expectation)
+               ≈ (1/L) Σ^L_{l=1} ∇_φ f(g_φ(ε^(l), x))    (Monte Carlo estimate)
+
+This is differentiable and unbiased!
+```
+
+**Variational Autoencoder (VAE):**
+```
+Model:
+- Encoder: q_φ(z|x) = N(z | μ_φ(x), σ²_φ(x))
+  Maps x → latent z using neural network
+
+- Decoder: p_θ(x|z) = N(x | μ_θ(z), σ²_θ(z)) or Bernoulli
+  Maps z → reconstruction x using neural network
+
+- Prior: p(z) = N(0, I)
+
+ELBO for VAE:
+L(θ, φ; x) = E_q_φ(z|x)[log p_θ(x|z)] - KL(q_φ(z|x) || p(z))
+
+For Gaussian encoder and prior, KL has closed form:
+KL(q_φ(z|x) || p(z)) = ½ Σ^d_{j=1} [μ²_j + σ²_j - log σ²_j - 1]
+
+where d = latent dimension
+
+Loss for single datapoint:
+Loss = -ELBO
+     = Reconstruction Loss + β · KL Divergence
+     ≈ ||x - x̂||² + β · ½ Σ^d_{j=1} [μ²_j + σ²_j - log σ²_j - 1]
+
+where:
+- β: Weight on KL term (β-VAE uses β ≠ 1 for disentanglement)
+- x̂ = decoder(z), where z = μ + σ ⊙ ε, ε ~ N(0, I)
+```
+
+**Properties and Theory:**
+
+**Theorem (ELBO as Variational Lower Bound):**
+```
+For any q(z):
+log p(x) ≥ ELBO(q) = E_q[log p(x|z)] - KL(q(z) || p(z))
+
+Gap = KL(q(z) || p(z|x))
+
+When q = p(·|x), gap = 0, ELBO = log p(x)
+```
+
+**Amortized Inference:**
+```
+Traditional VI: Optimize q for each x separately
+VAE: Learn inference network q_φ(z|x) once
+
+Benefits:
+- Fast inference at test time (single forward pass)
+- Parameter sharing across data points
+- Scales to large datasets
+
+Trade-off:
+- Amortization gap: q_φ(z|x) may not be optimal for each x
+```
+
+**Comparison with Other Methods:**
+```
+Method              | Complexity    | Exact | Scalable
+--------------------|---------------|-------|----------
+Exact Inference     | Exponential   | Yes   | No
+MCMC                | High          | Asymp | Medium
+Variational (VI)    | Low           | No    | Yes
+Normalizing Flows   | Medium        | No    | Yes
+
+VI Advantages:
+- Deterministic (no sampling)
+- Fast convergence
+- Scalable to large data
+- Provides lower bound on log p(x)
+
+VI Limitations:
+- Local optima
+- Approximation quality depends on q family
+- Underestimates uncertainty (mode-seeking)
+```
 
 ### Variational Autoencoder (Advanced)
 
@@ -756,29 +951,133 @@ def train_flow(model, dataloader, epochs=100):
             print(f"Epoch {epoch+1}, NLL: {total_loss/len(dataloader):.4f}")
 ```
 
-This Probabilistic Deep Learning guide now covers fundamental concepts with production-ready implementations. The repository is becoming increasingly comprehensive with advanced, complex examples across multiple domains!
+---
 
-**Summary of Enhanced Materials:**
+## References
 
-1. ✅ **ADVANCED_COMPUTER_VISION.md** (~1,775 lines)
-   - YOLOv8, DETR, Mask R-CNN
-   - DeepLabv3+, SegFormer
-   - PointNet++ for 3D
+### Bayesian Neural Networks
 
-2. ✅ **ADVANCED_NLP_TECHNIQUES.md** (~741 lines)
-   - Modern GPT with Flash Attention & RoPE
-   - BERT with dynamic masking
-   - Advanced training techniques
+1. **Blundell, C., Cornebise, J., Kavukcuoglu, K., & Wierstra, D. (2015).** "Weight uncertainty in neural networks." *International Conference on Machine Learning (ICML)*, pp. 1613-1622.
+   - Original Bayes by Backprop paper
 
-3. ✅ **PROBABILISTIC_DEEP_LEARNING.md** (New)
-   - Bayesian Neural Networks
-   - Hierarchical VAE
-   - Normalizing Flows
+2. **Gal, Y., & Ghahramani, Z. (2016).** "Dropout as a Bayesian approximation: Representing model uncertainty in deep learning." *International Conference on Machine Learning (ICML)*, pp. 1050-1059.
+   - Monte Carlo Dropout for uncertainty estimation
 
-Would you like me to continue with more advanced guides on:
-- Graph Learning (Graph Transformers, advanced GNNs)
-- Production ML Systems (model serving, monitoring, A/B testing)
-- Real-world Case Studies
-- Advanced Optimization Techniques
+3. **MacKay, D. J. (1992).** "A practical Bayesian framework for backpropagation networks." *Neural Computation*, 4(3), 448-472.
+   - Foundational work on Bayesian neural networks
 
-?
+4. **Graves, A. (2011).** "Practical variational inference for neural networks." *Advances in Neural Information Processing Systems (NeurIPS)*, 24.
+   - Variational inference for neural networks
+
+5. **Hernández-Lobato, J. M., & Adams, R. (2015).** "Probabilistic backpropagation for scalable learning of Bayesian neural networks." *International Conference on Machine Learning (ICML)*, pp. 1861-1869.
+   - Scalable probabilistic inference methods
+
+### Variational Inference
+
+6. **Jordan, M. I., Ghahramani, Z., Jaakkola, T. S., & Saul, L. K. (1999).** "An introduction to variational methods for graphical models." *Machine Learning*, 37(2), 183-233.
+   - Comprehensive introduction to variational inference
+
+7. **Blei, D. M., Kucukelbir, A., & McAuliffe, J. D. (2017).** "Variational inference: A review for statisticians." *Journal of the American Statistical Association*, 112(518), 859-877.
+   - Modern review of VI methods
+
+8. **Hoffman, M. D., Blei, D. M., Wang, C., & Paisley, J. (2013).** "Stochastic variational inference." *Journal of Machine Learning Research*, 14(1), 1303-1347.
+   - Stochastic VI for large-scale problems
+
+9. **Ranganath, R., Gerrish, S., & Blei, D. (2014).** "Black box variational inference." *Artificial Intelligence and Statistics (AISTATS)*, pp. 814-822.
+   - General-purpose VI algorithms
+
+### Variational Autoencoders
+
+10. **Kingma, D. P., & Welling, M. (2014).** "Auto-encoding variational bayes." *International Conference on Learning Representations (ICLR)*.
+    - Original VAE paper with reparameterization trick
+
+11. **Rezende, D. J., Mohamed, S., & Wierstra, D. (2014).** "Stochastic backpropagation and approximate inference in deep generative models." *International Conference on Machine Learning (ICML)*, pp. 1278-1286.
+    - Independent development of reparameterization trick
+
+12. **Higgins, I., Matthey, L., Pal, A., Burgess, C., Glorot, X., Botvinick, M., ... & Lerchner, A. (2017).** "beta-VAE: Learning basic visual concepts with a constrained variational framework." *International Conference on Learning Representations (ICLR)*.
+    - β-VAE for disentangled representations
+
+13. **Sønderby, C. K., Raiko, T., Maaløe, L., Sønderby, S. K., & Winther, O. (2016).** "Ladder variational autoencoders." *Advances in Neural Information Processing Systems (NeurIPS)*, 29.
+    - Hierarchical VAE architectures
+
+14. **Burda, Y., Grosse, R., & Salakhutdinov, R. (2016).** "Importance weighted autoencoders." *International Conference on Learning Representations (ICLR)*.
+    - Tighter variational bounds for VAEs
+
+### Normalizing Flows
+
+15. **Rezende, D., & Mohamed, S. (2015).** "Variational inference with normalizing flows." *International Conference on Machine Learning (ICML)*, pp. 1530-1538.
+    - Introduction of normalizing flows to VI
+
+16. **Dinh, L., Sohl-Dickstein, J., & Bengio, S. (2017).** "Density estimation using Real NVP." *International Conference on Learning Representations (ICLR)*.
+    - Real NVP for efficient exact likelihood
+
+17. **Kingma, D. P., & Dhariwal, P. (2018).** "Glow: Generative flow using invertible 1×1 convolutions." *Advances in Neural Information Processing Systems (NeurIPS)*, 31.
+    - Glow architecture for high-quality generation
+
+18. **Papamakarios, G., Nalisnick, E., Rezende, D. J., Mohamed, S., & Lakshminarayanan, B. (2021).** "Normalizing flows for probabilistic modeling and inference." *Journal of Machine Learning Research*, 22(57), 1-64.
+    - Comprehensive survey of normalizing flows
+
+19. **Kobyzev, I., Prince, S., & Brubaker, M. (2021).** "Normalizing flows: An introduction and review of current methods." *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 43(11), 3964-3979.
+    - Technical review of flow architectures
+
+### Gaussian Processes
+
+20. **Rasmussen, C. E., & Williams, C. K. I. (2006).** *Gaussian processes for machine learning.* MIT Press.
+    - Comprehensive textbook on GP theory and practice
+
+21. **Titsias, M. (2009).** "Variational learning of inducing variables in sparse Gaussian processes." *Artificial Intelligence and Statistics (AISTATS)*, pp. 567-574.
+    - Sparse GP approximations for scalability
+
+22. **Hensman, J., Fusi, N., & Lawrence, N. D. (2013).** "Gaussian processes for big data." *Uncertainty in Artificial Intelligence (UAI)*, pp. 282-290.
+    - Stochastic VI for GPs
+
+23. **Wilson, A. G., Hu, Z., Salakhutdinov, R., & Xing, E. P. (2016).** "Deep kernel learning." *Artificial Intelligence and Statistics (AISTATS)*, pp. 370-378.
+    - Combining deep learning with GPs
+
+### Energy-Based Models
+
+24. **LeCun, Y., Chopra, S., Hadsell, R., Ranzato, M., & Huang, F. (2006).** "A tutorial on energy-based learning." In *Predicting structured data* (pp. 1-59). MIT Press.
+    - Foundational tutorial on EBMs
+
+25. **Du, Y., & Mordatch, I. (2019).** "Implicit generation and modeling with energy based models." *Advances in Neural Information Processing Systems (NeurIPS)*, 32.
+    - Modern deep energy-based models
+
+26. **Song, Y., & Ermon, S. (2019).** "Generative modeling by estimating gradients of the data distribution." *Advances in Neural Information Processing Systems (NeurIPS)*, 32.
+    - Score-based generative models
+
+### Neural Processes
+
+27. **Garnelo, M., Schwarz, J., Rosenbaum, D., Viola, F., Rezende, D. J., Eslami, S. M. A., & Teh, Y. W. (2018).** "Neural processes." *ICML Workshop on Theoretical Foundations and Applications of Deep Generative Models*.
+    - Original neural processes paper
+
+28. **Garnelo, M., Rosenbaum, D., Maddison, C., Ramalho, T., Saxton, D., Shanahan, M., ... & Eslami, S. M. A. (2018).** "Conditional neural processes." *International Conference on Machine Learning (ICML)*, pp. 1704-1713.
+    - Conditional neural processes
+
+29. **Kim, H., Mnih, A., Schwarz, J., Garnelo, M., Eslami, A., Rosenbaum, D., ... & Teh, Y. W. (2019).** "Attentive neural processes." *International Conference on Learning Representations (ICLR)*.
+    - Attention mechanisms for neural processes
+
+### Uncertainty Quantification
+
+30. **Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017).** "Simple and scalable predictive uncertainty estimation using deep ensembles." *Advances in Neural Information Processing Systems (NeurIPS)*, 30.
+    - Deep ensembles for uncertainty
+
+31. **Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017).** "On calibration of modern neural networks." *International Conference on Machine Learning (ICML)*, pp. 1321-1330.
+    - Calibration of predictive uncertainties
+
+32. **Ovadia, Y., Fertig, E., Ren, J., Nado, Z., Sculley, D., Nowozin, S., ... & Snoek, J. (2019).** "Can you trust your model's uncertainty? Evaluating predictive uncertainty under dataset shift." *Advances in Neural Information Processing Systems (NeurIPS)*, 32.
+    - Evaluating uncertainty under distribution shift
+
+### Additional Resources
+
+33. **Murphy, K. P. (2022).** *Probabilistic machine learning: An introduction.* MIT Press.
+    - Modern comprehensive textbook
+
+34. **Murphy, K. P. (2023).** *Probabilistic machine learning: Advanced topics.* MIT Press.
+    - Advanced topics in probabilistic ML
+
+35. **Bishop, C. M. (2006).** *Pattern recognition and machine learning.* Springer.
+    - Classic textbook with strong probabilistic foundations
+
+---
+
+This Probabilistic Deep Learning guide now covers fundamental concepts with production-ready implementations and comprehensive academic references. The repository provides research-grade theoretical foundations with practical code examples across multiple domains of probabilistic deep learning.
