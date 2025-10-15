@@ -51,6 +51,34 @@
 - Loss function selection guide with practical recommendations
 - Custom loss implementation templates
 
+### **Modern ML/AI Techniques (2024-2025)** ⭐ **BRAND NEW**
+**[MODERN_ML_AI_TECHNIQUES_2024_2025.md](./MODERN_ML_AI_TECHNIQUES_2024_2025.md)** - Comprehensive guide to state-of-the-art techniques:
+
+- **Large Language Models** - GPT-4, Claude 3, Llama 3, Gemini architectures, fine-tuning (LoRA, QLoRA)
+- **Diffusion Models** - Stable Diffusion, DALL-E 3, ControlNet, DreamBooth
+- **Vision Transformers** - ViT, CLIP, SAM (Segment Anything), DINOv2
+- **RAG (Retrieval-Augmented Generation)** - Complete pipeline, hybrid search, advanced techniques
+- **Mixture of Experts** - GPT-4, Mixtral 8x7B architectures and training
+- **Constitutional AI & RLHF** - Alignment techniques, DPO, complete implementations
+- **Model Quantization** - GPTQ, GGUF, AWQ, QLoRA for efficient deployment
+- **Multimodal Models** - GPT-4V, LLaVA, BLIP-2 architectures
+- **Efficient Training** - Flash Attention, DeepSpeed ZeRO, FSDP
+- **Emerging Architectures** - Mamba, Retentive Networks, Hyena Hierarchy
+
+**126+ references, production-ready code, interview questions for each section**
+
+### **Speculative Coding for ML/AI** 🚀 **BRAND NEW**
+**[SPECULATIVE_CODING_ML_AI.md](./SPECULATIVE_CODING_ML_AI.md)** - Advanced coding patterns and testing strategies:
+
+- **Speculative Decoding** - 2-3x LLM inference speedup with no quality loss
+- **Specification-Driven Development** - Input/output specs, contracts, validation
+- **Speculative Execution Patterns** - Parallel inference, data loading, HPO
+- **Test-Driven ML Development** - Data testing, model testing, pipeline testing
+- **Contract-Based Development** - Property-based testing with Hypothesis
+- **Production Best Practices** - Monitoring, alerting, performance tracking
+
+**Complete implementations, testing frameworks, production patterns**
+
 ### **Comprehensive Visualization Guide**
 **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete ML/AI visualization toolkit with 200+ lines of production-ready code covering:
 
@@ -393,6 +421,60 @@ All code is runnable, well-documented, and ready for research papers, presentati
 
 ---
 
+#### **[09 - Natural Language Processing Fundamentals](./interactive_demos/09_nlp_fundamentals.ipynb)** ⭐ **NEW**
+**Complete NLP Pipeline from Text Processing to Transformers**
+
+**Part 1: Text Preprocessing**
+- Tokenization (word, sentence, subword)
+- Text cleaning and normalization
+- Stopword removal, stemming, lemmatization
+- Complete preprocessing pipeline
+
+**Part 2: Text Representation**
+- Bag of Words (BoW) and TF-IDF
+- Word embeddings (Word2Vec from scratch)
+- Similarity search and visualization
+- Comparison of representation methods
+
+**Part 3: Sequence Models**
+- RNN architecture and implementation
+- LSTM for sentiment analysis
+- GRU comparison
+- Handling vanishing gradients
+
+**Part 4: Attention Mechanisms**
+- Attention intuition and visualization
+- Self-attention (scaled dot-product)
+- Attention weight interpretation
+- Mathematical foundations
+
+**Part 5: Transformers**
+- Multi-head attention implementation
+- Complete Transformer encoder
+- Positional embeddings
+- Layer normalization and residuals
+
+**Part 6: Practical Applications**
+- Sentiment analysis with pre-trained models
+- Text generation with GPT-2
+- Using HuggingFace Transformers
+
+**Features:**
+- From-scratch Word2Vec implementation
+- Complete Transformer architecture
+- Attention visualization
+- Production-ready code
+- Interview Q&A integrated
+
+**Interview Topics:**
+- Stemming vs lemmatization
+- Why TF-IDF beats BoW
+- LSTM solving vanishing gradients
+- How attention helps in NLP
+- Why Transformers are faster than LSTMs
+
+---
+
 ## 🎯 Learning Paths
 
 ### 🌱 **Beginner Path** (4-6 weeks)
@@ -628,18 +710,22 @@ If this helped you, please star the repository! It helps others find these resou
 
 ## 🚀 What's Next?
 
+### Recently Completed ✅
+- [x] **Modern ML/AI Techniques (2024-2025)** - LLMs, Diffusion, ViTs, RAG, MoE, RLHF, Quantization
+- [x] **Speculative Coding Guide** - Speculative decoding, spec-driven development, testing frameworks
+- [x] **Natural Language Processing Fundamentals** - Complete notebook from text processing to Transformers
+
 ### Coming Soon
-- [ ] Time Series Analysis & Forecasting
-- [ ] Natural Language Processing Fundamentals
-- [ ] Computer Vision with CNNs
-- [ ] MLOps & Production Deployment
-- [ ] Reinforcement Learning Basics
-- [ ] AutoML and Neural Architecture Search
+- [ ] Computer Vision with CNNs (notebook 10)
+- [ ] MLOps & Production Deployment (notebook 11)
+- [ ] Reinforcement Learning Basics (notebook 12)
+- [ ] AutoML and Neural Architecture Search (notebook 13)
+- [ ] Time Series Analysis & Forecasting (expanded notebook)
 
 ### Roadmap
-- Q4 2025: Advanced Deep Learning architectures (Transformers, Diffusion Models)
-- Q1 2026: Production ML case studies and MLOps best practices
-- Q2 2026: Research paper implementations (SOTA models)
+- **Q4 2025:** ✅ Modern AI techniques completed, Advanced architectures documentation
+- **Q1 2026:** Production ML case studies, MLOps best practices, deployment guides
+- **Q2 2026:** Research paper implementations (SOTA models), project templates
 
 ---
 
@@ -651,6 +737,14 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 2025*
+*Last Updated: October 15, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 2.1*
+*Version: 2.5 - Major Enhancement Release*
+
+**New in v2.5:**
+- Modern ML/AI Techniques Guide (2024-2025)
+- Speculative Coding for ML/AI Guide
+- NLP Fundamentals Notebook (09)
+- 200+ new code examples
+- 50+ new visualizations
+- Interview questions for all new topics
