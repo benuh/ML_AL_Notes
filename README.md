@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **8 In-Depth Jupyter Notebooks** | 🎯 **100+ Interview Questions** | 🔬 **50+ Algorithms Implemented** | 📊 **200+ Visualizations**
+> 📚 **11 In-Depth Jupyter Notebooks** | 🎯 **100+ Interview Questions** | 🔬 **50+ Algorithms Implemented** | 📊 **200+ Visualizations**
 
 ---
 
@@ -475,6 +475,123 @@ All code is runnable, well-documented, and ready for research papers, presentati
 
 ---
 
+#### **[10 - Computer Vision with Deep Learning](./interactive_demos/10_computer_vision.ipynb)** ⭐ **NEW**
+**From CNNs to Modern Object Detection**
+
+**Part 1: Understanding Convolutions**
+- 2D convolution from scratch
+- Common kernels (edge detection, blur, sharpen)
+- Receptive field calculation
+- Feature extraction fundamentals
+
+**Part 2: Building CNNs from Scratch**
+- Simple CNN for MNIST
+- Convolutional layer implementation
+- Pooling layers (max, average, global)
+- Visualizing feature maps
+
+**Part 3: Transfer Learning**
+- Loading pre-trained ResNet
+- Fine-tuning for custom datasets
+- Freezing and unfreezing layers
+- Image classification pipeline
+
+**Part 4: Data Augmentation**
+- Standard augmentations (flip, rotate, crop)
+- Color jittering
+- Visualizing augmented samples
+- Best practices
+
+**Part 5: Training Pipeline**
+- Complete training loop
+- Validation and checkpointing
+- Learning rate scheduling
+- Monitoring and visualization
+
+**Part 6: Grad-CAM Visualization**
+- Class activation mapping
+- Understanding model decisions
+- Debugging with visualizations
+- Interpretability techniques
+
+**Features:**
+- From-scratch convolution implementation
+- Complete training pipeline
+- Transfer learning examples
+- Grad-CAM for interpretability
+- Production-ready patterns
+
+**Interview Topics:**
+- Why convolution over fully connected?
+- Skip connections in ResNet
+- Transfer learning benefits
+- Data augmentation importance
+- Grad-CAM explanation
+
+---
+
+#### **[11 - MLOps & Production Deployment](./interactive_demos/11_mlops_production.ipynb)** ⭐ **NEW**
+**Complete MLOps Pipeline - From Training to Production**
+
+**Part 1: Experiment Tracking**
+- MLflow setup and configuration
+- Logging parameters, metrics, and artifacts
+- Comparing experiments
+- Model registry management
+
+**Part 2: Model Deployment**
+- Flask API for model serving
+- FastAPI with automatic documentation
+- Input validation with Pydantic
+- Error handling and logging
+
+**Part 3: Containerization**
+- Docker image creation
+- Multi-stage builds for efficiency
+- Container orchestration basics
+- Deployment best practices
+
+**Part 4: Monitoring & Logging**
+- Application and model logging
+- Custom metrics tracking
+- Performance monitoring
+- Error alerting strategies
+
+**Part 5: Data Drift Detection**
+- Kolmogorov-Smirnov test implementation
+- Population Stability Index (PSI)
+- Statistical drift detection
+- Automated retraining triggers
+
+**Part 6: A/B Testing**
+- Experimental design for model comparison
+- Statistical significance testing
+- Multi-armed bandit algorithms
+- Production A/B testing frameworks
+
+**Part 7: CI/CD for ML**
+- Automated testing pipelines
+- Model validation gates
+- Continuous deployment strategies
+- Rollback procedures
+
+**Features:**
+- Complete deployment pipeline
+- Production-ready code patterns
+- Monitoring and alerting setup
+- Data drift detection system
+- A/B testing framework
+- Interview Q&A integrated
+
+**Interview Topics:**
+- Deploying ML models to production
+- Handling data drift
+- A/B testing for model comparison
+- Model monitoring strategies
+- CI/CD for ML systems
+
+---
+
 ## 🎯 Learning Paths
 
 ### 🌱 **Beginner Path** (4-6 weeks)
@@ -610,6 +727,38 @@ lime>=0.2.0            # Local explanations
   - Loss function selection guide with decision trees
   - Custom loss implementation templates (PyTorch & TensorFlow)
 
+- **[DEEP_LEARNING_ARCHITECTURES.md](./DEEP_LEARNING_ARCHITECTURES.md)** ⭐ **BRAND NEW**
+  - Complete neural network fundamentals (MLP from scratch with backprop)
+  - All activation functions (ReLU, GELU, Swish) with visualizations
+  - CNN architectures (VGG, ResNet, Inception, EfficientNet)
+  - Modern building blocks (Residual, Bottleneck, SE blocks)
+  - Optimization techniques (SGD, Adam, AdamW, learning rate schedules)
+  - Regularization methods (Dropout, BatchNorm, Data Augmentation, Mixup)
+  - Complete training pipeline with best practices
+  - Production-ready PyTorch implementations
+  - Interview questions for all architectures
+
+#### **MLOps & Production**
+- **[DEBUGGING_ML_MODELS.md](./DEBUGGING_ML_MODELS.md)** ⭐ **NEW**
+  - Systematic debugging process for ML models
+  - Data problems (distribution imbalance, normalization, leakage, outliers)
+  - Model problems (vanishing/exploding gradients, poor initialization, wrong architecture)
+  - Training problems (overfitting, underfitting, learning rate issues)
+  - Performance problems (slow training, memory errors, GPU utilization)
+  - Evaluation problems (metric selection, train-test mismatch)
+  - Complete debugging toolkit with code examples
+  - Debugging checklist for production systems
+  - Interview questions for ML debugging
+
+- **[MODEL_DEPLOYMENT_CHECKLIST.md](./MODEL_DEPLOYMENT_CHECKLIST.md)** ⭐ **NEW**
+  - Comprehensive 5-stage deployment checklist (Pre-dev → Post-deployment)
+  - Security checklist (data encryption, access control, compliance)
+  - Performance checklist (latency, throughput, cost optimization)
+  - Documentation templates (model cards, deployment runbooks)
+  - Red flags and best practices
+  - Quick pre-deployment verification
+  - Production-ready deployment workflow
+
 #### **Visualization and Tooling**
 - **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete visualization toolkit for ML/AI
 - **[LEARNING_GUIDE.md](./LEARNING_GUIDE.md)** - How to use this curriculum effectively
@@ -713,14 +862,19 @@ If this helped you, please star the repository! It helps others find these resou
 ### Recently Completed ✅
 - [x] **Modern ML/AI Techniques (2024-2025)** - LLMs, Diffusion, ViTs, RAG, MoE, RLHF, Quantization
 - [x] **Speculative Coding Guide** - Speculative decoding, spec-driven development, testing frameworks
-- [x] **Natural Language Processing Fundamentals** - Complete notebook from text processing to Transformers
+- [x] **Deep Learning Architectures Guide** - Complete reference from MLPs to EfficientNet
+- [x] **NLP Fundamentals Notebook (09)** - Text processing to Transformers with implementations
+- [x] **Computer Vision Notebook (10)** - CNNs, transfer learning, Grad-CAM visualization
+- [x] **MLOps & Production Deployment (notebook 11)** - Experiment tracking, deployment, monitoring, drift detection
+- [x] **ML Model Debugging Guide** - Systematic debugging process with complete toolkit
+- [x] **Model Deployment Checklist** - 5-stage production deployment checklist with templates
 
 ### Coming Soon
-- [ ] Computer Vision with CNNs (notebook 10)
-- [ ] MLOps & Production Deployment (notebook 11)
 - [ ] Reinforcement Learning Basics (notebook 12)
 - [ ] AutoML and Neural Architecture Search (notebook 13)
 - [ ] Time Series Analysis & Forecasting (expanded notebook)
+- [ ] Advanced Deep Learning Projects
+- [ ] Production ML Case Studies
 
 ### Roadmap
 - **Q4 2025:** ✅ Modern AI techniques completed, Advanced architectures documentation
@@ -737,14 +891,24 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 15, 2025*
+*Last Updated: October 16, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 2.5 - Major Enhancement Release*
+*Version: 3.1 - MLOps & Production Release*
 
-**New in v2.5:**
-- Modern ML/AI Techniques Guide (2024-2025)
-- Speculative Coding for ML/AI Guide
-- NLP Fundamentals Notebook (09)
-- 200+ new code examples
-- 50+ new visualizations
-- Interview questions for all new topics
+**New in v3.1:**
+- MLOps & Production Deployment Notebook (11) - Complete production pipeline
+- ML Model Debugging Guide - Systematic debugging process
+- Model Deployment Checklist - 5-stage production deployment workflow
+- Experiment tracking, monitoring, and drift detection
+- CI/CD for ML systems
+- Production best practices and templates
+
+**New in v3.0:**
+- Modern ML/AI Techniques Guide (2024-2025) - LLMs, Diffusion, RAG, MoE
+- Speculative Coding for ML/AI Guide - Advanced patterns and testing
+- Deep Learning Architectures Guide - Complete reference with implementations
+- NLP Fundamentals Notebook (09) - Text processing to Transformers
+- Computer Vision Notebook (10) - CNNs, transfer learning, Grad-CAM
+- 300+ new code examples
+- 80+ new visualizations
+- Interview questions for all topics
