@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **11 In-Depth Jupyter Notebooks** | 🎯 **100+ Interview Questions** | 🔬 **50+ Algorithms Implemented** | 📊 **200+ Visualizations**
+> 📚 **12 In-Depth Jupyter Notebooks** | 🎯 **120+ Interview Questions** | 🔬 **60+ Algorithms Implemented** | 📊 **250+ Visualizations**
 
 ---
 
@@ -592,6 +592,70 @@ All code is runnable, well-documented, and ready for research papers, presentati
 
 ---
 
+#### **[12 - Reinforcement Learning](./interactive_demos/12_reinforcement_learning.ipynb)** ⭐ **NEW**
+**Complete RL: From Fundamentals to Deep RL**
+
+**Part 1: RL Fundamentals**
+- Introduction to RL (agents, environments, rewards)
+- Markov Decision Processes (MDPs)
+- Value functions and policies
+- Bellman equations
+
+**Part 2: Classical RL**
+- Value Iteration algorithm
+- Q-Learning implementation
+- ε-greedy exploration
+- Solving Grid World
+
+**Part 3: Deep Q-Networks (DQN)**
+- Experience replay buffer
+- Target network stabilization
+- DQN algorithm implementation
+- Training on CartPole
+
+**Part 4: Policy Gradient Methods**
+- REINFORCE algorithm
+- Policy gradient theorem
+- Monte Carlo sampling
+- Variance reduction
+
+**Part 5: Actor-Critic Methods**
+- Advantage Actor-Critic (A2C)
+- Advantage function
+- Online learning
+- Shared network architecture
+
+**Part 6: Proximal Policy Optimization (PPO)**
+- Clipped surrogate objective
+- Trust region methods
+- State-of-the-art algorithm
+
+**Part 7: Advanced Topics**
+- Multi-armed bandits
+- Model-based RL
+- Offline RL
+- Multi-agent RL
+- Hierarchical RL
+- Inverse RL
+
+**Features:**
+- From-scratch implementations
+- Multiple environments (Grid World, CartPole)
+- Complete training loops
+- Performance visualization
+- Interview Q&A integrated
+
+**Interview Topics:**
+- Exploration vs exploitation tradeoff
+- Q-Learning vs SARSA
+- DQN innovations (replay, target network)
+- Value-based vs policy-based methods
+- Advantage function
+- Continuous action spaces
+- Challenges in deep RL
+
+---
+
 ## 🎯 Learning Paths
 
 ### 🌱 **Beginner Path** (4-6 weeks)
@@ -738,6 +802,28 @@ lime>=0.2.0            # Local explanations
   - Production-ready PyTorch implementations
   - Interview questions for all architectures
 
+- **[ADVANCED_DEEP_LEARNING.md](./ADVANCED_DEEP_LEARNING.md)** ⭐ **NEW**
+  - **Generative Models**: VAEs, GANs (Vanilla, DCGAN, WGAN, cGAN), Diffusion Models, Autoregressive Models
+  - **Advanced Optimization**: Learning rate schedules (Cosine, OneCycle, LR Finder), gradient clipping, mixed precision training, advanced optimizers (AdamW, RAdam), gradient accumulation
+  - **Advanced Regularization**: Label smoothing, Mixup, CutMix, Cutout, Stochastic Depth
+  - **Self-Supervised Learning**: Contrastive learning (SimCLR, MoCo), Masked Autoencoders (MAE)
+  - **Model Compression**: Knowledge distillation, pruning (structured & unstructured), quantization (PTQ, QAT)
+  - **Advanced Training**: Multi-GPU (DataParallel, DDP), EMA, Curriculum Learning
+  - **Architecture Design**: SE blocks, Inverted Residuals, ECA blocks
+  - Complete implementations with best practices and interview questions
+
+- **[DEEP_LEARNING_BEST_PRACTICES.md](./DEEP_LEARNING_BEST_PRACTICES.md)** ⭐ **NEW**
+  - **Getting Started Right**: Simple baselines, overfit single batch, strong baselines
+  - **Data Preparation**: EDA, normalization, smart augmentation, class imbalance handling
+  - **Model Architecture**: Weight initialization, BatchNorm usage, dropout strategies
+  - **Training Loop**: LR finder, proper training loop, mixed precision, gradient clipping
+  - **Debugging**: Loss not decreasing, performance plateaus, systematic diagnosis
+  - **Performance Optimization**: cuDNN benchmark, DataLoader optimization, memory reduction
+  - **Experiment Tracking**: Systematic organization, Weights & Biases integration
+  - **Production Deployment**: Model export (TorchScript, ONNX), quantization
+  - **Common Pitfalls**: 10 most common mistakes and solutions
+  - Battle-tested tips from real-world projects
+
 #### **MLOps & Production**
 - **[DEBUGGING_ML_MODELS.md](./DEBUGGING_ML_MODELS.md)** ⭐ **NEW**
   - Systematic debugging process for ML models
@@ -863,14 +949,16 @@ If this helped you, please star the repository! It helps others find these resou
 - [x] **Modern ML/AI Techniques (2024-2025)** - LLMs, Diffusion, ViTs, RAG, MoE, RLHF, Quantization
 - [x] **Speculative Coding Guide** - Speculative decoding, spec-driven development, testing frameworks
 - [x] **Deep Learning Architectures Guide** - Complete reference from MLPs to EfficientNet
+- [x] **Advanced Deep Learning Guide** - VAEs, GANs, Diffusion, Self-Supervised Learning, Model Compression
+- [x] **Deep Learning Best Practices** - Battle-tested tips, debugging, optimization, production deployment
 - [x] **NLP Fundamentals Notebook (09)** - Text processing to Transformers with implementations
 - [x] **Computer Vision Notebook (10)** - CNNs, transfer learning, Grad-CAM visualization
 - [x] **MLOps & Production Deployment (notebook 11)** - Experiment tracking, deployment, monitoring, drift detection
+- [x] **Reinforcement Learning (notebook 12)** - MDPs, Q-Learning, DQN, Policy Gradients, A2C, PPO
 - [x] **ML Model Debugging Guide** - Systematic debugging process with complete toolkit
 - [x] **Model Deployment Checklist** - 5-stage production deployment checklist with templates
 
 ### Coming Soon
-- [ ] Reinforcement Learning Basics (notebook 12)
 - [ ] AutoML and Neural Architecture Search (notebook 13)
 - [ ] Time Series Analysis & Forecasting (expanded notebook)
 - [ ] Advanced Deep Learning Projects
@@ -891,9 +979,40 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 16, 2025*
+*Last Updated: October 17, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 3.1 - MLOps & Production Release*
+*Version: 3.4 - Reinforcement Learning Release*
+
+**New in v3.4:**
+- **Reinforcement Learning Notebook (12)** - Complete RL from fundamentals to deep RL
+  - RL fundamentals (MDPs, value functions, Bellman equations)
+  - Classical RL (Value Iteration, Q-Learning, ε-greedy)
+  - Deep Q-Networks (DQN) with experience replay and target network
+  - Policy Gradients (REINFORCE algorithm)
+  - Actor-Critic (A2C) with advantage function
+  - Proximal Policy Optimization (PPO)
+  - Advanced topics (multi-agent, model-based, hierarchical)
+  - 10+ interview questions with detailed answers
+  - Multiple environments (Grid World, CartPole)
+
+**New in v3.3:**
+- **Deep Learning Best Practices Guide** - Battle-tested practical tips and debugging strategies
+  - Getting started right (baselines, overfitting single batch)
+  - Data preparation (EDA, normalization, augmentation)
+  - Training loop best practices (LR finder, mixed precision)
+  - Debugging (loss not decreasing, plateaus)
+  - Performance optimization (speed, memory)
+  - Experiment tracking and production deployment
+  - 10 common pitfalls and solutions
+
+**New in v3.2:**
+- Advanced Deep Learning Guide - Comprehensive generative models, optimization, and compression
+- VAEs, GANs (Vanilla, DCGAN, WGAN, cGAN), Diffusion Models implementations
+- Self-supervised learning (SimCLR, MoCo, MAE)
+- Advanced optimization (OneCycle LR, mixed precision, gradient accumulation)
+- Model compression (knowledge distillation, pruning, quantization)
+- Advanced regularization (Mixup, CutMix, label smoothing, stochastic depth)
+- Multi-GPU training and production best practices
 
 **New in v3.1:**
 - MLOps & Production Deployment Notebook (11) - Complete production pipeline
