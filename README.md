@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **12 In-Depth Jupyter Notebooks** | 🎯 **120+ Interview Questions** | 🔬 **60+ Algorithms Implemented** | 📊 **250+ Visualizations**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations**
 
 ---
 
@@ -656,6 +656,127 @@ All code is runnable, well-documented, and ready for research papers, presentati
 
 ---
 
+#### **[13 - AutoML and Neural Architecture Search](./interactive_demos/13_automl_neural_architecture_search.ipynb)** ⭐ **NEW**
+**Automated Machine Learning and Architecture Discovery**
+
+**Part 1: Hyperparameter Optimization**
+- Grid Search (exhaustive search)
+- Random Search (efficient sampling)
+- Bayesian Optimization with Optuna
+- Multi-objective optimization
+- Comparison and best practices
+
+**Part 2: AutoML Frameworks**
+- Combined Algorithm Selection and Hyperparameter Optimization (CASH)
+- Ensemble selection
+- Algorithm performance comparison
+- Complete pipeline automation
+
+**Part 3: Neural Architecture Search (NAS)**
+- Search space design
+- Random NAS baseline
+- Bayesian NAS with Optuna
+- Architecture component importance
+- Advanced methods (Evolutionary, RL, DARTS, One-Shot)
+
+**Part 4: Meta-Learning**
+- Learning to learn fundamentals
+- Cross-task optimization
+- Hyperparameter initialization
+- Fast adaptation to new tasks
+
+**Part 5: Automated Feature Engineering**
+- Feature selection (Univariate, RFE, Importance)
+- Automated selection with optimization
+- Feature importance analysis
+- Pareto optimization
+
+**Part 6: Best Practices**
+- When to use AutoML
+- Computational budget management
+- Validation strategies
+- Avoiding overfitting
+- Interpreting results
+- Common pitfalls
+
+**Features:**
+- Grid, Random, and Bayesian optimization implementations
+- CASH with multiple algorithms
+- NAS with flexible architectures
+- Meta-learning examples
+- Complete Optuna integration
+- Visualization of optimization history
+- Production deployment considerations
+
+**Interview Topics:**
+- Grid vs Random vs Bayesian optimization
+- CASH problem formulation
+- Neural Architecture Search methods
+- Meta-learning concepts
+- Preventing overfitting in HPO
+- Bayesian optimization mechanics
+- AutoML in production challenges
+
+---
+
+#### **[14 - Time Series Analysis & Forecasting](./interactive_demos/14_time_series_forecasting.ipynb)** ⭐ **NEW**
+**Complete Guide from Classical Methods to Modern Deep Learning**
+
+**Part 1: Time Series Fundamentals**
+- Components (trend, seasonality, cyclic, irregular)
+- Stationarity testing (Augmented Dickey-Fuller test)
+- Differencing techniques
+- ACF/PACF analysis
+- Time series decomposition (additive/multiplicative)
+
+**Part 2: Classical Statistical Methods**
+- Moving Averages (Simple, Weighted)
+- Exponential Smoothing (Simple, Double/Holt, Triple/Holt-Winters)
+- ARIMA models (AR, MA, ARMA, ARIMA)
+- SARIMA (Seasonal ARIMA)
+- Model selection with AIC/BIC
+
+**Part 3: Deep Learning for Time Series**
+- Time series dataset preparation (sliding window)
+- LSTM/GRU architectures
+- 1D Convolutional Neural Networks
+- Transformers with positional encoding
+- Multi-step ahead forecasting
+
+**Part 4: Advanced Topics**
+- Multivariate time series
+- Anomaly detection
+- Probabilistic forecasting
+- Transfer learning for time series
+
+**Part 5: Best Practices & Production**
+- Time series cross-validation (walk-forward)
+- Evaluation metrics (MAE, RMSE, MAPE, sMAPE, MASE)
+- Feature engineering for time series
+- Production deployment considerations
+
+**Features:**
+- 8 model implementations (ES, ARIMA, SARIMA, LSTM, CNN, Transformer)
+- Complete from-scratch implementations
+- Mathematical derivations for all methods
+- Model comparison framework
+- Comprehensive evaluation metrics
+- Visualization of forecasts and uncertainty
+- Production-ready patterns
+
+**Interview Topics:**
+- Stationarity and why it matters
+- AR vs MA vs ARMA differences
+- Why k-fold CV doesn't work for time series
+- LSTM vs Transformer for forecasting
+- Additive vs multiplicative seasonality
+- SARIMA seasonal components
+- Deep learning vs traditional methods
+- Outlier detection and handling
+- Walk-forward validation implementation
+
+---
+
 ## 🎯 Learning Paths
 
 ### 🌱 **Beginner Path** (4-6 weeks)
@@ -955,11 +1076,11 @@ If this helped you, please star the repository! It helps others find these resou
 - [x] **Computer Vision Notebook (10)** - CNNs, transfer learning, Grad-CAM visualization
 - [x] **MLOps & Production Deployment (notebook 11)** - Experiment tracking, deployment, monitoring, drift detection
 - [x] **Reinforcement Learning (notebook 12)** - MDPs, Q-Learning, DQN, Policy Gradients, A2C, PPO
+- [x] **AutoML & Neural Architecture Search (notebook 13)** - HPO, CASH, NAS, Meta-Learning
 - [x] **ML Model Debugging Guide** - Systematic debugging process with complete toolkit
 - [x] **Model Deployment Checklist** - 5-stage production deployment checklist with templates
 
 ### Coming Soon
-- [ ] AutoML and Neural Architecture Search (notebook 13)
 - [ ] Time Series Analysis & Forecasting (expanded notebook)
 - [ ] Advanced Deep Learning Projects
 - [ ] Production ML Case Studies
@@ -979,9 +1100,29 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 17, 2025*
+*Last Updated: October 18, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 3.4 - Reinforcement Learning Release*
+*Version: 4.1 - Time Series Forecasting Added* 🎉
+
+**New in v4.1:**
+- **Time Series Analysis & Forecasting Notebook (14)** ⭐ **BRAND NEW** - Complete time series curriculum
+  - Classical methods (MA, Exponential Smoothing, ARIMA, SARIMA)
+  - Deep learning (LSTM, 1D CNN, Transformers)
+  - 8 model implementations with complete comparison
+  - Production best practices and evaluation metrics
+  - Time series cross-validation (walk-forward)
+  - 10+ interview questions with detailed answers
+
+**New in v4.0:**
+- **AutoML & Neural Architecture Search Notebook (13)** - Complete automation of ML pipeline
+  - Hyperparameter optimization (Grid, Random, Bayesian with Optuna)
+  - Multi-objective optimization (accuracy vs speed)
+  - CASH (Combined Algorithm Selection and Hyperparameter Optimization)
+  - Neural Architecture Search (Random, Bayesian, advanced methods)
+  - Meta-learning (learning to learn across tasks)
+  - Automated feature engineering and selection
+  - Best practices and production deployment
+  - 8+ interview questions with detailed answers
 
 **New in v3.4:**
 - **Reinforcement Learning Notebook (12)** - Complete RL from fundamentals to deep RL
