@@ -92,6 +92,31 @@
 
 All code is runnable, well-documented, and ready for research papers, presentations, and production monitoring systems.
 
+### **Advanced Deep Learning Projects** 🎯 **BRAND NEW**
+**[ADVANCED_DL_PROJECTS.md](./ADVANCED_DL_PROJECTS.md) & [Part 2](./ADVANCED_DL_PROJECTS_PART2.md)** - 6 production-ready end-to-end deep learning projects:
+
+- **Project 1: Image Classification (ResNet on CIFAR-10)** - Complete pipeline with mixed precision, OneCycleLR, data augmentation
+- **Project 2: Object Detection (YOLO-style)** - Multi-task learning, anchor boxes, NMS, mAP evaluation
+- **Project 3: Text Generation (GPT-style Transformer)** - Character-level LM, attention mechanisms, sampling strategies
+- **Project 4: Diffusion Model for Image Synthesis** - DDPM/DDIM, U-Net, noise schedules, classifier-free guidance
+- **Project 5: Multimodal Image Captioning** - Vision encoder + language decoder, cross-modal attention
+- **Project 6: Production Recommendation System** - Collaborative filtering, caching, serving, monitoring
+
+**Each project includes:**
+- ✅ Complete, runnable implementation (500+ lines per project)
+- ✅ Data pipeline with augmentation
+- ✅ Training loop with best practices
+- ✅ Evaluation and metrics
+- ✅ Deployment considerations
+- ✅ Common pitfalls and solutions
+- ✅ Production checklist
+
+**Perfect for:**
+- Building portfolio projects for job applications
+- Understanding end-to-end ML workflows
+- Learning production ML best practices
+- Interview preparation with hands-on experience
+
 ---
 
 ## 📚 Learning Curriculum
@@ -966,6 +991,12 @@ lime>=0.2.0            # Local explanations
   - Quick pre-deployment verification
   - Production-ready deployment workflow
 
+#### **Projects and Hands-On Learning**
+- **[ADVANCED_DL_PROJECTS.md](./ADVANCED_DL_PROJECTS.md) & [Part 2](./ADVANCED_DL_PROJECTS_PART2.md)** - 6 complete deep learning projects
+  - Image Classification, Object Detection, Text Generation
+  - Diffusion Models, Multimodal Learning, Production Systems
+  - Complete implementations with deployment guides
+
 #### **Visualization and Tooling**
 - **[VISUALIZATION_GUIDE.md](./VISUALIZATION_GUIDE.md)** - Complete visualization toolkit for ML/AI
 - **[LEARNING_GUIDE.md](./LEARNING_GUIDE.md)** - How to use this curriculum effectively
@@ -1081,8 +1112,8 @@ If this helped you, please star the repository! It helps others find these resou
 - [x] **Model Deployment Checklist** - 5-stage production deployment checklist with templates
 
 ### Coming Soon
-- [ ] Time Series Analysis & Forecasting (expanded notebook)
-- [ ] Advanced Deep Learning Projects
+- [x] **Time Series Analysis & Forecasting (notebook 14)** - Complete classical + deep learning methods
+- [x] **Advanced Deep Learning Projects** - 6 production-ready project implementations
 - [ ] Production ML Case Studies
 
 ### Roadmap
@@ -1102,10 +1133,17 @@ If this helped you, please star the repository! It helps others find these resou
 
 *Last Updated: October 18, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 4.1 - Time Series Forecasting Added* 🎉
+*Version: 4.2 - Advanced Projects Added* 🎉
+
+**New in v4.2:**
+- **Advanced Deep Learning Projects Guide** ⭐ **BRAND NEW** - 6 production-ready end-to-end projects
+  - Image Classification (ResNet), Object Detection (YOLO), Text Generation (GPT)
+  - Diffusion Models, Multimodal Learning, Production Recommendation System
+  - 3000+ lines of production code across all projects
+  - Complete training pipelines, deployment guides, and best practices
 
 **New in v4.1:**
-- **Time Series Analysis & Forecasting Notebook (14)** ⭐ **BRAND NEW** - Complete time series curriculum
+- **Time Series Analysis & Forecasting Notebook (14)** - Complete time series curriculum
   - Classical methods (MA, Exponential Smoothing, ARIMA, SARIMA)
   - Deep learning (LSTM, 1D CNN, Transformers)
   - 8 model implementations with complete comparison
