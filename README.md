@@ -166,6 +166,70 @@ All code is runnable, well-documented, and ready for research papers, presentati
 - Learning real-world ML engineering
 - Building similar solutions in your organization
 
+### **ML System Design Interview Guide** 🎯 **BRAND NEW**
+**[ML_SYSTEM_DESIGN_INTERVIEW_GUIDE.md](./ML_SYSTEM_DESIGN_INTERVIEW_GUIDE.md) & [Part 2](./ML_SYSTEM_DESIGN_INTERVIEW_GUIDE_PART2.md)** - Complete interview preparation for ML system design:
+
+**Part 1: Framework and Examples**
+- **PROBLEM Framework** - Systematic approach for all ML system design interviews
+  - Problem definition & Requirements
+  - Outline high-level architecture
+  - Break down components
+  - List trade-offs
+  - Edge cases & scaling
+  - Monitoring & maintenance
+- **Complete YouTube Recommendation System** - Full worked example
+  - Two-stage retrieval + ranking architecture
+  - Feature engineering (user, video, context)
+  - Candidate generation and ranking models
+  - Caching strategies and latency optimization
+  - A/B testing and monitoring
+
+**Part 2: Patterns and Practice**
+- **6 Common ML System Patterns** - Recommendation, Search, CV, NLP, Fraud, Moderation
+- **Trade-off Analysis Framework** - Decision matrices and optimization
+- **7 Practical Tips & Tricks** - Battle-tested interview strategies
+- **Evaluation Rubric** - What interviewers look for
+- **7 Common Mistakes to Avoid** - Don't lose points unnecessarily
+- **11 Practice Problems** - Netflix, LinkedIn, Spotify, Google, Amazon, Face Recognition, Autonomous Vehicles, Email Auto-Reply, Chatbot, Fraud Detection, Content Moderation
+
+**Perfect for:**
+- FAANG/top tech company interviews
+- Senior ML Engineer positions
+- Staff+ level interviews
+- Building real-world ML systems
+
+### **ML Practical Templates & Checklists** 📋 **BRAND NEW**
+**[ML_PRACTICAL_TEMPLATES_CHECKLISTS.md](./ML_PRACTICAL_TEMPLATES_CHECKLISTS.md)**, **[Part 2](./ML_PRACTICAL_TEMPLATES_CHECKLISTS_PART2.md)**, **[Part 3](./ML_PRACTICAL_TEMPLATES_CHECKLISTS_PART3.md)** - Complete collection of production-ready templates:
+
+**Project Planning & Development:**
+1. **Project Initiation Templates** - Project charter, quick kickoff (lean version)
+2. **Data Analysis Checklist** - Initial exploration, quality report template
+3. **Feature Engineering Template** - Feature inventory, transformations, pipelines
+4. **Model Development Checklist** - 11-phase development process
+5. **Experiment Tracking Template** - Structured experiment logs with reproducibility
+6. **Model Evaluation Template** - Comprehensive evaluation report with business impact
+
+**Production & Operations:**
+7. **A/B Testing Plan Template** - Complete experimental design with statistical analysis
+8. **Production Deployment Checklist** - 13-section pre-deployment verification
+9. **Monitoring & Alerting Template** - 4-tier metrics with dashboards and runbooks
+10. **Incident Response Template** - Post-mortem and RCA framework
+11. **ML System Design Template** - PROBLEM framework applied to system design
+12. **Interview Preparation Checklist** - 12-week comprehensive interview prep plan
+
+**Features:**
+- ✅ Copy-paste ready templates
+- ✅ Production-tested checklists
+- ✅ Complete with code examples
+- ✅ Best practices integrated
+- ✅ Customizable for your organization
+
+**Perfect for:**
+- Kickstarting ML projects quickly
+- Ensuring nothing is missed in production
+- Standardizing team processes
+- Interview preparation with structured approach
+
 ---
 
 ## 📚 Learning Curriculum
@@ -1169,6 +1233,8 @@ If this helped you, please star the repository! It helps others find these resou
 - [x] **Time Series Analysis & Forecasting (notebook 14)** - Complete classical + deep learning methods
 - [x] **Advanced Deep Learning Projects** - 6 production-ready project implementations
 - [x] **Production ML Case Studies** - 5 real-world production systems with complete implementations
+- [x] **ML System Design Interview Guide** - Complete framework with PROBLEM approach, 11 practice problems
+- [x] **ML Practical Templates & Checklists** - 12 production-ready templates for entire ML lifecycle
 
 ### Roadmap
 - **Q4 2025:** ✅ Modern AI techniques completed, Advanced architectures documentation
@@ -1185,7 +1251,7 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 18, 2025*
+*Last Updated: October 21, 2025*
 *Maintained by: Benjamin Hu*
 *Version: 5.0 - Complete Production ML Curriculum* 🎉🎉🎉
 
