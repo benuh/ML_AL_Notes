@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **Quick Reference Cheat Sheets**
 
 ---
 
@@ -1027,6 +1027,29 @@ lime>=0.2.0            # Local explanations
 
 ### Essential Guides (In This Repository)
 
+#### **ML/AI Quick Reference & Cheat Sheets** 📋 **BRAND NEW**
+- **[ML_AI_QUICK_REFERENCE_CHEAT_SHEETS.md](./ML_AI_QUICK_REFERENCE_CHEAT_SHEETS.md)** ⭐ **ESSENTIAL**
+  - **One-page summaries** for quick lookups and interviews
+  - **Algorithm selection flowcharts** - Choose the right model in seconds
+  - **Common formulas** - Loss functions, metrics, optimization
+  - **Code snippets** - Copy-paste ready for common tasks
+  - **Evaluation metrics guide** - When to use which metric
+  - **Hyperparameter ranges** - Starting points for tuning (RF, XGBoost, NN, SVM, KNN)
+  - **Data processing strategies** - Missing data, encoding, scaling
+  - **Deep learning reference** - Activations, losses, optimizers, architectures
+  - **Common pitfalls & solutions** - Top 10 mistakes and how to avoid them
+  - **Interview cheat sheet** - 1-minute explanations of must-know concepts
+  - **Quick debugging guide** - Systematic troubleshooting for common issues
+  - **Time complexity table** - Big-O for all major algorithms
+  - **Production checklist** - Pre/post deployment verification
+
+  **Perfect for:**
+  - Interview preparation (quick review)
+  - On-the-job reference (fast lookups)
+  - Decision making (algorithm selection, metric choice)
+  - Debugging (systematic troubleshooting)
+  - Teaching/mentoring (concise explanations)
+
 #### **New Comprehensive Reference Guides (2025)** 🆕
 - **[ALGORITHM_COMPLEXITY_REFERENCE.md](./ALGORITHM_COMPLEXITY_REFERENCE.md)** ⭐ **NEW**
   - Complete Big-O complexity analysis for 100+ ML algorithms
@@ -1235,6 +1258,7 @@ If this helped you, please star the repository! It helps others find these resou
 - [x] **Production ML Case Studies** - 5 real-world production systems with complete implementations
 - [x] **ML System Design Interview Guide** - Complete framework with PROBLEM approach, 11 practice problems
 - [x] **ML Practical Templates & Checklists** - 12 production-ready templates for entire ML lifecycle
+- [x] **ML/AI Quick Reference & Cheat Sheets** - One-page summaries, flowcharts, code snippets for fast lookups
 
 ### Roadmap
 - **Q4 2025:** ✅ Modern AI techniques completed, Advanced architectures documentation
@@ -1253,7 +1277,31 @@ If this helped you, please star the repository! It helps others find these resou
 
 *Last Updated: October 21, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 5.0 - Complete Production ML Curriculum* 🎉🎉🎉
+*Version: 5.1 - Complete Production ML Curriculum + Interview Resources* 🎉🎉🎉
+
+**New in v5.1:** ⭐ **LATEST**
+- **ML System Design Interview Guide** - Complete PROBLEM framework with worked examples
+  - YouTube recommendation system (full architecture)
+  - 6 common ML system patterns (Recommendation, Search, CV, NLP, Fraud, Moderation)
+  - Trade-off analysis framework
+  - 11 practice problems (Netflix, LinkedIn, Google, Amazon, etc.)
+  - Evaluation rubric and common mistakes
+  - Perfect for FAANG/top tech interviews
+
+- **ML Practical Templates & Checklists** - 12 production-ready templates
+  - Project initiation, data analysis, feature engineering
+  - Model development, experiment tracking, evaluation
+  - A/B testing, deployment, monitoring, incident response
+  - Copy-paste ready for immediate use
+  - Standardize processes across teams
+
+- **ML/AI Quick Reference & Cheat Sheets** - Fast-access reference
+  - Algorithm selection flowcharts
+  - Common formulas and code snippets
+  - Hyperparameter ranges and evaluation metrics
+  - Common pitfalls and debugging guide
+  - Interview cheat sheet with 1-minute explanations
+  - Perfect for interviews and quick lookups
 
 **New in v5.0:**
 - **Production ML Case Studies** ⭐ **BRAND NEW** - 5 real-world production systems
