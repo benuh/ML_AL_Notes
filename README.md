@@ -1050,6 +1050,59 @@ lime>=0.2.0            # Local explanations
   - Debugging (systematic troubleshooting)
   - Teaching/mentoring (concise explanations)
 
+#### **Interview & Career Preparation** 💼 **BRAND NEW**
+- **[ML_CODING_INTERVIEW_PROBLEMS.md](./ML_CODING_INTERVIEW_PROBLEMS.md)** ⭐ **NEW**
+  - **30+ ML coding problems** with detailed solutions
+  - **Categories**: Data Manipulation, Statistical Analysis, Algorithm Implementation, Model Training, Optimization, Deep Learning, Production ML
+  - **Difficulty levels**: Easy (15), Medium (12), Hard (8)
+  - **Complete code solutions** with explanations and complexity analysis
+  - **Time/space complexity** for each problem
+  - **Problem-solving strategies** and interview tips
+  - **From-scratch implementations**: K-Means, Decision Trees, Linear Regression, Cross-validation, Bootstrap, Matrix Factorization
+  - **Statistical problems**: Confidence intervals, hypothesis testing, A/B testing
+  - **Deep learning problems**: Backpropagation, custom layers, attention mechanisms
+  - **Production problems**: Model serving API, data pipeline, monitoring, caching
+
+  **Perfect for:**
+  - Technical interview preparation (FAANG + top tech companies)
+  - Practicing ML coding skills
+  - Understanding algorithm internals
+  - Learning best practices for production ML code
+  - Building confidence with hands-on implementations
+
+- **[ML_CAREER_GUIDE.md](./ML_CAREER_GUIDE.md)** ⭐ **NEW**
+  - **8 career paths** detailed (ML Engineer, Data Scientist, Research Scientist, MLOps Engineer, Applied Scientist, ML Platform Engineer, AI Product Manager, AI Research Engineer)
+  - **Skills matrix** comparing different ML roles
+  - **Breaking into ML** - 3 detailed transition paths:
+    - From Software Engineering → ML (6-12 months)
+    - From Data Analyst → Data Scientist (6-9 months)
+    - From Fresh Graduate → ML Engineer (9-12 months)
+  - **Portfolio building guide** - 9 project ideas with difficulty levels
+  - **Job search strategy** - Resume tips, where to apply, networking
+  - **Interview preparation** - Coding, ML theory, system design, behavioral
+  - **Salary expectations** (US 2024-2025):
+    - Entry level: $100K-$220K
+    - Senior level: $180K-$500K+
+    - Staff+ level: $350K-$800K+
+  - **Career progression** - Timeline from junior to staff+ (15+ years)
+  - **Day-to-day responsibilities** for ML Engineer and Data Scientist
+  - **Staying current** - Learning resources, communities, conferences
+
+  **Perfect for:**
+  - Career planning and goal setting
+  - Understanding different ML roles
+  - Transitioning into ML/AI from other fields
+  - Salary negotiation preparation
+  - Building a strong ML portfolio
+  - Job search and interview preparation
+
+- **[ML_AI_GLOSSARY.md](./ML_AI_GLOSSARY.md)** - Complete terminology reference
+  - 300+ ML/AI terms with concise definitions
+  - Organized alphabetically (A-Z) for quick lookup
+  - Quick reference tables (activations, losses, optimizers, architectures)
+  - Examples and use cases for each term
+  - Perfect companion for learning and interviews
+
 #### **New Comprehensive Reference Guides (2025)** 🆕
 - **[ALGORITHM_COMPLEXITY_REFERENCE.md](./ALGORITHM_COMPLEXITY_REFERENCE.md)** ⭐ **NEW**
   - Complete Big-O complexity analysis for 100+ ML algorithms
