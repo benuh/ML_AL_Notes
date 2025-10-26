@@ -410,6 +410,11 @@ if __name__ == "__main__":
 
 ## 4. Event-Driven ML with Kafka
 
+**Note on Kafka Libraries:**
+- Examples use `kafka-python` (simple, pure Python implementation)
+- For **production** with high throughput: use `confluent-kafka-python` (C-based, 5-10x faster)
+- Install: `pip install kafka-python` or `pip install confluent-kafka`
+
 ### Real-Time Feature Computation
 
 #### Kafka Producer (Collect Events)
@@ -726,15 +731,28 @@ model_fp32.load_state_dict(torch.load("model.pth"))
 model_fp32.eval()
 
 # Dynamic Quantization (weights only)
-model_int8 = torch.quantization.quantize_dynamic(
+# Note: torch.quantization is deprecated in PyTorch 2.10+
+# Use torch.ao.quantization or torchao library for new projects
+model_int8 = torch.ao.quantization.quantize_dynamic(
     model_fp32,
     {torch.nn.Linear},  # Quantize linear layers
     dtype=torch.qint8
 )
 
+# Alternative: Using torchao (recommended for PyTorch 2.10+)
+# pip install torchao
+# from torchao.quantization import quantize_
+# quantize_(model_fp32, int8_dynamic_activation_int8_weight())
+
 # Compare sizes
 torch.save(model_fp32.state_dict(), "model_fp32.pth")
 torch.save(model_int8.state_dict(), "model_int8.pth")
+
+import os
+fp32_size = os.path.getsize("model_fp32.pth") / (1024 * 1024)  # MB
+int8_size = os.path.getsize("model_int8.pth") / (1024 * 1024)  # MB
+print(f"FP32 size: {fp32_size:.2f}MB, INT8 size: {int8_size:.2f}MB")
+print(f"Size reduction: {(1 - int8_size/fp32_size)*100:.1f}%")
 
 # Inference speedup
 import time

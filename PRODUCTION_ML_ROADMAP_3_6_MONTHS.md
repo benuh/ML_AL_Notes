@@ -696,13 +696,19 @@ Month 4-6: Interviews + Advanced (if needed)
 
 **3 Months (Aggressive):**
 - Junior ML Engineer offers
-- Salary: $80K-$120K (US)
+- Salary: $100K-$145K (US) - Average ~$125K
 - Startup or mid-size company
 
 **6 Months (More Realistic):**
 - Mid-level ML Engineer offers
-- Salary: $120K-$180K (US)
+- Salary: $144K-$200K (US) - Average ~$165K
 - Mix of companies (including some big tech)
+
+**Note:** Salaries vary significantly by:
+- Location (SF/NY: +30-50%, Seattle/Boston: +20-30%)
+- Company size (Big Tech: higher, Startups: lower base + equity)
+- Specific skills (LLMs, MLOps: premium)
+- Total comp includes base + bonus + equity
 
 **Success Rate:**
 - 50+ applications → 10-15 phone screens

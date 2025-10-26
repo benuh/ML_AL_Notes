@@ -124,41 +124,43 @@ cd my_feature_repo
 ```python
 # features.py
 from datetime import timedelta
-from feast import Entity, Feature, FeatureView, ValueType
-from feast.data_source import FileSource, BigQuerySource
-import pandas as pd
+from feast import Entity, FeatureView, Field, FileSource
+from feast.types import Int64, Float64, String, Bool, Int32
 
-# Define entity (primary key)
+# Define entity (primary key) - Updated API
 user = Entity(
-    name="user_id",
-    value_type=ValueType.INT64,
+    name="user",
+    join_keys=["user_id"],
     description="User identifier"
 )
 
 # Define data source
 user_stats_source = FileSource(
     path="data/user_stats.parquet",
-    event_timestamp_column="event_timestamp",
+    timestamp_field="event_timestamp",
 )
 
 # Alternative: BigQuery source
+# from feast import BigQuerySource
 # user_stats_source = BigQuerySource(
-#     table_ref="project.dataset.user_stats",
-#     event_timestamp_column="event_timestamp",
+#     table="project.dataset.user_stats",
+#     timestamp_field="event_timestamp",
 # )
 
-# Define feature view
+# Define feature view - Updated API with Field objects
 user_stats_fv = FeatureView(
     name="user_statistics",
-    entities=["user_id"],
+    entities=[user],  # Pass entity object, not string
     ttl=timedelta(days=7),
-    features=[
-        Feature(name="total_purchases", dtype=ValueType.INT64),
-        Feature(name="avg_purchase_value", dtype=ValueType.DOUBLE),
-        Feature(name="days_since_last_purchase", dtype=ValueType.INT32),
-        Feature(name="favorite_category", dtype=ValueType.STRING),
-        Feature(name="total_sessions", dtype=ValueType.INT64),
-        Feature(name="avg_session_duration", dtype=ValueType.DOUBLE),
+    schema=[
+        Field(name="user_id", dtype=Int64),  # Entity field
+        Field(name="total_purchases", dtype=Int64),
+        Field(name="avg_purchase_value", dtype=Float64),
+        Field(name="days_since_last_purchase", dtype=Int32),
+        Field(name="favorite_category", dtype=String),
+        Field(name="total_sessions", dtype=Int64),
+        Field(name="avg_session_duration", dtype=Float64),
+        Field(name="event_timestamp", dtype=Int64),  # Timestamp field
     ],
     online=True,  # Enable online serving
     source=user_stats_source,
@@ -167,27 +169,29 @@ user_stats_fv = FeatureView(
 
 # Product features
 product = Entity(
-    name="product_id",
-    value_type=ValueType.INT64,
+    name="product",
+    join_keys=["product_id"],
     description="Product identifier"
 )
 
 product_features_source = FileSource(
     path="data/product_features.parquet",
-    event_timestamp_column="event_timestamp",
+    timestamp_field="event_timestamp",
 )
 
 product_features_fv = FeatureView(
     name="product_features",
-    entities=["product_id"],
+    entities=[product],
     ttl=timedelta(days=30),
-    features=[
-        Feature(name="price", dtype=ValueType.DOUBLE),
-        Feature(name="category", dtype=ValueType.STRING),
-        Feature(name="brand", dtype=ValueType.STRING),
-        Feature(name="rating", dtype=ValueType.DOUBLE),
-        Feature(name="num_reviews", dtype=ValueType.INT64),
-        Feature(name="in_stock", dtype=ValueType.BOOL),
+    schema=[
+        Field(name="product_id", dtype=Int64),  # Entity field
+        Field(name="price", dtype=Float64),
+        Field(name="category", dtype=String),
+        Field(name="brand", dtype=String),
+        Field(name="rating", dtype=Float64),
+        Field(name="num_reviews", dtype=Int64),
+        Field(name="in_stock", dtype=Bool),
+        Field(name="event_timestamp", dtype=Int64),  # Timestamp field
     ],
     online=True,
     source=product_features_source,
