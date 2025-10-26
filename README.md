@@ -24,6 +24,44 @@
 
 ## 🆕 Recent Enhancements (October 2025)
 
+### **Latest: Production ML Infrastructure & 3-6 Month Intensive Roadmap** ⭐ **BRAND NEW**
+
+**NEW Production-Focused Materials for ML Engineers:**
+- ✅ **[PRODUCTION_ML_INFRASTRUCTURE.md](./PRODUCTION_ML_INFRASTRUCTURE.md)** - Complete guide to production ML infrastructure
+  - **Feature Stores:** Feast, Tecton, AWS Feature Store with hands-on examples
+  - **Data Infrastructure:** Warehouses vs Lakes vs Lakehouses (Snowflake, BigQuery, Delta Lake)
+  - **Data Pipelines:** Airflow, Prefect with production DAG examples
+  - **Streaming ML:** Kafka + Flink for real-time feature computation
+  - **Production Patterns:** Hybrid batch+streaming, caching, graceful degradation
+  - **Best Practices:** Monitoring, testing, cost optimization
+  - **Interview Questions:** Feature store architecture, training-serving consistency, drift detection
+
+- ✅ **[REALTIME_ML_SYSTEMS.md](./REALTIME_ML_SYSTEMS.md)** - Build low-latency, high-throughput ML systems
+  - **Low-Latency Serving:** TensorFlow Serving, TorchServe, ONNX Runtime, FastAPI
+  - **Event-Driven ML:** Kafka producers/consumers, streaming inference pipelines
+  - **Online Learning:** Incremental learning, contextual bandits, feedback loops
+  - **Optimization:** Model quantization, batching, caching, multi-model serving
+  - **Production Patterns:** Circuit breakers, request hedging, graceful degradation
+  - **Performance:** Achieve <100ms latency, handle 10K+ QPS
+  - **Interview Questions:** Fraud detection <50ms, online vs batch learning, latency optimization
+
+- ✅ **[PRODUCTION_ML_ROADMAP_3_6_MONTHS.md](./PRODUCTION_ML_ROADMAP_3_6_MONTHS.md)** - Fast-track to job-ready ML Engineer
+  - **Month 1:** Fundamentals + First Production Project (Kaggle → Deployed API)
+  - **Month 2:** Deep Learning + Real-Time Systems (CV project + Kafka pipeline)
+  - **Month 3:** NLP + Interview Prep + Job Applications (50+ applications)
+  - **Month 4-6:** Advanced Topics + Interviews + Offers
+  - **4-6 Production Projects:** Complete portfolio with live demos
+  - **Interview Prep:** 140+ questions, system design, mock interviews
+  - **Job Search Strategy:** Resume, portfolio website, networking, applications
+  - **Expected Outcome:** Junior-to-Mid level ML Engineer offers by Month 5-6
+
+**Perfect for:**
+- 🎯 Job seekers targeting ML Engineer / MLOps roles
+- 🏗️ Building production ML skills
+- ⚡ 3-6 month intensive learning track
+- 💼 Creating portfolio with deployed projects
+- 🚀 Fast-tracking to job readiness
+
 ### **Latest: Research-Grade Mathematical Enhancements** ⭐ **NEW**
 
 **Enhanced Theoretical Foundations Across Repository:**
