@@ -55,6 +55,37 @@
   - **Job Search Strategy:** Resume, portfolio website, networking, applications
   - **Expected Outcome:** Junior-to-Mid level ML Engineer offers by Month 5-6
 
+- ✅ **[ADVANCED_MONITORING_OBSERVABILITY.md](./ADVANCED_MONITORING_OBSERVABILITY.md)** - Production monitoring and drift detection
+  - **Monitoring Stack:** Prometheus + Grafana for metrics, ELK for logging
+  - **Model Performance Monitoring:** Accuracy, latency, throughput tracking with code
+  - **Data Drift Detection:** Evidently AI, statistical tests (KS test, PSI, Chi-square)
+  - **System Metrics:** Infrastructure monitoring, resource utilization, health checks
+  - **Alerting Patterns:** Multi-tier alerting, incident response, runbooks
+  - **Production Best Practices:** SLAs, dashboards, anomaly detection
+  - **Complete Implementations:** Prometheus integration, drift detection system
+  - **Interview Questions:** Handling drift, monitoring strategies, alerting thresholds
+
+- ✅ **[DISTRIBUTED_COMPUTING_ML.md](./DISTRIBUTED_COMPUTING_ML.md)** - Scale ML to production workloads
+  - **Apache Spark for ML:** Distributed data processing, feature engineering at scale
+  - **Ray for Distributed ML:** Distributed training, hyperparameter tuning, model serving
+  - **PyTorch Distributed Training:** DDP, DeepSpeed, FSDP for large models
+  - **Model Parallelism:** Pipeline parallelism, tensor parallelism for huge models
+  - **Hyperparameter Tuning at Scale:** Ray Tune, Optuna distributed
+  - **Production Patterns:** Fault tolerance, checkpointing, distributed inference
+  - **Complete Code Examples:** Spark ML pipelines, Ray training, PyTorch DDP
+  - **Interview Questions:** When to distribute, data vs model parallelism, scaling bottlenecks
+
+- ✅ **[END_TO_END_PROJECT_TEMPLATE.md](./END_TO_END_PROJECT_TEMPLATE.md)** - Complete production ML project template
+  - **Complete E-Commerce Recommendation System:** From data to deployment
+  - **Full Project Structure:** Organized codebase with best practices
+  - **Data Pipeline:** Synthetic data generator, ETL, feature engineering with Feast
+  - **Model Development:** Collaborative filtering with PyTorch, training pipeline
+  - **FastAPI Serving:** Production API with monitoring, health checks
+  - **Drift Detection:** Automated monitoring with Evidently AI
+  - **Docker & Kubernetes:** Complete deployment configuration
+  - **Testing Strategy:** Unit tests, integration tests, CI/CD with GitHub Actions
+  - **Portfolio Presentation:** README template, demo video script, metrics dashboard
+
 **Perfect for:**
 - 🎯 Job seekers targeting ML Engineer / MLOps roles
 - 🏗️ Building production ML skills
@@ -1413,6 +1444,9 @@ If this helped you, please star the repository! It helps others find these resou
 ## 🚀 What's Next?
 
 ### Recently Completed ✅
+- [x] **Advanced Monitoring & Observability** - Production monitoring stack, drift detection, alerting patterns
+- [x] **Distributed Computing for ML** - Spark, Ray, PyTorch DDP, model parallelism, distributed training
+- [x] **End-to-End Project Template** - Complete e-commerce recommendation system from data to deployment
 - [x] **Modern ML/AI Techniques (2024-2025)** - LLMs, Diffusion, ViTs, RAG, MoE, RLHF, Quantization
 - [x] **Speculative Coding Guide** - Speculative decoding, spec-driven development, testing frameworks
 - [x] **Deep Learning Architectures Guide** - Complete reference from MLPs to EfficientNet
@@ -1449,11 +1483,41 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 23, 2025*
+*Last Updated: October 26, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 5.2 - Enhanced Learning Resources + Ethics + Research* 🎉🎉🎉
+*Version: 5.3 - Production ML Engineering Enhancement* 🎉🎉🎉
 
-**New in v5.2:** ⭐ **LATEST**
+**New in v5.3:** ⭐ **LATEST**
+- **Advanced Monitoring & Observability** - Complete production monitoring guide
+  - Prometheus + Grafana monitoring stack
+  - Model performance tracking (accuracy, latency, throughput)
+  - Data drift detection (Evidently AI, KS test, PSI, Chi-square)
+  - System metrics and infrastructure monitoring
+  - Multi-tier alerting and incident response
+  - Production best practices and SLAs
+  - Complete implementations with code
+
+- **Distributed Computing for ML** - Scale ML to production workloads
+  - Apache Spark for distributed data processing
+  - Ray for distributed training and hyperparameter tuning
+  - PyTorch Distributed Data Parallel (DDP)
+  - DeepSpeed and FSDP for large models
+  - Model parallelism (pipeline, tensor parallelism)
+  - Production patterns (fault tolerance, checkpointing)
+  - Complete code examples and best practices
+
+- **End-to-End Production ML Project Template** - Portfolio-ready recommendation system
+  - Complete e-commerce recommendation system
+  - Full project structure with best practices
+  - Synthetic data generator and ETL pipeline
+  - Feature engineering with Feast
+  - Collaborative filtering model with PyTorch
+  - FastAPI serving with monitoring
+  - Docker and Kubernetes deployment
+  - Testing strategy with CI/CD (GitHub Actions)
+  - Portfolio presentation templates
+
+**New in v5.2:**
 - **ML Research and Paper Reading Guide** - Complete guide to reading and implementing papers
   - Three-pass method for efficient paper reading (save 50% time)
   - 50+ essential papers to read (classic: AlexNet, ResNet, Attention + modern: LoRA, FlashAttention, SAM)
