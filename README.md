@@ -119,6 +119,25 @@
   - **Benchmarking & Profiling:** Comprehensive latency/throughput/memory benchmarking
   - **Production Deployment:** Checklist, deployment scripts, optimization workflow
 
+- ✅ **[ML_EXPERIMENTATION_AB_TESTING.md](./ML_EXPERIMENTATION_AB_TESTING.md)** - Complete experimentation and A/B testing guide
+  - **Statistical Foundations:** Hypothesis testing, sample size calculation, multiple testing correction
+  - **Experiment Design:** Randomization strategies, stratified sampling, hash-based assignment, SRM detection
+  - **A/B Testing for ML:** Complete implementation, sequential testing, monitoring dashboards
+  - **Multi-Armed Bandits:** Epsilon-greedy, Thompson sampling, contextual bandits for dynamic optimization
+  - **Causal Inference:** ATE estimation, propensity score matching, difference-in-differences
+  - **Common Pitfalls:** Peeking problem, novelty effects, Simpson's paradox, seasonality
+  - **5 Interview Questions:** Experiment design, bandits vs A/B tests, statistical power, multiple metrics
+
+- ✅ **[ML_SECURITY_PRIVACY.md](./ML_SECURITY_PRIVACY.md)** - Secure and privacy-preserving ML systems
+  - **Threat Model:** Data poisoning, model inversion, membership inference, model stealing, adversarial examples
+  - **Data Security:** Encryption (at rest/transit), access control (RBAC), data anonymization, PII removal
+  - **Model Security:** Adversarial training, input validation, rate limiting, model watermarking
+  - **Privacy-Preserving ML:** Differential privacy, DP-SGD, federated learning, secure multi-party computation
+  - **Compliance:** GDPR requirements, model cards, documentation, privacy impact assessments
+  - **Secure Deployment:** HTTPS, API authentication, monitoring, incident response
+  - **Best Practices:** Security checklist, privacy checklist, defense in depth
+  - **3 Interview Questions:** Adversarial defense, differential privacy, GDPR compliance
+
 **Perfect for:**
 - 🎯 Job seekers targeting ML Engineer / MLOps roles
 - 🏗️ Building production ML skills
@@ -1477,6 +1496,8 @@ If this helped you, please star the repository! It helps others find these resou
 ## 🚀 What's Next?
 
 ### Recently Completed ✅
+- [x] **ML Experimentation & A/B Testing** - Complete guide to experiment design, hypothesis testing, bandits, causal inference
+- [x] **ML Security & Privacy** - Secure ML systems, adversarial defenses, differential privacy, GDPR compliance
 - [x] **ML Engineering Best Practices** - Comprehensive production engineering guide with code quality, testing, deployment
 - [x] **Cloud ML Platforms** - Complete AWS SageMaker, GCP Vertex AI, Azure ML guide with examples
 - [x] **Model Optimization for Production** - Quantization, pruning, distillation, serving optimization
@@ -1521,9 +1542,28 @@ If this helped you, please star the repository! It helps others find these resou
 
 *Last Updated: October 27, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 5.4 - Complete Production ML Engineering Suite* 🎉🎉🎉
+*Version: 5.5 - Complete Production ML Engineering Suite* 🎉🎉🎉
 
-**New in v5.4:** ⭐ **LATEST**
+**New in v5.5:** ⭐ **LATEST**
+- **ML Experimentation & A/B Testing** - Complete experimentation guide
+  - Statistical foundations (hypothesis testing, sample size, power analysis)
+  - Experiment design (randomization, stratification, SRM detection)
+  - A/B testing for ML models (complete implementation with monitoring)
+  - Multi-armed bandits (epsilon-greedy, Thompson sampling, contextual)
+  - Causal inference (ATE, propensity score matching, DiD)
+  - Common pitfalls and solutions (peeking, novelty, Simpson's paradox)
+  - 5 detailed interview Q&A on experimentation
+
+- **ML Security & Privacy** - Secure and privacy-preserving ML
+  - Threat model (poisoning, inversion, stealing, adversarial attacks)
+  - Data security (encryption, access control, PII removal)
+  - Model security (adversarial training, watermarking, rate limiting)
+  - Privacy-preserving ML (differential privacy, federated learning, SMPC)
+  - Compliance (GDPR requirements, model cards, documentation)
+  - Secure deployment and monitoring
+  - 3 detailed interview Q&A on security and privacy
+
+**New in v5.4:**
 - **ML Engineering Best Practices** - Comprehensive production engineering guide
   - Complete project structure and organization
   - Code quality, testing, and CI/CD best practices
