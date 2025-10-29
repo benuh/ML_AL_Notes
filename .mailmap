@@ -1,4 +1,4 @@
 # .mailmap - Maps commit authors to canonical names
-# This tells GitHub to attribute Claude's commits to Benjamin Hu
+# This remaps Claude's commits to Benjamin Hu on GitHub
 
 Benjamin Hu <huchangcan@gmail.com> Claude <noreply@anthropic.com>
