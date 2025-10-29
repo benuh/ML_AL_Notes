@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **Quick Reference Cheat Sheets** | 📖 **Research Paper Guide** | 🤝 **Ethics & Responsible AI** | 🎓 **Comprehensive Resources**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **Quick Reference Cheat Sheets** | 📖 **Research Paper Guide** | 🤝 **Ethics & Responsible AI** | 🎓 **Comprehensive Resources**
 
 ---
 
@@ -1181,6 +1181,41 @@ lime>=0.2.0            # Local explanations
   - Debugging (systematic troubleshooting)
   - Teaching/mentoring (concise explanations)
 
+#### **Hands-On Practice & Exercises** 🏋️ **BRAND NEW**
+- **[ML_ENGINEERING_EXERCISES.md](./ML_ENGINEERING_EXERCISES.md)** ⭐ **BRAND NEW**
+  - **80+ hands-on coding exercises** across all major ML topics
+  - **Structured by difficulty**: Easy (20+), Medium (30+), Hard (30+)
+  - **Complete solutions with explanations** for every exercise
+  - **Topics covered**:
+    - Data Processing & Feature Engineering (15 exercises)
+    - Classical ML Algorithms (20 exercises)
+    - Deep Learning (15 exercises)
+    - NLP & Computer Vision (10 exercises each)
+    - Production ML & MLOps (10 exercises)
+    - System Design & Scalability (10 exercises)
+  - **Starter code provided** - Framework to get you started
+  - **Hints when stuck** - Progressive guidance without spoiling solution
+  - **Follow-up challenges** - Extensions to deepen understanding
+  - **Learning paths by goal**:
+    - Beginner path (20-30 hours)
+    - Interview preparation path (40-50 hours)
+    - Production ML engineer path (60-80 hours)
+  - **Key exercises include**:
+    - Missing data imputation (5 strategies with comparison)
+    - Feature scaling strategies (StandardScaler, MinMaxScaler, RobustScaler)
+    - Feature engineering pipeline (end-to-end sklearn pipeline)
+    - K-Means clustering from scratch (including K-Means++ initialization)
+    - Decision tree from scratch (information gain, Gini impurity, pruning)
+    - Neural network with backpropagation
+    - And 74 more exercises!
+
+  **Perfect for:**
+  - Building practical ML skills through hands-on coding
+  - Interview preparation with timed exercises
+  - Understanding algorithms by implementing from scratch
+  - Reinforcing theoretical concepts with practice
+  - Systematic skill development with progressive difficulty
+
 #### **Interview & Career Preparation** 💼 **BRAND NEW**
 - **[ML_CODING_INTERVIEW_PROBLEMS.md](./ML_CODING_INTERVIEW_PROBLEMS.md)** ⭐ **NEW**
   - **30+ ML coding problems** with detailed solutions
@@ -1394,6 +1429,46 @@ lime>=0.2.0            # Local explanations
   - Quick pre-deployment verification
   - Production-ready deployment workflow
 
+#### **Domain-Specific ML Guides** 🏥💰🛒 **BRAND NEW**
+- **[DOMAIN_SPECIFIC_ML.md](./DOMAIN_SPECIFIC_ML.md)** ⭐ **BRAND NEW**
+  - **Complete guides for 3 major industries**: Healthcare, Finance, and E-commerce/Retail
+  - **Healthcare ML**:
+    - Medical image analysis (chest X-ray pneumonia detection with FDA considerations)
+    - Patient risk prediction (30-day readmission with EHR data)
+    - Drug discovery and clinical decision support
+    - HIPAA compliance and differential privacy
+    - FDA regulatory requirements (510(k), clinical validation)
+    - Complete implementations with DenseNet, attention mechanisms, Grad-CAM
+  - **Finance ML**:
+    - Real-time fraud detection (<50ms latency, 10K TPS)
+    - Credit scoring with fairness constraints (FCRA, ECOA compliance)
+    - Algorithmic trading and risk management
+    - Adversarial robustness (fraudsters adapting to models)
+    - Regulatory compliance (Basel III, Dodd-Frank)
+    - Multi-stage architecture (rules → fast ML → complex ML)
+  - **E-commerce/Retail ML**:
+    - Product recommendation systems (cold-start solutions)
+    - Dynamic pricing optimization (inventory, competition, demand)
+    - Search ranking and autocomplete
+    - Demand forecasting and inventory optimization
+    - Customer segmentation and personalization
+    - A/B testing for recommendation algorithms
+  - **Cross-domain patterns**:
+    - Cold start problem solutions (new users, new items, new markets)
+    - Class imbalance handling (rare events, fraud, conversions)
+    - Explainability requirements (SHAP, LIME, attention)
+  - **3 detailed interview questions** with complete answers
+  - **Production-ready code** for all use cases
+  - **Data characteristics** and challenges unique to each domain
+  - **Best practices** for deployment, monitoring, and compliance
+
+  **Perfect for:**
+  - Understanding ML applications in specific industries
+  - Interview preparation for domain-specific roles
+  - Building domain expertise for career specialization
+  - Learning industry-specific best practices and regulations
+  - Transitioning from general ML to specialized domains
+
 #### **Projects and Hands-On Learning**
 - **[ADVANCED_DL_PROJECTS.md](./ADVANCED_DL_PROJECTS.md) & [Part 2](./ADVANCED_DL_PROJECTS_PART2.md)** - 6 complete deep learning projects
   - Image Classification, Object Detection, Text Generation
@@ -1506,7 +1581,9 @@ If this helped you, please star the repository! It helps others find these resou
 ## 🚀 What's Next?
 
 ### Recently Completed ✅
-- [x] **ML System Design** - Complete interview guide with framework, real-world examples, and code implementations ⭐ **BRAND NEW**
+- [x] **Domain-Specific ML** - Complete guides for Healthcare, Finance, and E-commerce with production implementations ⭐ **BRAND NEW**
+- [x] **ML Engineering Exercises** - 80+ hands-on coding challenges with complete solutions
+- [x] **ML System Design** - Complete interview guide with framework, real-world examples, and code implementations
 - [x] **ML Experimentation & A/B Testing** - Complete guide to experiment design, hypothesis testing, bandits, causal inference
 - [x] **ML Security & Privacy** - Secure ML systems, adversarial defenses, differential privacy, GDPR compliance
 - [x] **ML Engineering Best Practices** - Comprehensive production engineering guide with code quality, testing, deployment
@@ -1553,9 +1630,30 @@ If this helped you, please star the repository! It helps others find these resou
 
 *Last Updated: October 28, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 5.6 - Production ML Engineering + System Design* 🎉🎉🎉
+*Version: 5.8 - Complete ML Ecosystem: Theory + Practice + Industry Applications* 🎉🎉🎉
 
-**New in v5.6:** ⭐ **LATEST**
+**New in v5.8:** ⭐ **LATEST**
+- **Domain-Specific ML** - Complete guides for Healthcare, Finance, and E-commerce
+  - Healthcare ML with FDA regulatory considerations and HIPAA compliance
+  - Finance ML with fairness constraints and regulatory compliance
+  - E-commerce ML with cold-start solutions and dynamic pricing
+  - Production-ready implementations for all major use cases
+  - Industry-specific best practices, challenges, and solutions
+  - Cross-domain patterns (cold start, class imbalance, explainability)
+  - Perfect for specializing in specific industries
+
+**New in v5.7:**
+- **ML Engineering Exercises** - 80+ hands-on coding challenges
+  - Complete starter code, hints, and solutions for every exercise
+  - Structured learning paths by goal (beginner, interview prep, production ML)
+  - Progressive difficulty levels (Easy, Medium, Hard)
+  - Covers all major topics: Data Processing, Classical ML, Deep Learning, NLP, CV, Production ML
+  - Implement algorithms from scratch (K-Means, Decision Trees, Neural Networks)
+  - Build production pipelines with sklearn
+  - Perfect for interview preparation and skill building
+  - Estimated 60-80 hours for complete mastery
+
+**New in v5.6:**
 - **ML System Design** - Complete interview preparation guide
   - Systematic framework for tackling any ML system design interview
   - Real-world examples (YouTube recommendations, fraud detection, search ranking)
