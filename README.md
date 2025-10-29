@@ -138,6 +138,16 @@
   - **Best Practices:** Security checklist, privacy checklist, defense in depth
   - **3 Interview Questions:** Adversarial defense, differential privacy, GDPR compliance
 
+- ✅ **[ML_SYSTEM_DESIGN.md](./ML_SYSTEM_DESIGN.md)** - Complete ML system design for interviews ⭐ **BRAND NEW**
+  - **ML System Design Framework:** Step-by-step PROBLEM approach for any ML system design interview
+  - **Key Components:** Data pipelines, training infrastructure, model serving, monitoring, feedback loops
+  - **Design Patterns:** Two-tower architecture, online learning with bandits, multi-stage pipelines
+  - **Real ML System Designs:** YouTube recommendations, fraud detection, search ranking with complete implementations
+  - **Scaling Considerations:** Horizontal vs vertical scaling, caching strategies, database sharding, async processing
+  - **Trade-offs:** Model complexity vs latency, batch vs online learning, feature engineering vs deep learning
+  - **3 Interview Questions:** News feed ranking, concept drift detection, A/B testing ML models with detailed answers
+  - **Complete Code Examples:** Production-ready implementations for all major components
+
 **Perfect for:**
 - 🎯 Job seekers targeting ML Engineer / MLOps roles
 - 🏗️ Building production ML skills
@@ -1496,6 +1506,7 @@ If this helped you, please star the repository! It helps others find these resou
 ## 🚀 What's Next?
 
 ### Recently Completed ✅
+- [x] **ML System Design** - Complete interview guide with framework, real-world examples, and code implementations ⭐ **BRAND NEW**
 - [x] **ML Experimentation & A/B Testing** - Complete guide to experiment design, hypothesis testing, bandits, causal inference
 - [x] **ML Security & Privacy** - Secure ML systems, adversarial defenses, differential privacy, GDPR compliance
 - [x] **ML Engineering Best Practices** - Comprehensive production engineering guide with code quality, testing, deployment
@@ -1540,11 +1551,21 @@ If this helped you, please star the repository! It helps others find these resou
 
 ---
 
-*Last Updated: October 27, 2025*
+*Last Updated: October 28, 2025*
 *Maintained by: Benjamin Hu*
-*Version: 5.5 - Complete Production ML Engineering Suite* 🎉🎉🎉
+*Version: 5.6 - Production ML Engineering + System Design* 🎉🎉🎉
 
-**New in v5.5:** ⭐ **LATEST**
+**New in v5.6:** ⭐ **LATEST**
+- **ML System Design** - Complete interview preparation guide
+  - Systematic framework for tackling any ML system design interview
+  - Real-world examples (YouTube recommendations, fraud detection, search ranking)
+  - Complete code implementations for all major components
+  - Design patterns (two-tower, online learning, multi-stage pipelines)
+  - Scaling strategies and trade-off analysis
+  - 3 detailed interview questions with expert answers
+  - Perfect for FAANG and senior+ ML engineer interviews
+
+**New in v5.5:**
 - **ML Experimentation & A/B Testing** - Complete experimentation guide
   - Statistical foundations (hypothesis testing, sample size, power analysis)
   - Experiment design (randomization, stratification, SRM detection)
