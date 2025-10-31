@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **Quick Reference Cheat Sheets** | 📖 **Research Paper Guide** | 🤝 **Ethics & Responsible AI** | 🎓 **Comprehensive Resources**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **7 New Learning Guides** | 💼 **100+ Project Ideas** | 🧠 **Learning Science Methods** | 🎤 **Interview Mastery** | 📖 **Career Roadmaps**
 
 ---
 
@@ -54,10 +54,14 @@
 ## 🎯 How to Use This Repository
 
 ### For Beginners
-1. Start with [Setup Guide](./resources/SETUP_GUIDE.md)
-2. Follow the [Learning Roadmap](./guides/fundamentals/LEARNING_ROADMAP.md)
-3. Complete [Interactive Notebooks](./interactive_demos/) in order (01-06)
-4. Practice with [Beginner Exercises](./guides/interview-prep/ML_ENGINEERING_EXERCISES.md#beginner-path)
+1. **New to ML?** Start with [Quick Start Guide](./resources/QUICK_START_GUIDE.md) - Your first week in ML
+2. Set up environment with [Setup Guide](./resources/SETUP_GUIDE.md)
+3. Choose your [Learning Schedule](./resources/ML_LEARNING_SCHEDULE.md) (3/6/12-month tracks)
+4. Follow the [Learning Roadmap](./guides/fundamentals/LEARNING_ROADMAP.md)
+5. Complete [Interactive Notebooks](./interactive_demos/) in order (01-06)
+6. Build projects from [ML Project Ideas](./resources/ML_PROJECT_IDEAS.md) (start with Beginner tier)
+7. Showcase work with [Portfolio Guide](./resources/PORTFOLIO_GUIDE.md)
+8. Practice with [Beginner Exercises](./guides/interview-prep/ML_ENGINEERING_EXERCISES.md#beginner-path)
 
 ### For Interview Preparation
 1. Review [Interview Prep Notebooks](./interactive_demos/00_ML_Interview_Preparation.ipynb)
@@ -259,10 +263,28 @@
 
 **Location:** [`resources/`](./resources/)
 
-### Career & Learning
-- [**Comprehensive ML Resources**](./resources/COMPREHENSIVE_ML_RESOURCES.md) - Books, courses, communities
+### Getting Started
+- [**Quick Start Guide**](./resources/QUICK_START_GUIDE.md) ⭐ **NEW** - Your first week in ML (beginner-friendly)
+- [**ML Learning Schedule**](./resources/ML_LEARNING_SCHEDULE.md) ⭐ **NEW** - 3/6/12-month study plans
+
+### Learning Strategies
+- [**Effective Learning Strategies**](./resources/EFFECTIVE_LEARNING_STRATEGIES.md) ⭐ **NEW** - How to learn ML efficiently (spaced repetition, active recall)
+- [**Common ML Mistakes**](./resources/COMMON_ML_MISTAKES.md) ⭐ **NEW** - Avoid common pitfalls in learning, modeling, and career
+
+### Career & Projects
+- [**ML Project Ideas**](./resources/ML_PROJECT_IDEAS.md) ⭐ **NEW** - 100+ projects organized by difficulty
+- [**Portfolio Guide**](./resources/PORTFOLIO_GUIDE.md) ⭐ **NEW** - How to showcase your work and get hired
 - [**ML Career Guide**](./resources/ML_CAREER_GUIDE.md) - 8 career paths, salary data
 - [**ML Career Roadmap**](./resources/ML_CAREER_ROADMAP.md)
+
+### Interview Preparation
+- [**ML Interview Tips**](./resources/ML_INTERVIEW_TIPS.md) ⭐ **NEW** - From application to offer (resume, behavioral, negotiation)
+- [**ML System Design**](./guides/interview-prep/ML_SYSTEM_DESIGN.md) - Complete framework with examples
+- [**ML Coding Problems**](./guides/interview-prep/ML_CODING_INTERVIEW_PROBLEMS.md) - 30+ problems with solutions
+- [**ML Engineering Exercises**](./guides/interview-prep/ML_ENGINEERING_EXERCISES.md) - 80+ hands-on challenges
+
+### Learning Resources
+- [**Comprehensive ML Resources**](./resources/COMPREHENSIVE_ML_RESOURCES.md) - Books, courses, communities
 - [**ML Research Paper Reading Guide**](./resources/ML_RESEARCH_PAPER_READING_GUIDE.md)
 - [**Research Papers Guide**](./resources/RESEARCH_PAPERS_GUIDE.md)
 
@@ -368,6 +390,19 @@ For detailed setup instructions, see [Setup Guide](./resources/SETUP_GUIDE.md).
 ## 🆕 What's New
 
 ### Version 5.8 (October 2025) - Latest
+
+**🎓 Learning Resources:**
+- ✅ **Quick Start Guide** - Complete first week plan for absolute beginners (7-day roadmap)
+- ✅ **Effective Learning Strategies** - Evidence-based study techniques (spaced repetition, Feynman technique)
+- ✅ **Common ML Mistakes** - 33 mistakes to avoid (learning, data, modeling, career)
+- ✅ **ML Learning Schedule** - Three complete study plans (3/6/12-month tracks)
+
+**💼 Career & Interview:**
+- ✅ **ML Interview Tips** - Complete guide from application to offer (resume, behavioral, salary negotiation)
+- ✅ **Portfolio Guide** - How to showcase ML projects to get hired (templates + examples)
+- ✅ **ML Project Ideas** - 100+ projects organized by difficulty level for portfolio building
+
+**📚 Technical Content:**
 - ✅ **Domain-Specific ML** - Healthcare, Finance, E-commerce guides
 - ✅ **ML System Design** - Complete interview framework
 - ✅ **ML Engineering Exercises** - 80+ hands-on challenges
@@ -431,7 +466,9 @@ If this helped you, please:
 
 **Ready to become an ML/AI expert?**
 
-**Start here:** [Getting Started](./interactive_demos/01_getting_started.ipynb) → [Learning Roadmap](./guides/fundamentals/LEARNING_ROADMAP.md)
+**Complete beginner?** → [Quick Start Guide](./resources/QUICK_START_GUIDE.md) (Your first week)
+
+**Have some experience?** → [Getting Started](./interactive_demos/01_getting_started.ipynb) → [Learning Roadmap](./guides/fundamentals/LEARNING_ROADMAP.md)
 
 **Happy Learning! 🎓🚀**
 
