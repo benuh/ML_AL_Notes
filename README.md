@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **7 New Learning Guides** | 💼 **100+ Project Ideas** | 🧠 **Learning Science Methods** | 🎤 **Interview Mastery** | 📖 **Career Roadmaps**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **12 Practical Guides** | 💼 **100+ Project Ideas** | 🧠 **Learning Science Methods** | 🎤 **Interview Mastery** | 📖 **Career Roadmaps**
 
 ---
 
@@ -128,6 +128,11 @@
 - [**Data Preprocessing Complete Guide**](./guides/fundamentals/DATA_PREPROCESSING_COMPLETE_GUIDE.md) ⭐ **NEW** - Complete preprocessing workflow (missing values, outliers, encoding, scaling, pipelines)
 - [**Feature Engineering Guide**](./guides/fundamentals/FEATURE_ENGINEERING_GUIDE.md) ⭐ **NEW** - Create better features (numerical, categorical, datetime, text, geo)
 - [**Model Selection Guide**](./guides/fundamentals/MODEL_SELECTION_GUIDE.md) ⭐ **NEW** - Choose the right algorithm (decision tree, comparison framework, cheat sheets)
+- [**Hyperparameter Tuning Guide**](./guides/fundamentals/HYPERPARAMETER_TUNING_GUIDE.md) ⭐ **NEW** - Optimize models (Grid Search, Random Search, Bayesian Optimization, algorithm-specific tips)
+- [**Model Evaluation Metrics Guide**](./guides/fundamentals/MODEL_EVALUATION_METRICS_GUIDE.md) ⭐ **NEW** - Choose and interpret metrics (classification, regression, ranking, custom business metrics)
+- [**Cross-Validation Guide**](./guides/fundamentals/CROSS_VALIDATION_GUIDE.md) ⭐ **NEW** - Robust model evaluation (K-Fold, Stratified, Time Series, Nested CV, best practices)
+- [**Bias-Variance Tradeoff Guide**](./guides/fundamentals/BIAS_VARIANCE_TRADEOFF_GUIDE.md) ⭐ **NEW** - Understand and fix overfitting/underfitting (learning curves, diagnostics, solutions)
+- [**Regularization Techniques Guide**](./guides/fundamentals/REGULARIZATION_TECHNIQUES_GUIDE.md) ⭐ **NEW** - Prevent overfitting (L1/L2, Dropout, Early Stopping, Data Augmentation)
 
 ### Learning Guides
 - [**Learning Guide**](./guides/fundamentals/LEARNING_GUIDE.md) - How to use this curriculum effectively
@@ -412,6 +417,11 @@ For detailed setup instructions, see [Setup Guide](./resources/SETUP_GUIDE.md).
 - ✅ **Data Preprocessing Complete Guide** - End-to-end preprocessing (missing values, outliers, encoding, scaling, pipelines)
 - ✅ **Model Selection Guide** - Choose the right algorithm (decision trees, comparison frameworks, detailed cheat sheets)
 - ✅ **Feature Engineering Guide** - Create better features (numerical, categorical, datetime, text, geospatial)
+- ✅ **Hyperparameter Tuning Guide** - Optimize models (Grid Search, Random Search, Bayesian Optimization, algorithm-specific tuning)
+- ✅ **Model Evaluation Metrics Guide** - Choose and interpret metrics (classification, regression, ranking, custom metrics)
+- ✅ **Cross-Validation Guide** - Robust evaluation (K-Fold, Stratified, Time Series, Nested CV, prevent data leakage)
+- ✅ **Bias-Variance Tradeoff Guide** - Understand and fix overfitting/underfitting (learning curves, diagnostics, solutions)
+- ✅ **Regularization Techniques Guide** - Prevent overfitting (L1/L2 Ridge/Lasso, Dropout, Early Stopping, Data Augmentation)
 - ✅ **ML Debugging Strategies** - Systematic debugging approach (data, model, training, production issues with case studies)
 - ✅ **Domain-Specific ML** - Healthcare, Finance, E-commerce guides
 - ✅ **ML System Design** - Complete interview framework
