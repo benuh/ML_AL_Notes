@@ -123,6 +123,7 @@
 - [**Algorithm Complexity Reference**](./guides/fundamentals/ALGORITHM_COMPLEXITY_REFERENCE.md) - Big-O analysis for 100+ algorithms
 - [**Loss Functions Guide**](./guides/fundamentals/LOSS_FUNCTIONS_GUIDE.md) - Complete derivations with convergence proofs
 - [**Optimization Algorithms**](./guides/fundamentals/OPTIMIZATION_ALGORITHMS.md) - SGD, Adam, and variants
+- [**Feature Engineering Guide**](./guides/fundamentals/FEATURE_ENGINEERING_GUIDE.md) ⭐ **NEW** - Create better features (numerical, categorical, datetime, text, geo)
 
 ### Learning Guides
 - [**Learning Guide**](./guides/fundamentals/LEARNING_GUIDE.md) - How to use this curriculum effectively
@@ -198,6 +199,7 @@
 - [**Model Optimization for Production**](./guides/production/MODEL_OPTIMIZATION_PRODUCTION.md) - Quantization, pruning
 - [**Model Optimization Guide**](./guides/production/MODEL_OPTIMIZATION_GUIDE.md)
 - [**Advanced Monitoring & Observability**](./guides/production/ADVANCED_MONITORING_OBSERVABILITY.md)
+- [**ML Debugging Strategies**](./guides/production/ML_DEBUGGING_STRATEGIES.md) ⭐ **NEW** - Systematic debugging (data, model, training, production issues)
 - [**Debugging ML Models**](./guides/production/DEBUGGING_ML_MODELS.md)
 
 ### Scaling & Operations
@@ -403,6 +405,8 @@ For detailed setup instructions, see [Setup Guide](./resources/SETUP_GUIDE.md).
 - ✅ **ML Project Ideas** - 100+ projects organized by difficulty level for portfolio building
 
 **📚 Technical Content:**
+- ✅ **ML Debugging Strategies** - Systematic debugging approach (data, model, training, production issues with case studies)
+- ✅ **Feature Engineering Guide** - Create better features (numerical, categorical, datetime, text, geospatial)
 - ✅ **Domain-Specific ML** - Healthcare, Finance, E-commerce guides
 - ✅ **ML System Design** - Complete interview framework
 - ✅ **ML Engineering Exercises** - 80+ hands-on challenges
