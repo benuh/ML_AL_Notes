@@ -123,7 +123,11 @@
 - [**Algorithm Complexity Reference**](./guides/fundamentals/ALGORITHM_COMPLEXITY_REFERENCE.md) - Big-O analysis for 100+ algorithms
 - [**Loss Functions Guide**](./guides/fundamentals/LOSS_FUNCTIONS_GUIDE.md) - Complete derivations with convergence proofs
 - [**Optimization Algorithms**](./guides/fundamentals/OPTIMIZATION_ALGORITHMS.md) - SGD, Adam, and variants
+
+### Practical Guides
+- [**Data Preprocessing Complete Guide**](./guides/fundamentals/DATA_PREPROCESSING_COMPLETE_GUIDE.md) ⭐ **NEW** - Complete preprocessing workflow (missing values, outliers, encoding, scaling, pipelines)
 - [**Feature Engineering Guide**](./guides/fundamentals/FEATURE_ENGINEERING_GUIDE.md) ⭐ **NEW** - Create better features (numerical, categorical, datetime, text, geo)
+- [**Model Selection Guide**](./guides/fundamentals/MODEL_SELECTION_GUIDE.md) ⭐ **NEW** - Choose the right algorithm (decision tree, comparison framework, cheat sheets)
 
 ### Learning Guides
 - [**Learning Guide**](./guides/fundamentals/LEARNING_GUIDE.md) - How to use this curriculum effectively
@@ -405,8 +409,10 @@ For detailed setup instructions, see [Setup Guide](./resources/SETUP_GUIDE.md).
 - ✅ **ML Project Ideas** - 100+ projects organized by difficulty level for portfolio building
 
 **📚 Technical Content:**
-- ✅ **ML Debugging Strategies** - Systematic debugging approach (data, model, training, production issues with case studies)
+- ✅ **Data Preprocessing Complete Guide** - End-to-end preprocessing (missing values, outliers, encoding, scaling, pipelines)
+- ✅ **Model Selection Guide** - Choose the right algorithm (decision trees, comparison frameworks, detailed cheat sheets)
 - ✅ **Feature Engineering Guide** - Create better features (numerical, categorical, datetime, text, geospatial)
+- ✅ **ML Debugging Strategies** - Systematic debugging approach (data, model, training, production issues with case studies)
 - ✅ **Domain-Specific ML** - Healthcare, Finance, E-commerce guides
 - ✅ **ML System Design** - Complete interview framework
 - ✅ **ML Engineering Exercises** - 80+ hands-on challenges
