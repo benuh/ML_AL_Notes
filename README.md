@@ -7,7 +7,7 @@
 
 **The most comprehensive, hands-on Machine Learning and AI learning resource - designed for self-learners, interview preparation, and production ML engineering.**
 
-> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **12 Practical Guides** | 💼 **100+ Project Ideas** | 🧠 **Learning Science Methods** | 🎤 **Interview Mastery** | 📖 **Career Roadmaps**
+> 📚 **14 Complete Jupyter Notebooks** | 🎯 **140+ Interview Questions** | 🏋️ **80+ Hands-On Exercises** | 🔬 **73+ Algorithms Implemented** | 📊 **280+ Visualizations** | 📋 **12 Production Templates** | 🚀 **14 Practical Guides** | 💼 **100+ Project Ideas** | 🧠 **Learning Science Methods** | 🎤 **Interview Mastery** | 📖 **Career Roadmaps**
 
 ---
 
@@ -133,6 +133,8 @@
 - [**Cross-Validation Guide**](./guides/fundamentals/CROSS_VALIDATION_GUIDE.md) ⭐ **NEW** - Robust model evaluation (K-Fold, Stratified, Time Series, Nested CV, best practices)
 - [**Bias-Variance Tradeoff Guide**](./guides/fundamentals/BIAS_VARIANCE_TRADEOFF_GUIDE.md) ⭐ **NEW** - Understand and fix overfitting/underfitting (learning curves, diagnostics, solutions)
 - [**Regularization Techniques Guide**](./guides/fundamentals/REGULARIZATION_TECHNIQUES_GUIDE.md) ⭐ **NEW** - Prevent overfitting (L1/L2, Dropout, Early Stopping, Data Augmentation)
+- [**Gradient Descent and Optimization Guide**](./guides/fundamentals/GRADIENT_DESCENT_OPTIMIZATION_GUIDE.md) ⭐ **NEW** - Master optimizers (SGD, Momentum, Adam, RMSprop, learning rate schedules)
+- [**Handling Imbalanced Data Guide**](./guides/fundamentals/HANDLING_IMBALANCED_DATA_GUIDE.md) ⭐ **NEW** - Tackle class imbalance (SMOTE, class weights, ensemble methods, anomaly detection)
 
 ### Learning Guides
 - [**Learning Guide**](./guides/fundamentals/LEARNING_GUIDE.md) - How to use this curriculum effectively
@@ -422,6 +424,8 @@ For detailed setup instructions, see [Setup Guide](./resources/SETUP_GUIDE.md).
 - ✅ **Cross-Validation Guide** - Robust evaluation (K-Fold, Stratified, Time Series, Nested CV, prevent data leakage)
 - ✅ **Bias-Variance Tradeoff Guide** - Understand and fix overfitting/underfitting (learning curves, diagnostics, solutions)
 - ✅ **Regularization Techniques Guide** - Prevent overfitting (L1/L2 Ridge/Lasso, Dropout, Early Stopping, Data Augmentation)
+- ✅ **Gradient Descent and Optimization Guide** - Master optimizers (SGD, Momentum, Nesterov, Adam, RMSprop, learning rate schedules)
+- ✅ **Handling Imbalanced Data Guide** - Tackle class imbalance (SMOTE, cost-sensitive learning, ensemble methods for imbalanced datasets)
 - ✅ **ML Debugging Strategies** - Systematic debugging approach (data, model, training, production issues with case studies)
 - ✅ **Domain-Specific ML** - Healthcare, Finance, E-commerce guides
 - ✅ **ML System Design** - Complete interview framework
