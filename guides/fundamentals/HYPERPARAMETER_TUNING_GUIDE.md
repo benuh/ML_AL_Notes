@@ -235,6 +235,13 @@ grid_fine.fit(X_train, y_train)
 
 **Theory:** Random search explores parameter space more efficiently. With same budget, random search tests more unique values per hyperparameter.
 
+**Key insight (Bergstra & Bengio, 2012):** In practice, only a few hyperparameters significantly affect performance. Random search explores more values for each hyperparameter independently, making it more likely to find good values for the important ones. Grid search wastes trials testing all combinations of unimportant parameters.
+
+Example: With 9 trials testing 2 hyperparameters:
+- Grid search: Tests 3×3 grid = 3 unique values per parameter
+- Random search: Tests 9 unique values per parameter (on average)
+- If only one parameter matters, random search has 3× better chance of finding good value!
+
 ```python
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import randint, uniform
@@ -303,7 +310,15 @@ param_distributions = {
 - Limited time/compute budget
 - Want to explore broadly
 
-**Rule of thumb:** Random search with n_iter=100 often beats grid search with same number of trials.
+**Rule of thumb:** Random search with n_iter=100 often beats grid search with same number of trials, especially when:
+- Some hyperparameters are much more important than others
+- You're tuning 3+ hyperparameters simultaneously
+- You're not sure which hyperparameters matter most
+
+**When grid search is better:**
+- You have domain knowledge about which discrete values to test
+- Very small search space (<50 combinations)
+- You want complete coverage of a small region
 
 ---
 
@@ -312,6 +327,24 @@ param_distributions = {
 ### Concept
 
 **Smarter than random:** Uses previous results to guide search
+
+**How it works:**
+1. Build probabilistic model of objective function (usually Gaussian Process or Tree-structured Parzen Estimator)
+2. Use model to predict promising regions of hyperparameter space
+3. Sample from promising regions (balancing exploration vs exploitation)
+4. Update model with new results and repeat
+
+**When Bayesian optimization is worth the overhead:**
+- Each trial is expensive (>1 minute to train)
+- Limited budget (<100 trials due to time/cost constraints)
+- Hyperparameters have complex interactions
+- Objective function is smooth (not random/noisy)
+
+**When to stick with random search:**
+- Fast models (<10 seconds per trial) - overhead not worth it
+- Very noisy objective function (Bayesian models struggle)
+- Large budget (>500 trials) - random search catches up
+- Simple hyperparameter relationships
 
 **Libraries:**
 - Optuna (recommended, easy to use)
@@ -451,6 +484,18 @@ Round 3:  3 configs × 100% data → Keep top 1
 Much faster than trying all 27 configs on full data!
 ```
 
+**Critical assumption:** Performance on small subset/few iterations correlates with final performance. This works well for:
+- Increasing n_estimators (more trees generally helps monotonically)
+- Neural network training (early learning curves are predictive)
+- Increasing training data (more data usually helps)
+
+**May not work well when:**
+- Early performance is noisy and uncorrelated with final performance
+- Some configs need more data/iterations to show their potential (e.g., high-capacity models that need more data to shine)
+- Small performance differences that matter are washed out by noise at small scales
+
+**Recommendation:** Use successive halving when you're tuning iteration-based hyperparameters or have strong correlation between early and final performance. For other cases, random/Bayesian search may be safer.
+
 ---
 
 ## Algorithm-Specific Tuning
@@ -529,6 +574,7 @@ import xgboost as xgb
 model = xgb.XGBClassifier(
     learning_rate=0.1,
     n_estimators=1000,  # Set high
+    eval_metric='logloss',  # Must match your scoring objective!
     random_state=42
 )
 
@@ -541,6 +587,11 @@ model.fit(
 )
 
 print(f"Best iteration: {model.best_iteration}")
+
+# Important: eval_metric should align with your goal
+# Classification: 'logloss', 'error', 'auc'
+# Regression: 'rmse', 'mae', 'mape'
+# Custom: Define your own metric function
 ```
 
 ### Neural Networks
@@ -619,6 +670,32 @@ grid_search = GridSearchCV(
 # ❌ Bad: Using single train/val split
 # Easy to overfit to validation set during tuning
 ```
+
+**Important:** Even with CV, extensive hyperparameter tuning can overfit to the CV folds themselves. For unbiased performance estimates when tuning many hyperparameters:
+
+```python
+from sklearn.model_selection import cross_val_score
+
+# Nested CV: Outer loop for unbiased evaluation, inner loop for tuning
+outer_cv = 5
+inner_cv = 3
+
+grid_search = GridSearchCV(model, param_grid, cv=inner_cv, scoring='accuracy')
+
+# Get unbiased estimate of performance
+nested_scores = cross_val_score(grid_search, X_train, y_train, cv=outer_cv)
+print(f"Nested CV score: {nested_scores.mean():.3f} ± {nested_scores.std():.3f}")
+
+# After getting unbiased estimate, retrain on all data for deployment
+grid_search.fit(X_train, y_train)
+final_model = grid_search.best_estimator_
+```
+
+**When to use nested CV:**
+- Comparing multiple tuning strategies and need fair comparison
+- Reporting performance in publication/research
+- Extensive hyperparameter search (>100 combinations)
+- Want to know true expected performance, not optimistically biased estimate
 
 ### 2. Tune on Training Set, Evaluate on Test Set
 
@@ -737,6 +814,20 @@ for params in all_possible_combinations:  # 1000+ combinations
 grid_search = GridSearchCV(model, param_grid, cv=5)
 # CV protects against overfitting to single validation set
 ```
+
+**Why this is a problem (multiple comparisons):**
+- Each hyperparameter trial is like a hypothesis test
+- With 100 trials and validation score ≈ 0.85, you expect some scores near 0.88 just by random chance
+- This is the ML equivalent of p-hacking in statistics
+- The best validation score becomes an overly optimistic estimate of true performance
+
+**Example:** If your model's true accuracy is 85% and you try 100 random hyperparameter sets, the best validation score will likely be around 87-88% due to random variation alone. This 2-3% gap is pure overfitting to the validation set.
+
+**Solutions:**
+- Use cross-validation (helps but doesn't eliminate the problem)
+- Use nested CV for unbiased estimates
+- Hold out a separate test set that you ONLY evaluate once
+- Limit the number of hyperparameter trials if using a single validation set
 
 ### 2. Tuning on Test Set
 
@@ -882,14 +973,23 @@ def objective(trial):
         'random_state': 42
     }
 
+    # Use cross-validation, NOT test set!
     model = RandomForestClassifier(**params)
-    model.fit(X_train, y_train)
-    return model.score(X_test, y_test)
+    score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+    return score
 
 study = optuna.create_study(direction='maximize')
 study.optimize(objective, n_trials=50, show_progress_bar=True)
 
-print(f"Optuna: {study.best_value:.3f}")
+# Train best model and evaluate on test set
+best_params = study.best_params
+best_params['random_state'] = 42
+best_model = RandomForestClassifier(**best_params)
+best_model.fit(X_train, y_train)
+optuna_score = best_model.score(X_test, y_test)
+
+print(f"Optuna CV score: {study.best_value:.3f}")
+print(f"Optuna test score: {optuna_score:.3f}")
 print(f"Best params: {study.best_params}")
 
 # Summary
@@ -897,7 +997,8 @@ print("\n=== Summary ===")
 print(f"Baseline:      {baseline_score:.3f}")
 print(f"Grid Search:   {grid_score:.3f}")
 print(f"Random Search: {random_score:.3f}")
-print(f"Optuna:        {study.best_value:.3f}")
+print(f"Optuna:        {optuna_score:.3f}")
+print("\nNote: All methods used CV for tuning, then evaluated once on held-out test set")
 ```
 
 ---
