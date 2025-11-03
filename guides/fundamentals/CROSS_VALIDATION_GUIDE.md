@@ -143,12 +143,17 @@ print(f"Mean accuracy: {scores.mean():.4f}")
 - ❌ When you need faster training
 
 **Pros:**
-- Maximum training data
-- No randomness in splits
+- Maximum training data (N-1 samples per fold)
+- Nearly unbiased estimate of model performance
+- No randomness in splits (deterministic)
 
 **Cons:**
 - Very slow (N models for N samples)
-- High variance in estimates
+- High variance in performance estimate (estimates are highly correlated)
+- Computationally prohibitive for large datasets
+- Not suitable for time series data
+
+**Statistical note:** LOOCV has low bias but high variance in the error estimate because the training sets overlap significantly (differ by only one sample), making the performance estimates highly correlated.
 
 ### 4. Holdout Validation (Train-Validation-Test Split)
 
@@ -438,16 +443,28 @@ for fold, (train_idx, test_idx) in enumerate(
 **Why gap matters:**
 
 ```python
-# Without gap - model can "peek" at recent data
+# Without gap - potential data leakage and unrealistic evaluation
 # Example: Predicting stock price for day 100
 # Training on days 0-99 includes day 99 (immediately before!)
-# This is unrealistic - you won't have today's data to predict tomorrow
+# Problems:
+# 1. Feature calculation may use future information (look-ahead bias)
+# 2. Autocorrelation can leak information from day 99 to day 100
+# 3. Doesn't reflect real deployment (data collection/processing lag)
 
 # With gap - more realistic
 # Training on days 0-95
-# Gap: days 96-98 (simulates time needed to prepare/deploy model)
+# Gap: days 96-98 (accounts for data processing/model deployment time)
 # Test: days 99-100
+# Benefits:
+# 1. Prevents look-ahead bias in feature engineering
+# 2. Simulates realistic forecasting scenario
+# 3. Accounts for operational constraints
 ```
+
+**Critical for time series:**
+- Financial data: Gap accounts for settlement time, regulatory reporting delays
+- IoT/sensor data: Gap accounts for data transmission, processing latency
+- Sales forecasting: Gap accounts for inventory ordering lead time
 
 ---
 
@@ -547,10 +564,20 @@ Difference: 3.30 percentage points
 ```
 
 **When to use nested CV:**
-- ✅ Reporting final model performance
-- ✅ Comparing different model types
-- ✅ Publishing research results
-- ❌ Just tuning hyperparameters (use regular GridSearchCV)
+- ✅ Reporting unbiased estimate of model performance for publication/presentation
+- ✅ Comparing different model types (e.g., Random Forest vs SVM)
+- ✅ Model selection when you need realistic performance estimate
+- ✅ Research papers and rigorous evaluation
+
+**When NOT to use nested CV:**
+- ❌ Just finding best hyperparameters for deployment (use regular GridSearchCV)
+- ❌ When you have separate held-out test set (use that for final evaluation)
+- ❌ Limited computational budget (nested CV is expensive)
+
+**Important clarification:**
+- Nested CV gives you an **unbiased performance estimate**
+- It does NOT give you the final model to deploy
+- After nested CV, retrain on all data with best hyperparameters for deployment
 
 ---
 

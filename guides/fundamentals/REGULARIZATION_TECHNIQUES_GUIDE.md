@@ -319,9 +319,13 @@ plt.show()
 - ✅ Good for high-dimensional data
 
 **Disadvantages:**
-- ❌ Can be unstable with correlated features
-- ❌ Arbitrarily selects one feature from correlated group
-- ❌ Slower to compute than Ridge
+- ❌ Can be unstable with correlated features (small data changes → large coefficient changes)
+- ❌ Arbitrarily selects one feature from correlated group (non-deterministic selection)
+- ❌ Slower to compute than Ridge (no closed-form solution, requires iterative optimization)
+- ❌ May struggle when p > n (more features than samples) without additional constraints
+
+**Why instability with correlated features?**
+When features are highly correlated, Lasso tends to arbitrarily pick one and ignore others. For example, if features X₁ and X₂ are identical, Lasso might give all weight to X₁ in one run and all to X₂ in another run with slightly different data. Ridge, by contrast, distributes weight equally among correlated features.
 
 **When to use:**
 - High-dimensional data (many features)

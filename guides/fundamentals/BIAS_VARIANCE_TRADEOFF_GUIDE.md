@@ -260,6 +260,12 @@ plt.show()
 4. Variance increases with complexity
 5. Optimal complexity minimizes bias² + variance
 
+**Important notes:**
+- This classical U-shaped curve applies to traditional ML models (trees, polynomials, SVMs)
+- Modern deep learning can exhibit "double descent": test error may decrease again after the interpolation threshold
+- For neural networks, implicit regularization from SGD and architecture can prevent variance from increasing monotonically
+- The tradeoff is less pronounced when using proper regularization techniques
+
 ---
 
 ## Overfitting vs Underfitting
