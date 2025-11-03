@@ -34,7 +34,7 @@ Where:
 - **α**: Learning rate
 - **∇J(θ)**: Gradient of loss function
 
-**Intuition:** Move in the direction opposite to the gradient (steepest ascent) to find minimum.
+**Intuition:** The gradient points in the direction of steepest ascent. We move in the opposite direction (negative gradient) to find the minimum.
 
 ### Implementing from Scratch
 
@@ -469,6 +469,9 @@ v_t = β × v_{t-1} + α × ∇J(θ)
 Where:
 - **v**: Velocity (accumulated gradients)
 - **β**: Momentum coefficient (typically 0.9)
+- **α**: Learning rate
+
+**Note:** Some implementations use `v_t = β × v_{t-1} + ∇J(θ)` and `θ = θ - α × v_t` (learning rate applied during update). Both are mathematically equivalent but affect how you tune hyperparameters.
 
 ### Implementation
 
@@ -885,12 +888,19 @@ print(f"  Final theta: {theta_adam}")
 - ✅ Good default choice
 
 **Disadvantages:**
-- ❌ Can fail to converge in some cases
-- ❌ Three hyperparameters
+- ❌ Can fail to converge in some cases (particularly on simple convex problems)
+- ❌ May not converge to optimal solution for some non-convex problems
+- ❌ Requires tuning of three hyperparameters (though default values work well)
 
 **When to use:**
 - Default choice for deep learning
 - Typical values: α=0.001, β₁=0.9, β₂=0.999
+- Reduce α if training is unstable; increase if converging too slowly
+
+**Important notes:**
+- Adam can sometimes generalize worse than SGD+Momentum for some tasks
+- For best generalization, consider using SGD+Momentum with learning rate schedule
+- Adam works best when you need fast convergence and good enough (not optimal) solutions
 
 ---
 

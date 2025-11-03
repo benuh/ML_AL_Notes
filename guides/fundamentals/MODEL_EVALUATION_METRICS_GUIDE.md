@@ -329,9 +329,11 @@ print(f"Weighted F1: {f1_weighted:.3f}")
 ```
 
 **When to use:**
-- **Macro:** All classes equally important (rare classes matter)
-- **Micro:** Larger classes more important
-- **Weighted:** Balance by actual class distribution
+- **Macro:** All classes equally important (rare classes matter). Best when you care about performance on all classes regardless of size.
+- **Micro:** Larger classes more important. Equivalent to accuracy for multi-class. Good when classes are imbalanced but you care about overall samples.
+- **Weighted:** Balance by actual class distribution. Good default for imbalanced multi-class problems.
+
+**Important note:** For imbalanced multi-class, macro-averaged metrics can be misleading if you have very small classes. Consider using weighted average or examining per-class metrics.
 
 #### Classification Report
 

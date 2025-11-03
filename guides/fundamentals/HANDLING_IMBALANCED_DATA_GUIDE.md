@@ -445,8 +445,16 @@ plt.show()
 - ✅ Reduces overfitting vs random oversampling
 
 **Disadvantages:**
-- ❌ Can create noisy samples
-- ❌ Computationally expensive
+- ❌ Can create noisy samples (especially if minority class is noisy)
+- ❌ May generate unrealistic samples in sparse regions
+- ❌ Computationally expensive for large datasets
+- ❌ Can amplify noise or outliers in minority class
+
+**Critical warnings:**
+- ⚠️ NEVER apply SMOTE before cross-validation (causes data leakage)
+- ⚠️ NEVER apply SMOTE to test set (only on training data)
+- ⚠️ Works poorly when minority class has multiple distinct clusters
+- ⚠️ May not help with tree-based models (they handle imbalance well already)
 
 ### 4. SMOTE Variants
 
