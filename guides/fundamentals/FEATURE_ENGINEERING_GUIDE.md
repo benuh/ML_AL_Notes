@@ -108,6 +108,24 @@ df['income_bracket'] = pd.cut(
 )
 ```
 
+**When binning helps:**
+- ✅ Tree-based models with true non-linear relationships (e.g., insurance risk by age has jumps at 25, 65)
+- ✅ Linear models when relationship is highly non-linear (binning + one-hot creates piecewise linear)
+- ✅ Interpretability: easier to explain "senior discount" than "0.05 × age"
+- ✅ Dealing with outliers: extreme values get capped within bins
+
+**When binning hurts:**
+- ❌ Linear relationships: binning loses information (age 30→35 treated same as 18→30)
+- ❌ Deep learning models: they can learn non-linearities, binning just loses precision
+- ❌ Arbitrary bin boundaries: where you cut matters a lot
+- ❌ Sparse data: too many bins with few samples leads to overfitting
+
+**Important considerations:**
+- Equal-width binning: sensitive to outliers (one extreme value creates huge empty bins)
+- Quantile binning: ensures balanced bins but arbitrary boundaries
+- Domain-knowledge binning: best when you know meaningful thresholds (e.g., voting age 18, retirement age 65)
+- Keep original continuous feature too: model can choose which to use
+
 ### 2. Mathematical Transformations
 
 **Log transformation** (for skewed distributions):
@@ -124,6 +142,34 @@ axes[0].set_title('Original (Skewed)')
 axes[1].hist(df['log_income'], bins=50)
 axes[1].set_title('Log-Transformed (Normal)')
 ```
+
+**Why log transformation works for skewed data:**
+
+1. **Compresses large values, expands small values:**
+   - log(1) = 0, log(10) = 2.3, log(100) = 4.6, log(1000) = 6.9
+   - Difference 1→10 (9 units) maps to 0→2.3 (2.3 units)
+   - Difference 100→1000 (900 units) maps to 4.6→6.9 (2.3 units)
+   - Effect: Reduces influence of extreme values without removing them
+
+2. **Converts multiplicative relationships to additive:**
+   - Original: y = a × x₁ × x₂
+   - Log-transformed: log(y) = log(a) + log(x₁) + log(x₂)
+   - Linear models work better with additive relationships
+
+3. **Makes distribution more symmetric and closer to normal:**
+   - Many real-world phenomena are log-normal (incomes, house prices, city populations)
+   - Log transformation → approximately normal distribution
+   - Helps algorithms that assume normality (e.g., Linear Regression, LDA)
+
+4. **Stabilizes variance (homoscedasticity):**
+   - Before: variance grows with mean (rich people have more income variation)
+   - After: more constant variance across all values
+   - Important for linear regression assumptions
+
+**When to use log transformation:**
+- Right-skewed data (long tail on right side)
+- Data spans multiple orders of magnitude (1 to 1,000,000)
+- Multiplicative processes (compound growth, prices)
 
 **Power transformations** (Box-Cox, Yeo-Johnson):
 ```python
@@ -433,6 +479,47 @@ df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
 df['dow_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
 df['dow_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
 ```
+
+**Why cyclical encoding is essential:**
+
+**Problem with naive encoding:**
+- Encoding months as 1-12 creates artificial ordering
+- Model learns: month 12 (December) is far from month 1 (January)
+- Reality: December and January are adjacent (1 month apart)
+- Distance in feature space: |12 - 1| = 11 (maximum possible!)
+- This is wrong: December and January should be close
+
+**How sine/cosine solves this:**
+- Maps cyclical values to a circle in 2D space
+- December (12): sin = 0.0, cos = 1.0
+- January (1): sin = 0.5, cos = 0.87
+- Euclidean distance: √[(0.0-0.5)² + (1.0-0.87)²] = 0.52 (small! ✓)
+- Compare to naive: |12 - 1| = 11 (huge! ✗)
+
+**Why you need BOTH sin and cos:**
+- Only sin: sin(0°) = sin(360°) = 0 → can't distinguish start from end
+- Only cos: cos(0°) = cos(360°) = 1 → same problem
+- Both: (sin(0°), cos(0°)) = (0, 1) and (sin(360°), cos(360°)) = (0, 1) → identical (✓)
+- Also: (sin(180°), cos(180°)) = (0, -1) → opposite side of circle (✓)
+
+**Visualization:**
+```
+Month encoding on circle:
+- Jan (1): 30° → (sin=0.50, cos=0.87)
+- Jul (7): 210° → (sin=-0.50, cos=-0.87)
+- Dec (12): 360° → (sin=0.00, cos=1.00)
+December and January are now close in 2D space!
+```
+
+**When cyclical encoding is critical:**
+- Time features: hour (0-23), month (1-12), day of week (0-6)
+- Angles: wind direction (0-360 degrees), compass bearings
+- Any periodic feature where endpoints connect
+
+**When NOT needed:**
+- Year: 2024 is not close to 2025 cyclically (use as-is or normalize)
+- Day of month: Day 31 is not close to day 1 (month boundaries matter)
+- Ordinal features: education level (high school→bachelor→master) is not cyclical
 
 ### 3. Time Since / Until Event
 
