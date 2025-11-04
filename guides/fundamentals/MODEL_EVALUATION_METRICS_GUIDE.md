@@ -183,6 +183,17 @@ print(f"F1-Score: {f1:.2%}")
 - F1 = 0.0: Worst
 - F1 close to 0: Either precision or recall is very low
 
+**Why harmonic mean (not arithmetic mean)?**
+Harmonic mean penalizes extreme values more heavily:
+- Arithmetic mean of 100% and 0% = 50% (misleading!)
+- Harmonic mean of 100% and 0% = 0% (correctly shows model is useless)
+
+Example with precision=100%, recall=10%:
+- Arithmetic mean: (100 + 10)/2 = 55% (sounds okay)
+- Harmonic mean (F1): 2×(100×10)/(100+10) = 18% (correctly reflects poor performance)
+
+The harmonic mean ensures both precision AND recall must be high for a good F1 score.
+
 #### F-Beta Score
 
 **Generalization of F1:** Allows weighting precision vs recall
@@ -248,6 +259,22 @@ plt.show()
 **When NOT to use:**
 - ❌ Highly imbalanced data (use PR-AUC instead)
 - ❌ Care about performance at specific threshold
+
+**Why ROC-AUC fails on imbalanced data:**
+ROC curve uses False Positive Rate (FPR) = FP/(FP+TN). When negative class is very large (e.g., 99% of data):
+- Even with many false positives, FPR stays low because TN is huge
+- ROC-AUC can look great (0.95+) while model is actually terrible for minority class
+- PR curve uses Precision = TP/(TP+FP), which directly shows poor performance
+
+**Concrete example:**
+- Dataset: 990 negatives, 10 positives (1% positive class)
+- Model: Predicts positive for 100 samples, correctly catching 9/10 positives
+- TPR (Recall) = 9/10 = 90% (looks good)
+- FPR = 91/990 = 9% (looks good → ROC-AUC will be high)
+- Precision = 9/100 = 9% (terrible! 91% of positive predictions are wrong)
+- PR-AUC will correctly show this model is poor
+
+**Rule of thumb:** If positive class < 10% of data, use PR-AUC instead of ROC-AUC.
 
 #### Precision-Recall AUC
 
@@ -459,9 +486,32 @@ print(f"MAPE: {mape:.2f}%")
 - ❌ Target has zeros (division by zero!)
 - ❌ Target has very small values (unstable)
 
+**Critical problems with MAPE:**
+1. **Asymmetric penalty**: MAPE penalizes over-predictions more than under-predictions
+   - Predicting 90 when true=100: Error = |100-90|/100 = 10%
+   - Predicting 110 when true=100: Error = |100-110|/100 = 10%
+   - BUT if predicting 50 when true=100: Error = 50%
+   - While predicting 150 when true=100: Error = 50%
+   - However, predicting 50 when true=50: Error = 0% vs predicting 100 when true=50: Error = 100%!
+
+2. **Not actually scale-independent**: Large percentage errors on small values dominate
+   - If predicting [1000, 10]: errors [100, 1] give MAPE = (10% + 10%)/2 = 10%
+   - But errors [50, 5] give MAPE = (5% + 50%)/2 = 27.5% (worse, even though absolute errors are better!)
+
+3. **Undefined for zero values**: Cannot divide by zero
+
+**Alternatives to MAPE:**
+- **sMAPE (Symmetric MAPE)**: (100/n) × Σ|y_true - y_pred| / ((|y_true| + |y_pred|)/2)
+- **MASE (Mean Absolute Scaled Error)**: Scales by naive forecast error, handles zeros
+- **RMSE / MAE**: If you don't actually need scale-independence
+
 ### R² Score (Coefficient of Determination)
 
 **Formula:** 1 - (SS_res / SS_tot)
+
+Where:
+- SS_res = Σ(y_true - y_pred)² (residual sum of squares)
+- SS_tot = Σ(y_true - ȳ)² (total sum of squares, variance)
 
 ```python
 from sklearn.metrics import r2_score
@@ -487,6 +537,26 @@ r2 = 0.85  # Model explains 85% of variance
 **When NOT to use:**
 - ❌ Target is not normally distributed
 - ❌ Non-linear relationships
+
+**Important clarifications:**
+1. **R² can be negative**: This happens when your model performs worse than simply predicting the mean. It means SS_res > SS_tot (your predictions are worse than a horizontal line at the mean).
+
+2. **R² can be misleading**:
+   - High R² doesn't mean good predictions if target has high variance
+   - Low R² doesn't mean bad predictions if target has low variance
+   - R² increases as you add features (even random ones!) → use adjusted R²
+
+3. **Adjusted R²**: Penalizes adding useless features
+   ```python
+   def adjusted_r2(r2, n_samples, n_features):
+       return 1 - (1 - r2) * (n_samples - 1) / (n_samples - n_features - 1)
+   ```
+
+4. **R² ≠ correlation²** (except for simple linear regression with one feature)
+
+Example of misleading R²:
+- Predicting daily temperature: R² = 0.60 (actually good! Temperature varies a lot)
+- Predicting room temperature: R² = 0.60 (terrible! Room temp should be stable)
 
 ### Huber Loss
 
