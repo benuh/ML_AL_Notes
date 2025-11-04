@@ -211,6 +211,31 @@ model.fit(X_train, y_train)
 - Slower than linear models
 - Large memory footprint
 
+**Why Random Forest is such a good default:**
+
+1. **Bias-Variance tradeoff sweet spot:**
+   - Single tree: Low bias (can fit complex patterns) but high variance (unstable)
+   - Ensemble of trees: Maintains low bias while dramatically reducing variance
+   - Formula: Var(average) = Var(tree) / n_trees (if trees were independent)
+   - In practice, trees are correlated, but variance still reduces significantly
+
+2. **Built-in regularization through randomness:**
+   - Bootstrap sampling (row randomness): Each tree sees different data
+   - Feature subsetting (column randomness): Each split considers random subset of features
+   - Combined effect: Decorrelates trees, improves ensemble performance
+   - Default feature subset: √n_features (classification) or n_features/3 (regression)
+
+3. **Robust to hyperparameter choices:**
+   - More trees almost always better (diminishing returns after ~100-500)
+   - Max_depth can often be left unlimited without severe overfitting
+   - Min_samples_split/leaf provide gentle regularization
+   - Hard to make Random Forest perform terribly with default settings
+
+4. **No feature scaling required:**
+   - Tree splits are based on thresholds, not distances
+   - Scale-invariant: Same tree whether feature is 0-1 or 0-1000
+   - Saves preprocessing time and reduces error potential
+
 ```python
 from sklearn.ensemble import RandomForestRegressor
 
@@ -237,6 +262,44 @@ importances = pd.DataFrame({
 - Tabular data
 - Can tune hyperparameters
 
+**Key differences explained:**
+
+**XGBoost (2014):**
+- **Tree growth:** Level-wise (grows all nodes at same depth before moving deeper)
+- **Speed:** Moderate (pre-sorting for splits is expensive)
+- **Memory:** Higher (stores pre-sorted features)
+- **Best for:** General purpose, well-tested, most mature
+- **Special features:** Built-in regularization, handles missing values well
+
+**LightGBM (2017):**
+- **Tree growth:** Leaf-wise (grows tree by choosing leaf with max delta loss)
+- **Speed:** Fastest (histogram-based algorithm, no pre-sorting)
+- **Memory:** Lowest (histogram binning)
+- **Best for:** Large datasets (>10K rows), many features (>100)
+- **Caution:** Leaf-wise growth can overfit on small datasets (<10K rows)
+- **Special features:** Categorical feature support, faster training
+
+**CatBoost (2017):**
+- **Tree growth:** Symmetric (balanced trees)
+- **Speed:** Moderate-fast
+- **Memory:** Moderate
+- **Best for:** Datasets with many categorical features, need minimal tuning
+- **Special features:** Best-in-class categorical encoding (ordered target statistics), less prone to overfitting
+- **Advantage:** Often works well with default parameters
+
+**Performance comparison (typical):**
+```
+Accuracy:    XGBoost ≈ LightGBM ≈ CatBoost (all within 1%)
+Speed:       LightGBM > CatBoost > XGBoost (2-10x difference)
+Tuning ease: CatBoost > LightGBM > XGBoost
+Categorical: CatBoost > LightGBM > XGBoost (manual encoding)
+```
+
+**Selection guide:**
+- **XGBoost:** Default choice, most documentation/examples, proven track record
+- **LightGBM:** Large datasets where speed matters, deep trees (leaf-wise growth)
+- **CatBoost:** Many categorical features, want good defaults without tuning
+
 **XGBoost:**
 ```python
 import xgboost as xgb
@@ -244,26 +307,26 @@ import xgboost as xgb
 model = xgb.XGBRegressor(
     n_estimators=100,
     learning_rate=0.1,
-    max_depth=5,
+    max_depth=5,  # Level-wise: limits depth
     random_state=42
 )
 model.fit(X_train, y_train)
 ```
 
-**LightGBM (faster for large datasets):**
+**LightGBM:**
 ```python
 import lightgbm as lgb
 
 model = lgb.LGBMRegressor(
     n_estimators=100,
     learning_rate=0.1,
-    max_depth=5,
+    num_leaves=31,  # Leaf-wise: limits leaves (2^max_depth)
     random_state=42
 )
 model.fit(X_train, y_train)
 ```
 
-**CatBoost (handles categorical features):**
+**CatBoost:**
 ```python
 from catboost import CatBoostRegressor
 
@@ -274,6 +337,7 @@ model = CatBoostRegressor(
     random_state=42,
     verbose=False
 )
+# No need to encode categorical features!
 model.fit(X_train, y_train, cat_features=['city', 'category'])
 ```
 
@@ -425,12 +489,12 @@ model.fit(X_train, y_train)
 - Text classification
 - Very small datasets
 - Need fast training
-- Features are independent
+- Features are independent (or when violation doesn't hurt much)
 
 **Variants:**
-- **GaussianNB**: Continuous features
-- **MultinomialNB**: Count data (text)
-- **BernoulliNB**: Binary features
+- **GaussianNB**: Continuous features (assumes normal distribution)
+- **MultinomialNB**: Count data (text, word frequencies)
+- **BernoulliNB**: Binary features (presence/absence)
 
 ```python
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
@@ -443,6 +507,46 @@ model = MultinomialNB(alpha=1.0)
 
 model.fit(X_train, y_train)
 ```
+
+**Independence assumption explained:**
+
+**The assumption:** Features are conditionally independent given the class.
+
+Formula: P(x₁, x₂, ..., xₙ | y) = P(x₁|y) × P(x₂|y) × ... × P(xₙ|y)
+
+**Example of violation:**
+- Spam detection with features: contains("free"), contains("money"), contains("offer")
+- These words are correlated: emails with "free" often have "money" and "offer"
+- Naive Bayes assumes: P(free, money | spam) = P(free | spam) × P(money | spam)
+- Reality: P(free, money | spam) < P(free | spam) × P(money | spam) (due to correlation)
+
+**Why it often works despite violation:**
+
+1. **Classification only needs correct ranking:**
+   - Don't need exact probabilities, just need P(spam | x) > P(not spam | x)
+   - Independence violation affects both classes similarly
+   - Relative ordering often preserved even if absolute probabilities wrong
+
+2. **Errors can cancel out:**
+   - Overestimating some feature correlations, underestimating others
+   - Systematic errors may balance across features
+   - Final prediction can still be correct
+
+3. **Low variance:**
+   - Fewer parameters to estimate (each feature separately)
+   - Less prone to overfitting on small datasets
+   - Can outperform complex models that overfit
+
+**When independence violation hurts:**
+- Strong feature dependencies that affect one class more than another
+- Example: In medical diagnosis, symptoms that always occur together should be treated as one feature
+- Very redundant features (duplicate columns, word stems + words)
+
+**Best practices:**
+- Remove highly correlated features before training
+- Feature selection to reduce redundancy
+- Despite "naive" assumption, often competitive with sophisticated models on text
+- Especially good baseline for text: 10-20 lines of code, trains in seconds
 
 ### K-Nearest Neighbors (KNN)
 
@@ -465,6 +569,46 @@ model = KNeighborsClassifier(
 )
 model.fit(X_train, y_train)
 ```
+
+**Curse of dimensionality explained:**
+
+**Problem:** As dimensions increase, distance-based methods break down.
+
+**Why this happens:**
+
+1. **All points become equidistant:**
+   - In high dimensions, distance between nearest and farthest neighbors converges
+   - Example with random points in d dimensions:
+     - d=2: nearest neighbor distance ≈ 0.1, farthest ≈ 1.0 (10x difference)
+     - d=10: nearest ≈ 0.7, farthest ≈ 1.2 (1.7x difference)
+     - d=100: nearest ≈ 0.95, farthest ≈ 1.05 (1.1x difference)
+   - Result: Cannot distinguish "close" from "far"
+
+2. **Data becomes sparse:**
+   - To cover same density, need exponentially more points
+   - Example: Cover unit interval [0,1] with 10 points → 10 points needed
+   - Cover unit square [0,1]×[0,1] same density → 100 points needed
+   - Cover d-dimensional cube → 10^d points needed
+   - At d=10, need 10 billion points!
+
+3. **Volume concentrates at boundaries:**
+   - Almost all volume of hypersphere is near surface
+   - Example: Fraction of volume within 99% of radius:
+     - d=2 (circle): 98% of volume
+     - d=10: 90.4% of volume
+     - d=100: 36.6% of volume
+   - Most points are far from center, near surface
+
+**Practical impact on KNN:**
+- Neighbors aren't actually "near" in any meaningful sense
+- Distance metric loses discriminative power
+- Need exponentially more data as dimensions grow
+- Performance degrades dramatically above ~10-20 dimensions
+
+**Solutions:**
+- Dimensionality reduction (PCA, t-SNE) before KNN
+- Feature selection to remove irrelevant features
+- Use algorithms designed for high dimensions (tree-based, linear)
 
 ### Neural Networks
 
