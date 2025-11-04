@@ -276,6 +276,28 @@ Is the column important?
          └─ Create missing indicator + imputation
 ```
 
+**Understanding missing data mechanisms:**
+
+1. **MCAR (Missing Completely at Random):**
+   - Missingness is unrelated to any data (observed or unobserved)
+   - Example: Survey responses lost due to random server crash
+   - Test: Missing data pattern shows no correlation with any variable
+   - Safe to use: Simple imputation (mean/median/mode)
+
+2. **MAR (Missing at Random):**
+   - Missingness related to observed data, but not the missing value itself
+   - Example: Younger people more likely to skip income question (missingness relates to age, not income value)
+   - Test: Missingness correlates with other observed features
+   - Solution: Model-based imputation (KNN, MICE) using correlated features
+
+3. **MNAR (Missing Not at Random):**
+   - Missingness related to the unobserved value itself
+   - Example: High earners more likely to skip income question (missingness relates to income value)
+   - Test: Missingness remains unexplained after accounting for all observed variables
+   - Solution: Create missing indicator + imputation, or model missingness explicitly
+
+**Important:** MCAR is rare in practice. Most real-world missing data is MAR or MNAR. Using simple imputation (mean) on MAR/MNAR data can introduce bias.
+
 ---
 
 ## Dealing with Duplicates
@@ -589,7 +611,7 @@ def target_encode(train_df, val_df, cat_col, target_col, smoothing=10):
     counts = agg['count']
     means = agg['mean']
 
-    # Smoothing
+    # Smoothing (shrinkage towards global mean)
     smooth = (counts * means + smoothing * global_mean) / (counts + smoothing)
 
     # Apply to both train and validation
@@ -614,6 +636,30 @@ for train_idx, val_idx in kf.split(df):
     df.loc[val_idx, 'city_encoded'] = val_enc
 ```
 
+**Critical warnings about target encoding:**
+
+1. **Data leakage risk is VERY HIGH:**
+   - NEVER use entire dataset to calculate target encoding
+   - MUST use cross-validation or train-only encoding
+   - Test set should be encoded using train set statistics only
+
+2. **Why smoothing (shrinkage) is essential:**
+   - Formula: smooth = (n × mean + m × global_mean) / (n + m)
+   - Where n = category count, m = smoothing parameter
+   - Without smoothing: Rare categories with 1 sample get encoded as 0 or 1 (overfitting)
+   - With smoothing: Rare categories shrink towards global mean (regularization)
+   - Example: Category with 1 positive sample → encoded as 1.0 without smoothing vs 0.6 with smoothing
+
+3. **When target encoding works well:**
+   - High cardinality categorical variables (100+ categories)
+   - Tree-based models (RandomForest, XGBoost) - they capture non-linear relationships
+   - Categories with sufficient samples (>20 per category)
+
+4. **When to avoid target encoding:**
+   - Linear models (high overfitting risk, prefer one-hot encoding)
+   - Categories with very few samples (<10)
+   - When interpretability is critical (creates hard-to-explain features)
+
 ---
 
 ## Feature Scaling and Normalization
@@ -631,7 +677,39 @@ for train_idx, val_idx in kf.split(df):
 **Don't need scaling:**
 - Tree-based models (Decision Trees, Random Forest, XGBoost)
 
+**Why certain algorithms need scaling:**
+
+1. **Gradient descent-based algorithms (Linear/Logistic Regression, Neural Networks):**
+   - Features with larger scales dominate gradient updates
+   - Example: Feature A (range 0-1), Feature B (range 0-10000)
+   - Gradient ∂L/∂weight_B will be ~10000× larger than ∂L/∂weight_A
+   - Result: Optimizer takes tiny steps for B, giant steps for A → slow convergence or divergence
+   - Scaling makes optimization landscape more spherical, enabling faster convergence
+
+2. **Distance-based algorithms (KNN, SVM with RBF kernel, K-Means):**
+   - Distance calculation: √[(x1-y1)² + (x2-y2)² + ...]
+   - Feature with larger range dominates distance metric
+   - Example: age (0-100) and income (0-100000) → income will dominate Euclidean distance
+   - Result: Model ignores features with smaller ranges
+   - Scaling ensures all features contribute equally to distance
+
+3. **Regularization (Lasso, Ridge):**
+   - Penalty term: λ × Σ(weights²)
+   - Features with larger scales get smaller weights to maintain same prediction
+   - Example: Feature A (0-1) gets weight=100, Feature B (0-100) gets weight=1
+   - Regularization penalizes weight=100 much more than weight=1
+   - Result: Model biased towards features with larger scales
+   - Scaling ensures fair regularization penalty across all features
+
+**Why tree-based models don't need scaling:**
+- Split decisions based on feature thresholds, not feature magnitudes
+- Example: "age < 30" works regardless of whether age is 0-100 or 0-1
+- Trees are invariant to monotonic transformations of features
+- Each feature evaluated independently in split decisions
+
 ### StandardScaler (Z-score normalization)
+
+**Formula:** x_scaled = (x - μ) / σ
 
 ```python
 from sklearn.preprocessing import StandardScaler
@@ -648,7 +726,17 @@ X_test_scaled = scaler.transform(X_test)
 # Result: mean=0, std=1
 ```
 
+**When to use StandardScaler:**
+- Default choice for most ML algorithms
+- Features follow approximately normal distribution
+- Algorithm assumes features are centered around 0 (e.g., PCA)
+- Want to preserve shape of original distribution while standardizing
+
+**Important:** StandardScaler is sensitive to outliers because it uses mean and std.
+
 ### MinMaxScaler
+
+**Formula:** x_scaled = (x - x_min) / (x_max - x_min)
 
 ```python
 from sklearn.preprocessing import MinMaxScaler
@@ -662,7 +750,21 @@ X_test_scaled = scaler.transform(X_test)
 # Result: values between 0 and 1
 ```
 
+**When to use MinMaxScaler:**
+- Neural networks (especially with sigmoid/tanh activation)
+- Image pixel values (already in 0-255 range)
+- Features with hard bounds (e.g., age, percentages)
+- When you need specific range (e.g., 0-1 for algorithms sensitive to scale)
+
+**Important:**
+- Very sensitive to outliers (single outlier can compress entire distribution)
+- Test set values can fall outside [0,1] if test has values beyond train's min/max
+
 ### RobustScaler (for outliers)
+
+**Formula:** x_scaled = (x - median) / IQR
+
+Where IQR (Interquartile Range) = Q3 - Q1 (75th percentile - 25th percentile)
 
 ```python
 from sklearn.preprocessing import RobustScaler
@@ -674,6 +776,27 @@ X_train_scaled = scaler.transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Uses median and IQR instead of mean and std
+```
+
+**When to use RobustScaler:**
+- Data contains outliers that you want to keep
+- Distribution is not Gaussian
+- Heavy-tailed distributions
+- StandardScaler gives poor results due to extreme values
+
+**Why RobustScaler is robust:**
+- Median is unaffected by extreme values (unlike mean)
+- IQR uses middle 50% of data, ignoring extreme 25% on each end
+- Example: [1, 2, 3, 4, 1000] → median=3, IQR=2 (outlier 1000 doesn't affect scaling)
+- Compare StandardScaler: mean=202, std=397 (completely distorted by outlier!)
+
+**Scaler selection guide:**
+```
+Do you have outliers?
+├─ Yes → RobustScaler
+└─ No
+   ├─ Need specific range (0-1)? → MinMaxScaler
+   └─ Otherwise → StandardScaler (default)
 ```
 
 ### MaxAbsScaler
