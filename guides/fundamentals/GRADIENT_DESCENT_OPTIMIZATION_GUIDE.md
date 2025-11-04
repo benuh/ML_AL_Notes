@@ -359,6 +359,12 @@ plt.show()
 - Online learning
 - Non-convex problems
 
+**Important clarification on "escaping local minima":**
+The noise in SGD can help escape *shallow* local minima, but this is not a reliable mechanism. In practice:
+- For convex problems: No local minima exist, so this doesn't apply
+- For modern deep learning: Networks are overparameterized with many global minima; the challenge is finding *good* minima that generalize well, not escaping bad ones
+- The real benefit of SGD's noise is implicit regularization that helps generalization, not local minima escape
+
 ---
 
 ## Mini-Batch Gradient Descent
@@ -452,6 +458,14 @@ for batch_size, label in zip(batch_sizes, batch_labels):
 **When to use:**
 - Default choice for most problems
 - Typical batch sizes: 32, 64, 128, 256
+
+**Batch size selection guide:**
+- **Small batches (16-32)**: More noise → better generalization but slower convergence per epoch. Better for small datasets.
+- **Medium batches (64-128)**: Good balance for most tasks. Sweet spot for many problems.
+- **Large batches (256-512+)**: Faster training but may generalize worse. Requires higher learning rate (linear scaling rule: if you multiply batch size by k, multiply learning rate by k). Can get stuck in sharp minima.
+
+**Why large batches may generalize worse:**
+Research (Keskar et al., 2017) suggests large batches converge to sharp minima (high curvature) while small batches find flat minima (low curvature). Flat minima tend to generalize better to test data. This is still an active research area.
 
 ---
 
@@ -812,12 +826,23 @@ print(f"  RMSprop final loss: {loss_rmsprop[-1]:.2f}")
 ### Formula
 
 ```
-m_t = β₁ × m_{t-1} + (1-β₁) × ∇J(θ)        # First moment
-v_t = β₂ × v_{t-1} + (1-β₂) × (∇J(θ))²     # Second moment
+m_t = β₁ × m_{t-1} + (1-β₁) × ∇J(θ)        # First moment (mean)
+v_t = β₂ × v_{t-1} + (1-β₂) × (∇J(θ))²     # Second moment (uncentered variance)
 m̂_t = m_t / (1 - β₁ᵗ)                      # Bias correction
 v̂_t = v_t / (1 - β₂ᵗ)                      # Bias correction
 θ = θ - α × m̂_t / (√v̂_t + ε)
 ```
+
+**Why bias correction is essential:**
+Since m₀ = 0 and v₀ = 0, the moment estimates are biased toward zero, especially in early iterations.
+
+Example: With β₁=0.9 and constant gradient g:
+- Step 1: m₁ = 0.9×0 + 0.1×g = 0.1g (severely underestimated, should be close to g)
+- Step 2: m₂ = 0.9×0.1g + 0.1×g = 0.19g (still underestimated)
+- Without correction: Would take many steps to reach true estimate
+- With correction m₁/(1-0.9¹) = 0.1g/0.1 = g (correct estimate immediately!)
+
+The bias is most severe early in training and diminishes as t increases (since β₁ᵗ → 0 as t → ∞).
 
 ### Implementation
 
@@ -1120,14 +1145,20 @@ for name, result in results.items():
 
 ### Performance Table
 
-| Optimizer | Speed | Convergence Quality | Hyperparameter Sensitivity | Memory |
-|-----------|-------|---------------------|----------------------------|--------|
-| SGD | Fast | Poor | High | Low |
-| Momentum | Fast | Good | Medium | Low |
-| Nesterov | Fast | Good | Medium | Low |
-| AdaGrad | Medium | Good for sparse | Low | Medium |
-| RMSprop | Medium | Good | Low | Medium |
-| Adam | Medium | Very Good | Very Low | Medium |
+| Optimizer | Speed | Convergence Quality | Hyperparameter Sensitivity | Memory | Known Failure Cases |
+|-----------|-------|---------------------|----------------------------|--------|-------------------|
+| SGD | Fast | Poor without schedule | High (LR critical) | Low | Plateaus, ravines |
+| Momentum | Fast | Good | Medium | Low | Still struggles with ravines |
+| Nesterov | Fast | Good | Medium | Low | Marginal improvement over Momentum |
+| AdaGrad | Medium | Good for sparse | Low | Medium | Stops learning (accumulator grows indefinitely) |
+| RMSprop | Medium | Good | Low | Medium | None major (unpublished, less tested) |
+| Adam | Medium | Very Good | Very Low | Medium | Sometimes converges to worse minima than SGD |
+
+**Critical insights:**
+- **AdaGrad's fatal flaw**: Learning rate → 0 as training progresses (G keeps growing). Never use for long training runs.
+- **Adam vs SGD generalization gap**: Adam often converges faster but SGD+Momentum may find better minima. For state-of-the-art results (competitions, research), try both.
+- **RMSprop**: Fixes AdaGrad but less theoretically grounded (was unpublished until 2012, from Hinton's course). Adam is usually preferred.
+- **Nesterov**: Theoretically better convergence rate, but empirically often similar to Momentum. Worth trying but not always better.
 
 ---
 
@@ -1181,6 +1212,12 @@ plt.legend()
 plt.show()
 
 print(f"Recommended learning rate: {optimal_lr:.2e}")
+print("\nHow to interpret the LR finder plot:")
+print("1. Left side (low LR): Loss decreases slowly → too conservative")
+print("2. Middle (optimal range): Loss decreases rapidly → steepest part of curve")
+print("3. Right side (high LR): Loss increases/explodes → unstable")
+print("4. Pick LR at steepest descent, or 10x smaller for safety")
+print("5. If using one-cycle policy, pick max_lr at steepest point")
 ```
 
 ### 2. Gradient Clipping
@@ -1235,26 +1272,89 @@ def adam_with_gradient_clipping(X, y, learning_rate=0.001, max_grad_norm=1.0,
 
 print("Gradient clipping prevents exploding gradients")
 print("Useful for RNNs and unstable training")
+print("\nWhen gradient clipping is necessary vs optional:")
+print("NECESSARY:")
+print("  - RNNs/LSTMs (prone to exploding gradients due to backprop through time)")
+print("  - Very deep networks without batch normalization")
+print("  - Training with high learning rates")
+print("  - When you observe NaN losses or gradient explosion")
+print("\nOPTIONAL (may help but not critical):")
+print("  - Well-normalized networks with batch norm")
+print("  - Residual networks (ResNets)")
+print("  - When using adaptive optimizers like Adam")
+print("\nHow it works:")
+print("  If ||gradient|| > threshold: gradient = gradient × (threshold / ||gradient||)")
+print("  This rescales gradient to have max norm = threshold, preserving direction")
+print("  Common thresholds: 0.5 to 5.0 depending on model architecture")
 ```
 
 ### 3. Warmup
 
 ```python
-def adam_with_warmup(X, y, max_lr=0.001, warmup_steps=10, **kwargs):
+def adam_with_warmup(X, y, max_lr=0.001, warmup_epochs=5, total_epochs=100,
+                     beta1=0.9, beta2=0.999, batch_size=32, epsilon=1e-8, random_state=42):
     """
     Adam with learning rate warmup.
     """
-    # Gradually increase learning rate for first warmup_steps
-    for step in range(1, warmup_steps + 1):
-        lr = max_lr * (step / warmup_steps)
-        # Train one epoch with this lr
-        # ... (implementation details)
+    np.random.seed(random_state)
+    m, n = X.shape
+    theta = np.zeros(n)
+    m_t = np.zeros(n)
+    v_t = np.zeros(n)
+    t = 0
+    loss_history = []
 
-    # Continue with max_lr
-    # ... (implementation details)
+    for epoch in range(total_epochs):
+        # Calculate current learning rate with warmup
+        if epoch < warmup_epochs:
+            # Linear warmup
+            current_lr = max_lr * (epoch + 1) / warmup_epochs
+        else:
+            current_lr = max_lr
 
-    print(f"Warmup helps with training stability")
-    print(f"Gradually increase LR from 0 to {max_lr} over {warmup_steps} steps")
+        indices = np.random.permutation(m)
+        X_shuffled = X[indices]
+        y_shuffled = y[indices]
+
+        for i in range(0, m, batch_size):
+            t += 1
+            X_batch = X_shuffled[i:i+batch_size]
+            y_batch = y_shuffled[i:i+batch_size]
+
+            predictions = X_batch.dot(theta)
+            gradient = (1/len(X_batch)) * X_batch.T.dot(predictions - y_batch)
+
+            m_t = beta1 * m_t + (1 - beta1) * gradient
+            v_t = beta2 * v_t + (1 - beta2) * gradient**2
+
+            m_hat = m_t / (1 - beta1**t)
+            v_hat = v_t / (1 - beta2**t)
+
+            theta = theta - current_lr * m_hat / (np.sqrt(v_hat) + epsilon)
+
+        predictions = X.dot(theta)
+        loss = (1/(2*m)) * np.sum((predictions - y)**2)
+        loss_history.append(loss)
+
+    return theta, loss_history
+
+print("Learning rate warmup: Why and when?")
+print("\nWHY warmup helps:")
+print("  - At start, parameters are random and gradients may be large/unstable")
+print("  - High LR + large gradients = unstable updates, potential divergence")
+print("  - Warmup allows model to find good region of parameter space first")
+print("  - Particularly important with large batch sizes (batch size ≥ 1024)")
+print("\nWHEN to use warmup:")
+print("  - BERT-style transformers (essential)")
+print("  - Large batch training (batch size > 512)")
+print("  - Very deep networks (50+ layers)")
+print("  - Training from random initialization")
+print("\nWHEN warmup is unnecessary:")
+print("  - Small batch training (≤ 256)")
+print("  - Fine-tuning pretrained models")
+print("  - Shallow networks")
+print("  - When using conservative learning rates")
+print("\nTypical warmup duration: 1-10% of total training steps")
 ```
 
 ### Quick Decision Guide
