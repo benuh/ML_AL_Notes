@@ -390,11 +390,30 @@ print(classification_report(y_test, y_pred_rus))
 
 **Create synthetic samples by interpolating between minority class samples.**
 
+**How SMOTE works (algorithm):**
+1. For each minority class sample x:
+   - Find k nearest minority class neighbors (default k=5)
+   - Randomly select one neighbor x_neighbor
+   - Generate synthetic sample: x_new = x + λ × (x_neighbor - x), where λ ~ Uniform(0, 1)
+   - This creates point along line segment between x and x_neighbor
+
+**Example:**
+```
+Original point: [2.0, 3.0]
+Neighbor:       [4.0, 5.0]
+Random λ = 0.6
+
+Synthetic: [2.0, 3.0] + 0.6 × ([4.0, 5.0] - [2.0, 3.0])
+         = [2.0, 3.0] + 0.6 × [2.0, 2.0]
+         = [2.0, 3.0] + [1.2, 1.2]
+         = [3.2, 4.2]
+```
+
 ```python
 from imblearn.over_sampling import SMOTE
 
 # SMOTE
-smote = SMOTE(random_state=42)
+smote = SMOTE(random_state=42, k_neighbors=5)  # k_neighbors is critical parameter
 X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
 
 print("After SMOTE:")
@@ -600,6 +619,26 @@ print("\nResults without Class Weights:")
 print(classification_report(y_test, y_pred_unweighted))
 ```
 
+**How 'balanced' class weights work:**
+Formula: weight_i = n_samples / (n_classes × n_samples_i)
+
+Example with 990 negatives, 10 positives (1000 total, 2 classes):
+- weight_0 = 1000 / (2 × 990) = 0.505 (majority class gets small weight)
+- weight_1 = 1000 / (2 × 10) = 50.0 (minority class gets large weight)
+
+Effect: Misclassifying one minority sample costs 50x more than one majority sample, forcing the model to pay attention to rare class.
+
+**When class weights work well:**
+- ✅ Linear models (LogisticRegression, LinearSVC)
+- ✅ Tree-based models (RandomForest, XGBoost, LightGBM)
+- ✅ SVMs
+- ✅ Mild to moderate imbalance (up to 100:1)
+
+**When class weights may not help:**
+- ❌ Models that don't support sample weights
+- ❌ Extreme imbalance (>1000:1) - may need anomaly detection instead
+- ❌ When minority class is just noise (class weights amplify noise too)
+
 ### 2. Threshold Adjustment
 
 **Adjust decision threshold to favor minority class.**
@@ -656,6 +695,48 @@ y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
 
 print("\nResults with Optimal Threshold:")
 print(classification_report(y_test, y_pred_optimal))
+```
+
+**Important considerations for threshold adjustment:**
+
+1. **When threshold adjustment is appropriate:**
+   - ✅ Model outputs well-calibrated probabilities
+   - ✅ You have clear metric to optimize (e.g., maximize F1, achieve 90% recall)
+   - ✅ Different error costs are known (can optimize threshold based on cost)
+   - ✅ Business requirements change over time (easy to adjust without retraining)
+
+2. **When threshold adjustment is NOT enough:**
+   - ❌ Model probabilities are poorly calibrated (e.g., all predictions near 0.5 or extremes)
+   - ❌ Model hasn't learned minority class patterns (threshold can't fix bad model)
+   - ❌ Severe imbalance where model never predicts minority class
+
+3. **Threshold selection on test set is data leakage:**
+   - Using test set to find optimal threshold, then evaluating on same test set is WRONG
+   - Correct approach: Use validation set to find threshold, evaluate on separate test set
+   - Or use nested cross-validation: inner loop finds threshold, outer loop evaluates
+
+4. **Default threshold (0.5) assumes equal costs and balanced classes:**
+   - Default 0.5 is optimal only when P(y=1) = 0.5 and errors have equal cost
+   - For imbalanced data with 1% positives, optimal threshold is often much lower (0.1-0.3)
+   - Example: With 1% positive class and equal error costs, optimal threshold ≈ 0.01
+
+**Example of threshold selection without leakage:**
+```python
+# Split into train, validation, test
+X_tr, X_temp, y_tr, y_temp = train_test_split(X, y, test_size=0.4, stratify=y, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=42)
+
+# Train on train set
+model.fit(X_tr, y_tr)
+
+# Find optimal threshold on validation set
+y_val_scores = model.predict_proba(X_val)[:, 1]
+optimal_threshold = find_optimal_threshold(y_val, y_val_scores, metric='f1')
+
+# Evaluate on test set with chosen threshold
+y_test_scores = model.predict_proba(X_test)[:, 1]
+y_test_pred = (y_test_scores >= optimal_threshold).astype(int)
+print(classification_report(y_test, y_test_pred))
 ```
 
 ---
@@ -813,6 +894,32 @@ print(df_ensemble.round(4))
 ## Anomaly Detection Approaches
 
 **For severe imbalance (e.g., 1000:1), treat as anomaly detection.**
+
+**When to use anomaly detection instead of classification:**
+
+1. **Extreme imbalance (>1000:1):**
+   - Minority class < 0.1% of data
+   - Example: Network intrusion (1 attack per 10,000 normal requests)
+   - Too few minority samples for classifier to learn meaningful patterns
+
+2. **Minority class is fundamentally different:**
+   - Minority class = "anything abnormal"
+   - Normal class is well-defined, abnormal class is diverse
+   - Example: Fraud detection (fraudsters constantly change tactics)
+
+3. **Labeled minority samples are scarce but normal samples are abundant:**
+   - Can train on unlabeled normal data only
+   - Don't need labeled anomalies for training
+
+**When to stick with classification approaches:**
+- Imbalance < 100:1
+- Minority class has clear, learnable patterns
+- Sufficient labeled examples of minority class (>100 samples)
+- Need probabilistic predictions, not just binary anomaly/normal
+
+**Key difference in approach:**
+- **Classification:** Learn decision boundary between classes using both classes
+- **Anomaly detection:** Learn "normal" behavior, flag deviations as anomalies
 
 ### 1. Isolation Forest
 
