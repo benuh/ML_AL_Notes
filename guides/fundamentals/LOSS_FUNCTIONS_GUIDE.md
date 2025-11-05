@@ -139,6 +139,28 @@ Outlier dominates loss due to squaring
 ✗ When: Data has outliers (use Huber or MAE instead)
 ```
 
+**MSE vs MAE: Decision guide**
+
+**Choose MSE when:**
+1. **Gaussian noise assumption holds:** Real-world data often has Gaussian errors (measurement noise, sensor noise)
+2. **Large errors are qualitatively different:** Predicting $100K vs $50K for house price is worse than $51K vs $50K
+3. **Want smooth optimization:** MSE gradients are continuous and smooth everywhere
+4. **Training stability matters:** Constant-magnitude gradients of MAE can cause issues with learning rate
+
+**Choose MAE when:**
+1. **Outliers exist and are NOT errors:** Legitimate extreme values that shouldn't dominate loss
+2. **Want median prediction:** MSE → mean, MAE → median (median more robust)
+3. **All errors equally bad:** Missing by $10K or $100K both count as one failed prediction
+4. **Interpretable loss:** MAE in same units as target (average error)
+
+**Practical example (house prices):**
+- Dataset: 100 houses, 99 priced $200K-$300K, 1 mansion at $5M
+- Model predicting $250K for everything:
+  - MSE: Dominated by $5M outlier, loss ≈ 22M², pushes model to overpredict
+  - MAE: All errors weighted equally, loss ≈ $50K average, robust to outlier
+- If mansion is legitimate (not error): Use MAE
+- If mansion is data entry error: Use MSE or remove outlier
+
 ### Mean Absolute Error (MAE) / L1 Loss
 
 **Mathematical Form:**
@@ -410,6 +432,45 @@ Combining:
         = ŷ_i - y_i  (since Σ_c y_c = 1)
 ```
 
+**Why this gradient is elegant and perfect:**
+
+1. **Intuitive form:** Gradient = prediction error
+   - If ŷ_i = 0.9 and y_i = 1 (correct class): gradient = -0.1 (small correction)
+   - If ŷ_i = 0.1 and y_i = 1: gradient = -0.9 (large correction)
+   - Automatic adjustment based on confidence error
+
+2. **No vanishing gradient problem:**
+   - Gradient magnitude = |ŷ_i - y_i|
+   - Even when completely wrong (ŷ_i → 0 for true class), gradient stays bounded
+   - Compare to squared loss: ∂(ŷ - y)²/∂z = 2(ŷ - y)·ŷ(1-ŷ) → vanishes when ŷ → 0 or 1
+   - Cross-entropy: Always provides learning signal when wrong
+
+3. **Natural cancellation of complex terms:**
+   - Softmax derivative involves all classes (Jacobian)
+   - Cross-entropy derivative has division by prediction
+   - Together they magically simplify to ŷ_i - y_i
+   - No exponentials, no divisions in final gradient!
+
+4. **Probabilistic interpretation:**
+   - Gradient points in direction of steepest KL divergence reduction
+   - Matches Fisher information matrix for efficient learning
+   - Statistically optimal for categorical distributions
+
+**Example showing non-saturation:**
+```
+True class: i=2, y = [0, 0, 1, 0]
+Logits: z = [-5, -5, -5, 1] (very wrong! predicting class 3)
+
+Softmax: ŷ ≈ [0.002, 0.002, 0.002, 0.994]
+
+Gradient w.r.t. z₂ (true class): 0.002 - 1 = -0.998
+Large negative gradient → increase z₂ strongly ✓
+
+Compare if we used squared loss (ŷ - y)²:
+∂/∂z₂ = 2(ŷ₂ - 1)·ŷ₂·(1-ŷ₂) ≈ 2(-0.998)·0.002·0.998 ≈ -0.004
+Tiny gradient due to ŷ₂ ≈ 0 → training stalls! ✗
+```
+
 **Statistical Interpretation:**
 ```
 Maximum Likelihood under Categorical distribution:
@@ -642,6 +703,56 @@ Hyperparameter sensitivity:
 - Less sensitive than might expect
 ```
 
+**Hyperparameter selection guide:**
+
+**γ (focusing parameter):**
+- γ = 0: Standard cross-entropy (no focusing)
+- γ = 1: Moderate down-weighting of easy examples
+- γ = 2: Standard choice (aggressive down-weighting)
+- γ = 5: Very aggressive (may ignore too many examples)
+
+**Effect of γ on loss reduction:**
+```
+Well-classified example (p_t = 0.9):
+γ=0: weight = 1.0     (CE baseline)
+γ=1: weight = 0.1     (10× reduction)
+γ=2: weight = 0.01    (100× reduction)
+γ=5: weight = 0.00001 (100,000× reduction!)
+
+Misclassified example (p_t = 0.1):
+γ=0: weight = 1.0
+γ=1: weight = 0.9     (10% reduction)
+γ=2: weight = 0.81    (19% reduction)
+γ=5: weight = 0.59    (41% reduction)
+```
+
+**α_t (class balancing):**
+- Purpose: Balance positive/negative class importance
+- Formula: α_t = n_neg / (n_pos + n_neg) for positive class
+- Example with 1:99 imbalance: α_t = 0.99 for positive class
+- Typical range: 0.25-0.75
+- Interacts with γ: start with α_t = 0.25, adjust based on validation
+
+**When focal loss helps vs doesn't:**
+
+**Helps when:**
+- Extreme imbalance (>100:1)
+- Many easy negatives (background in object detection)
+- Few hard positives that matter
+- One-stage detectors (RetinaNet, FCOS)
+
+**Doesn't help / may hurt when:**
+- Balanced dataset (use standard CE)
+- Easy positives and hard negatives (focal loss would focus on wrong examples)
+- Two-stage methods already handling imbalance via sampling
+- Very small datasets (<1K samples) - may overfit to hard examples
+
+**Practical tip:**
+Start with CE, switch to focal loss if:
+1. Model predicts majority class with high confidence
+2. Minority class recall is low despite high precision
+3. Training loss plateaus early
+
 **Use Cases:**
 ```
 ✓ Object detection (RetinaNet)
@@ -706,14 +817,56 @@ Effect:
 - Better calibration
 ```
 
+**Why label smoothing works:**
+
+1. **Prevents overconfidence:**
+   - Hard labels encourage model to make predictions arbitrarily confident
+   - Softmax with z_correct >> z_wrong → ŷ_correct ≈ 1
+   - Model achieves this by increasing logit magnitudes: ||z|| → ∞
+   - Label smoothing caps maximum achievable probability: ŷ_max = 1 - ε + ε/K
+
+2. **Implicit regularization on logits:**
+   - Without smoothing: logits can grow unbounded
+   - With smoothing: bounded logits (can't make perfect prediction)
+   - Example with K=10, ε=0.1:
+     - Target: [0.01, 0.01, 0.91, ..., 0.01]
+     - Model can't achieve this by making z_2 → ∞
+     - Forces model to learn reasonable feature magnitudes
+
+3. **Better calibration:**
+   - Overconfident models: predicted probability doesn't match true probability
+   - Example: Model predicts 99% confidence but is only 90% accurate
+   - Label smoothing reduces confidence → better calibrated probabilities
+   - Calibration: P(correct | confidence=p) ≈ p
+
+4. **Robustness to label noise:**
+   - Real labels may have ~5-10% error rate (human annotation mistakes)
+   - Hard labels assume 100% certainty → model fits noise
+   - Soft labels admit uncertainty → model less affected by noise
+
+**Optimal ε selection:**
+```
+Theory suggests: ε ≈ estimated label noise rate
+
+Practical recommendations:
+- ε = 0.1: Standard choice for ImageNet (works for most cases)
+- ε = 0.05: Conservative, when labels are high quality
+- ε = 0.2: Aggressive, when labels are noisy or dataset is small
+- ε = 0.3: Very aggressive, rarely used (may hurt)
+
+Rule of thumb: Start with ε = 0.1, increase if overfitting, decrease if underfitting
+```
+
 **Use Cases:**
 ```
 ✓ Image classification (standard practice now)
 ✓ When: Want better generalization
 ✓ When: Training labels may be noisy
 ✓ When: Model tends to overfit
-✗ When: Dataset is very small
-✗ When: Need perfect accuracy on training set
+✓ When: Need calibrated probabilities for decision-making
+✗ When: Dataset is very small (<1K samples)
+✗ When: Need perfect accuracy on training set (e.g., memorization tasks)
+✗ When: Labels are verified perfect (rare in practice)
 ```
 
 ---
@@ -778,6 +931,82 @@ Behavior difference:
 P has two modes, Q is unimodal
 - Forward KL: Q spreads between modes (bad)
 - Reverse KL: Q picks one mode (better for VI)
+```
+
+**Intuitive explanation of forward vs reverse:**
+
+**Forward KL: KL(P || Q) = E_P[log P - log Q]**
+
+Behavior:
+- Expectation over P: Must have high probability under Q wherever P has probability
+- If P(x) > 0 but Q(x) ≈ 0: log Q(x) → -∞, KL → ∞ (infinite penalty!)
+- Forces Q to cover all of P (Q spreads out to avoid zero probability under P)
+
+Example (mixture of two Gaussians):
+```
+P = 0.5·N(-3, 1) + 0.5·N(+3, 1)  (two modes at -3 and +3)
+Q = N(μ, σ²)                      (single Gaussian)
+
+Forward KL minimization:
+- Q must have P(x)>0 → Q(x)>0 everywhere P has mass
+- Result: Q = N(0, 4) (wide Gaussian covering both modes)
+- Mean μ=0 (average of -3 and +3)
+- Large variance to cover both modes
+```
+
+**Reverse KL: KL(Q || P) = E_Q[log Q - log P]**
+
+Behavior:
+- Expectation over Q: Only cares about where Q has probability
+- If Q(x) > 0 but P(x) ≈ 0: log P(x) → -∞, KL → ∞
+- Forces Q to only put mass where P has high probability (Q is zero-avoiding under P)
+- Q ignores low-probability regions of P
+
+Example (same mixture):
+```
+P = 0.5·N(-3, 1) + 0.5·N(+3, 1)
+Q = N(μ, σ²)
+
+Reverse KL minimization:
+- Q can put mass anywhere, but gets penalized if P is low there
+- Result: Q = N(-3, 1) OR N(+3, 1) (picks one mode!)
+- Which mode depends on initialization
+- Tight fit to chosen mode
+```
+
+**Practical consequences:**
+
+**Use Forward KL (Maximum Likelihood) when:**
+- Have samples from P (data distribution)
+- Want Q to explain all data variations
+- Can't afford to miss any data modes
+- Example: Generative modeling (GAN, diffusion)
+
+**Use Reverse KL (Variational Inference) when:**
+- Need to sample from Q and evaluate P
+- Want tractable approximate posterior
+- Okay with approximating one mode well
+- Example: VAE, variational Bayes
+
+**Visual intuition:**
+```
+P: ⚫  ⚫    (two modes)
+
+Forward KL → Q: ━━━━━ (covers both, wide)
+Reverse KL → Q:  ⚫    (picks one, tight)
+```
+
+**Mathematical reason:**
+```
+Forward: ∫ p(x) log[p(x)/q(x)] dx
+- Integral weighted by p(x)
+- High penalty where p(x) is large but q(x) is small
+- q must spread to cover all of p
+
+Reverse: ∫ q(x) log[q(x)/p(x)] dx
+- Integral weighted by q(x)
+- Only penalty where q(x) is large
+- q can ignore regions where p is small
 ```
 
 **Gradient (for Variational Inference):**
