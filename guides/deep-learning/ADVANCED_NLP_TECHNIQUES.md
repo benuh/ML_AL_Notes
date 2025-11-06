@@ -46,9 +46,10 @@ Components:
    - out_i = Σ_j α_ij · v_j
 
 Complexity:
-- Time: O(n·m·d_k + n²·d_v)
+- Time: O(n·m·d_k + n·m·d_v) = O(n·m·d)
   - QK^T: O(n·m·d_k)
   - softmax(·)V: O(n·m·d_v)
+  - For self-attention (n=m): O(n²·d)
 - Space: O(n·m) for attention matrix
 ```
 

@@ -2,8 +2,9 @@
 
 **A Comprehensive Guide to State-of-the-Art Machine Learning and AI**
 
-> Last Updated: October 2025
+> Last Updated: November 2025
 > This guide covers cutting-edge techniques, architectures, and methodologies that define the current state of AI.
+> **Note:** Model specifications, especially for proprietary models, are based on publicly available information and may not reflect actual implementations.
 
 ---
 
@@ -30,20 +31,23 @@ Large Language Models have revolutionized NLP and are now being applied across d
 ### Key Models (2024-2025)
 
 #### **GPT-4 and GPT-4 Turbo** (OpenAI)
-- **Architecture:** Decoder-only transformer (rumored ~1.76T parameters, MoE)
+- **Architecture:** Decoder-only transformer
+  - *Exact parameters undisclosed; speculation suggests MoE architecture with ~1T+ total parameters*
+  - *Note: OpenAI has not confirmed architectural details publicly*
 - **Key Features:**
   - 128K context window
   - Multimodal (text + vision)
   - Improved reasoning and factuality
 - **Applications:** Code generation, analysis, creative writing, complex reasoning
 
-#### **Claude 3 (Opus, Sonnet, Haiku)** (Anthropic)
+#### **Claude (Sonnet 4.5, Opus, Sonnet 3.5, Haiku)** (Anthropic)
 - **Architecture:** Constitutional AI with RLHF
 - **Key Features:**
   - 200K context window
   - Strong safety alignment
   - Excellent instruction following
-- **Applications:** Long-document analysis, safe AI assistants, code review
+  - Extended thinking capabilities (Sonnet 4+)
+- **Applications:** Long-document analysis, safe AI assistants, code review, complex reasoning
 
 #### **Llama 3** (Meta)
 - **Parameters:** 8B, 70B, 405B variants
@@ -64,13 +68,17 @@ Large Language Models have revolutionized NLP and are now being applied across d
 ### Training Techniques
 
 #### **1. Chinchilla Scaling Laws**
-Optimal model training requires balancing model size and training tokens:
+Optimal model training requires balancing model size and training tokens for compute-optimal performance:
 ```
-Optimal tokens ≈ 20 × parameters
+Optimal tokens ≈ 20 × parameters (for a given compute budget)
 ```
-**Example:** 70B parameter model should train on ~1.4T tokens
+**More precisely:** For compute-optimal training, the number of training tokens should scale proportionally with the number of parameters. The Chinchilla paper found that many large models (like GPT-3) were significantly undertrained relative to their size.
 
-**Key Insight:** Most early LLMs were undertrained; smaller models trained longer can outperform larger undertrained models.
+**Example:**
+- 70B parameter model → ~1.4T training tokens (compute-optimal)
+- GPT-3 (175B params) was trained on 300B tokens → undertrained by ~6x
+
+**Key Insight:** Smaller models trained on more data can outperform larger undertrained models, especially when compute budget is fixed. This suggests investing more in high-quality training data rather than just increasing model size.
 
 **Reference:** *Training Compute-Optimal Large Language Models* - Hoffmann et al. (2022)
 
@@ -587,10 +595,13 @@ Where:
 
 ### Modern MoE Models
 
-#### **GPT-4** (Rumored)
-- 8 experts × 220B parameters each ≈ 1.76T total
-- Top-2 routing per token
-- Active: ~440B parameters per forward pass
+#### **GPT-4** (Speculative - Unconfirmed)
+- *Architecture details not officially disclosed by OpenAI*
+- *Speculation based on analysis suggests possible MoE with:*
+  - *~8 experts × ~220B parameters each ≈ ~1.76T total*
+  - *Top-2 routing per token*
+  - *Active: ~440B parameters per forward pass*
+- **Important:** These are unverified estimates from the research community
 
 #### **Mixtral 8x7B** (Mistral AI)
 - 8 experts × 7B parameters = 56B total
@@ -1235,8 +1246,10 @@ Long convolutions (FFT-based) + Gating
 
 ---
 
-**Last Updated:** October 2025
+**Last Updated:** November 2025
 **Next Update:** January 2026 (Q1 2026 techniques)
+
+**Disclaimer:** Model specifications for proprietary models (GPT-4, Gemini, Claude) are based on publicly available information and may not reflect actual implementations. Always verify critical information from official sources.
 
 ---
 
