@@ -2,7 +2,7 @@
 
 **From Fundamentals to State-of-the-Art Architectures**
 
-> Last Updated: October 2025
+> Last Updated: November 2025
 > Comprehensive guide to deep learning architectures with mathematical foundations and implementations
 
 ---
