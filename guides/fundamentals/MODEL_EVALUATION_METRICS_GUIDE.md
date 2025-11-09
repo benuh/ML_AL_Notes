@@ -109,9 +109,12 @@ accuracy = accuracy_score(y_true, y_pred)  # 99%!
 
 #### Precision
 
-**Formula:** TP / (TP + FP)
+**Formula:**
+```
+Precision = TP / (TP + FP) = P(y_true=1 | ŷ=1)
+```
 
-**Interpretation:** Of all positive predictions, how many are correct?
+**Interpretation:** Of all positive predictions, how many are correct? This is the conditional probability that a sample is truly positive given that the model predicted positive.
 
 ```python
 from sklearn.metrics import precision_score
@@ -135,9 +138,14 @@ print(f"Precision: {precision:.2%}")
 
 #### Recall (Sensitivity, True Positive Rate)
 
-**Formula:** TP / (TP + FN)
+**Formula:**
+```
+Recall = TP / (TP + FN) = P(ŷ=1 | y_true=1)
+```
 
-**Interpretation:** Of all actual positives, how many did we catch?
+**Interpretation:** Of all actual positives, how many did we catch? This is the conditional probability that the model predicts positive given that the sample is truly positive.
+
+**Also known as:** Sensitivity, True Positive Rate (TPR), Hit Rate, Power (in hypothesis testing)
 
 ```python
 from sklearn.metrics import recall_score
@@ -162,9 +170,16 @@ print(f"Recall: {recall:.2%}")
 
 #### F1-Score
 
-**Formula:** 2 × (Precision × Recall) / (Precision + Recall)
+**Formula:**
+```
+F1 = 2 × (Precision × Recall) / (Precision + Recall)
+   = 2TP / (2TP + FP + FN)
+   = Harmonic Mean(Precision, Recall)
+```
 
 **Harmonic mean of precision and recall**
+
+**Derivation:** For two values a and b, harmonic mean = 2/(1/a + 1/b) = 2ab/(a+b)
 
 ```python
 from sklearn.metrics import f1_score
@@ -198,7 +213,17 @@ The harmonic mean ensures both precision AND recall must be high for a good F1 s
 
 **Generalization of F1:** Allows weighting precision vs recall
 
-**Formula:** (1 + β²) × (Precision × Recall) / (β² × Precision + Recall)
+**Formula:**
+```
+F_β = (1 + β²) × (Precision × Recall) / (β² × Precision + Recall)
+    = (1 + β²) × TP / ((1 + β²) × TP + β² × FN + FP)
+```
+
+**Mathematical interpretation:** β controls the weight of recall vs precision:
+- β² is the ratio of weight given to recall vs precision
+- β=1 → equal weight (F1 score)
+- β=2 → recall weighted 4× more than precision (β²=4)
+- β=0.5 → precision weighted 4× more than recall (1/β²=4)
 
 ```python
 from sklearn.metrics import fbeta_score
@@ -247,9 +272,14 @@ plt.show()
 ```
 
 **Interpretation:**
-- AUC = 1.0: Perfect classifier
-- AUC = 0.5: Random guessing
-- AUC < 0.5: Worse than random (predictions inverted)
+- AUC = 1.0: Perfect classifier (can find threshold with TPR=1, FPR=0)
+- AUC = 0.5: Random guessing (ROC curve is diagonal line)
+- AUC < 0.5: Worse than random (predictions inverted - flip them!)
+
+**Mathematical meaning:** AUC = P(score(positive sample) > score(negative sample))
+- Probability that a randomly chosen positive example ranks higher than a randomly chosen negative example
+- Equivalent to Mann-Whitney U statistic / Wilcoxon rank-sum test
+- Can be computed as: AUC = (Σ_i Σ_j 1[s_i > s_j]) / (n_pos × n_neg) where i∈positives, j∈negatives
 
 **When to use:**
 - ✅ Need threshold-independent metric
@@ -310,6 +340,15 @@ plt.show()
 
 **Measures quality of probability predictions**
 
+**Formula:**
+```
+Log Loss = -(1/n) Σ [y_i log(p_i) + (1-y_i) log(1-p_i)]
+```
+where:
+- y_i ∈ {0,1} is the true label
+- p_i is the predicted probability of class 1
+- n is the number of samples
+
 ```python
 from sklearn.metrics import log_loss
 
@@ -319,9 +358,15 @@ print(f"Log Loss: {logloss:.3f}")
 ```
 
 **Interpretation:**
-- Lower is better
-- 0 = perfect predictions
-- Penalizes confident wrong predictions heavily
+- Lower is better (range: [0, ∞))
+- Log Loss = 0: Perfect probabilistic predictions
+- Log Loss → ∞: Confident wrong predictions (e.g., p=0.99 when y=0)
+- Penalizes confident wrong predictions exponentially
+
+**Example penalties:**
+- Predict p=0.9 when y=1: Loss = -log(0.9) = 0.105
+- Predict p=0.9 when y=0: Loss = -log(0.1) = 2.303 (much worse!)
+- Predict p=0.01 when y=1: Loss = -log(0.01) = 4.605 (very bad!)
 
 **When to use:**
 - ✅ Need well-calibrated probabilities
@@ -391,7 +436,17 @@ weighted avg       0.86      0.85      0.85       300
 
 ### Mean Absolute Error (MAE)
 
-**Formula:** (1/n) × Σ|y_true - y_pred|
+**Formula:**
+```
+MAE = (1/n) Σ|y_i - ŷ_i| = (1/n) Σ|e_i|
+```
+where e_i = y_i - ŷ_i is the residual/error for sample i
+
+**Properties:**
+- **L1 norm** of the error vector
+- **Median-optimal:** Minimized when ŷ = median(y)
+- **Robust to outliers:** Linear penalty for all errors
+- **Not differentiable at 0:** Can be problematic for gradient-based optimization
 
 ```python
 from sklearn.metrics import mean_absolute_error
@@ -418,7 +473,17 @@ mae = 25000  # Predictions off by $25,000 on average
 
 ### Mean Squared Error (MSE)
 
-**Formula:** (1/n) × Σ(y_true - y_pred)²
+**Formula:**
+```
+MSE = (1/n) Σ(y_i - ŷ_i)² = (1/n) Σe_i²
+```
+
+**Properties:**
+- **L2 norm squared** of the error vector (divided by n)
+- **Mean-optimal:** Minimized when ŷ = mean(y)
+- **Sensitive to outliers:** Quadratic penalty amplifies large errors
+- **Differentiable everywhere:** Preferred for gradient-based optimization
+- **Relation to variance:** MSE = Bias² + Variance (bias-variance decomposition)
 
 ```python
 from sklearn.metrics import mean_squared_error
@@ -441,7 +506,18 @@ print(f"MSE: {mse:.2f}")
 
 ### Root Mean Squared Error (RMSE)
 
-**Formula:** sqrt(MSE)
+**Formula:**
+```
+RMSE = √MSE = √((1/n) Σ(y_i - ŷ_i)²)
+```
+
+**Comparison with MAE:**
+- For errors [1, 1, 1, 1]: MAE = 1, RMSE = 1 (same)
+- For errors [0, 0, 0, 4]: MAE = 1, RMSE = 2 (RMSE penalizes large error more)
+- **Rule of thumb:** RMSE ≥ MAE always, with equality only if all errors are identical
+- **RMSE/MAE ratio:** Indicates error distribution
+  - Ratio ≈ 1: Errors are uniform
+  - Ratio >> 1: Errors have high variance / many outliers
 
 ```python
 from sklearn.metrics import mean_squared_error

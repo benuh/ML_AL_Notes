@@ -45,7 +45,15 @@ print(f"Test Accuracy: {accuracy:.4f}")  # 0.8100 - 4% difference!
 
 **Problem:** Single split gives you one estimate that depends heavily on how you split the data.
 
-**Solution:** Cross-validation gives multiple estimates for a more robust evaluation.
+**Mathematical issue:** For a single split with test set of size n_test, the standard error of the accuracy estimate is:
+```
+SE(accuracy) ≈ √(p(1-p) / n_test)
+```
+where p is the true accuracy. For p=0.85 and n_test=200: SE ≈ 0.025 (2.5%).
+
+This means a single 85% accuracy could actually represent true performance anywhere from 80-90% (95% CI).
+
+**Solution:** Cross-validation averages K estimates, reducing variance by approximately √K (though not exactly due to correlation between folds).
 
 ---
 
@@ -81,6 +89,15 @@ Scores: [0.84 0.86 0.83 0.87 0.85]
 Mean: 0.8500
 Std: 0.0141
 ```
+
+**Statistical interpretation:**
+- **Mean (μ̂)**: Estimate of true model performance E[L(f, D)]
+- **Std (σ̂)**: Variation across folds, but NOT standard error of the mean
+- **Standard error**: SE ≈ σ̂/√K only if folds were independent (they're not)
+- **Actual SE**: Typically σ̂/√K × √(2(K-1)/K) ≈ σ̂/√K × √1.6 for K=5
+- **95% CI**: [μ̂ - 1.96×SE, μ̂ + 1.96×SE]
+
+For this example: SE ≈ 0.0141/√5 × √1.6 ≈ 0.008, so 95% CI ≈ [0.834, 0.866].
 
 **When to use:**
 - ✅ Regression problems
@@ -154,6 +171,19 @@ print(f"Mean accuracy: {scores.mean():.4f}")
 - Not suitable for time series data
 
 **Statistical note:** LOOCV has low bias but high variance in the error estimate because the training sets overlap significantly (differ by only one sample), making the performance estimates highly correlated.
+
+**Mathematical analysis:**
+- **Bias:** E[L̂_LOOCV] ≈ E[L_true] (nearly unbiased, training on n-1 samples ≈ n samples)
+- **Variance:** Var[L̂_LOOCV] is HIGH because:
+  - Correlation between folds: ρ ≈ (n-2)/(n-1) ≈ 1 for large n
+  - Training sets share n-2 samples → predictions highly correlated
+  - Variance formula: Var[L̂_CV] = Var[L_i]/n + 2×Cov[L_i,L_j]×n(n-1)/2n²
+  - For LOOCV: Var ≈ Var[L_i]/n × (1 + (n-1)ρ) ≈ Var[L_i] (doesn't decrease with n!)
+
+**K-Fold vs LOOCV tradeoff:**
+- K-fold (K=5,10): Moderate bias (train on (K-1)/K × n samples), low variance (folds less correlated)
+- LOOCV (K=n): Low bias (train on n-1 samples), high variance (folds highly correlated)
+- **Typical choice:** K=5 or K=10 provides best bias-variance tradeoff for the CV estimate itself
 
 ### 4. Holdout Validation (Train-Validation-Test Split)
 
@@ -277,8 +307,10 @@ scores = cross_val_score(
 print(f"Number of fits: {len(scores)}")  # 50
 print(f"Mean: {scores.mean():.4f}")
 print(f"Std: {scores.std():.4f}")
-print(f"95% CI: [{scores.mean() - 1.96*scores.std():.4f}, "
-      f"{scores.mean() + 1.96*scores.std():.4f}]")
+se = scores.std() / np.sqrt(len(scores))
+print(f"Standard Error: {se:.4f}")
+print(f"95% CI: [{scores.mean() - 1.96*se:.4f}, "
+      f"{scores.mean() + 1.96*se:.4f}]")
 ```
 
 **When to use:**
@@ -306,13 +338,22 @@ scores_repeated = cross_val_score(
 )
 time_repeated = time.time() - start
 
+# Corrected standard errors
+se_regular = scores_regular.std() / np.sqrt(len(scores_regular))
+se_repeated = scores_repeated.std() / np.sqrt(len(scores_repeated))
+
 print(f"Regular 5-fold:")
-print(f"  Mean: {scores_regular.mean():.4f} ± {scores_regular.std():.4f}")
+print(f"  Mean: {scores_regular.mean():.4f} ± {se_regular:.4f} (SE)")
+print(f"  Std: {scores_regular.std():.4f}")
 print(f"  Time: {time_regular:.2f}s")
 
 print(f"\nRepeated 5-fold (10 repeats):")
-print(f"  Mean: {scores_repeated.mean():.4f} ± {scores_repeated.std():.4f}")
+print(f"  Mean: {scores_repeated.mean():.4f} ± {se_repeated:.4f} (SE)")
+print(f"  Std: {scores_repeated.std():.4f}")
 print(f"  Time: {time_repeated:.2f}s ({time_repeated/time_regular:.1f}x slower)")
+
+print(f"\nVariance reduction: {(se_regular/se_repeated):.2f}x")
+print(f"  (Note: Not exactly √10 due to correlation between repeats)")
 ```
 
 ---
