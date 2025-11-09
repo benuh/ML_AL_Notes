@@ -84,6 +84,9 @@ def analyze_imbalance(y):
     print(f"Minority class ({minority_class}): {minority_count} samples")
     print(f"Imbalance ratio: {imbalance_ratio:.2f}:1")
 
+    # Calculate imbalance metrics
+    minority_ratio = minority_count / (majority_count + minority_count)
+
     if imbalance_ratio < 2:
         severity = "Balanced"
     elif imbalance_ratio < 10:
@@ -94,6 +97,13 @@ def analyze_imbalance(y):
         severity = "Severe Imbalance"
 
     print(f"Severity: {severity}")
+    print(f"Minority class ratio: {minority_ratio:.4f} ({minority_ratio*100:.2f}%)")
+
+    # Statistical significance: With n samples and base rate p,
+    # expected minority samples = n×p, std = √(n×p×(1-p))
+    expected = len(y) * minority_ratio
+    std = np.sqrt(len(y) * minority_ratio * (1-minority_ratio))
+    print(f"Expected minority samples: {expected:.1f} ± {std:.1f}")
 
     return imbalance_ratio
 
@@ -169,6 +179,23 @@ plt.show()
 ```
 
 **Problem:** Accuracy is misleading! A model that predicts everything as majority class can have high accuracy but is useless for detecting minority class.
+
+**Mathematical explanation:** For imbalance ratio r:1 (r negatives per positive):
+- Baseline accuracy (always predict negative) = r/(r+1)
+- For r=99: Baseline = 99/100 = 99%!
+- A model needs accuracy > r/(r+1) to beat naive baseline
+
+**Expected accuracy by chance:**
+- With class prior P(y=1) = p:
+  - Random guessing: Accuracy = p² + (1-p)²
+  - For p=0.01: Accuracy = 0.01² + 0.99² = 0.9802 (98%!)
+  - Even random guessing looks good!
+
+**Why accuracy fails:**
+- Accuracy = (TP + TN) / n
+- When TN >> TP (many negatives), accuracy ≈ TN/n ≈ (1-p)
+- Model can achieve high accuracy by ignoring minority class entirely
+- A 1% improvement from 99% → 100% accuracy requires correctly classifying ALL positives (going from 0% → 100% recall)
 
 ---
 
@@ -282,6 +309,17 @@ plot_roc_and_pr_curves(y_test, y_scores)
 
 ### 4. Matthews Correlation Coefficient (MCC)
 
+**Formula:**
+```
+MCC = (TP×TN - FP×FN) / √((TP+FP)(TP+FN)(TN+FP)(TN+FN))
+```
+
+**Properties:**
+- **Range:** [-1, +1] where +1 = perfect, 0 = random, -1 = total disagreement
+- **Balanced:** Considers all four confusion matrix quadrants equally
+- **Correlation:** Equivalent to Pearson φ coefficient between true and predicted binary variables
+- **Invariant:** Not affected by class imbalance (unlike accuracy or F1)
+
 ```python
 from sklearn.metrics import matthews_corrcoef
 
@@ -391,11 +429,23 @@ print(classification_report(y_test, y_pred_rus))
 **Create synthetic samples by interpolating between minority class samples.**
 
 **How SMOTE works (algorithm):**
-1. For each minority class sample x:
-   - Find k nearest minority class neighbors (default k=5)
-   - Randomly select one neighbor x_neighbor
-   - Generate synthetic sample: x_new = x + λ × (x_neighbor - x), where λ ~ Uniform(0, 1)
-   - This creates point along line segment between x and x_neighbor
+
+**Mathematical formulation:**
+1. For each minority class sample x_i:
+   - Compute k-nearest neighbors in minority class: N_k(x_i) using Euclidean distance
+   - For each synthetic sample to generate:
+     - Randomly select neighbor: x_nn ∈ N_k(x_i)
+     - Generate synthetic sample: x_syn = x_i + λ × (x_nn - x_i)
+     - where λ ~ Uniform(0, 1)
+   - This interpolates between x_i and x_nn in feature space
+
+**Geometric interpretation:**
+- SMOTE creates convex combinations of minority class examples
+- Synthetic samples lie on line segments connecting real minority samples
+- This expands the minority class decision region without simple duplication
+- With k neighbors and n_samples to generate, creates n_samples/k synthetics per original sample (on average)
+
+**Important:** SMOTE only operates in feature space along minority class manifold. It does NOT create arbitrary points or extrapolate beyond existing data.
 
 **Example:**
 ```
