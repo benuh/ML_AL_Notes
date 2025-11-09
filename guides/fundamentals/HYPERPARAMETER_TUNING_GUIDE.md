@@ -233,14 +233,18 @@ grid_fine.fit(X_train, y_train)
 
 **More efficient than grid search for high dimensions**
 
-**Theory:** Random search explores parameter space more efficiently. With same budget, random search tests more unique values per hyperparameter.
+**Theory (Bergstra & Bengio, 2012):** Random search explores parameter space more efficiently when hyperparameters have varying importance.
 
-**Key insight (Bergstra & Bengio, 2012):** In practice, only a few hyperparameters significantly affect performance. Random search explores more values for each hyperparameter independently, making it more likely to find good values for the important ones. Grid search wastes trials testing all combinations of unimportant parameters.
+**Mathematical insight:** For n trials over d hyperparameters:
+- Grid search: Tests n^(1/d) unique values per parameter
+- Random search: Tests n unique values per parameter (expected)
+- When only k << d parameters are important, random search provides O(n^(k/d)) vs O(n) coverage of important subspace
 
-Example: With 9 trials testing 2 hyperparameters:
-- Grid search: Tests 3×3 grid = 3 unique values per parameter
-- Random search: Tests 9 unique values per parameter (on average)
-- If only one parameter matters, random search has 3× better chance of finding good value!
+**Concrete example:** With 9 trials testing 2 hyperparameters:
+- Grid search: 3×3 grid = 3 unique values per parameter
+- Random search: 9 unique values per parameter (expected)
+- If only 1 parameter is critical, random search samples 9 values vs 3 values from the critical range
+- Expected improvement: ~3× better exploration of the important dimension
 
 ```python
 from sklearn.model_selection import RandomizedSearchCV
@@ -329,22 +333,29 @@ param_distributions = {
 **Smarter than random:** Uses previous results to guide search
 
 **How it works:**
-1. Build probabilistic model of objective function (usually Gaussian Process or Tree-structured Parzen Estimator)
-2. Use model to predict promising regions of hyperparameter space
-3. Sample from promising regions (balancing exploration vs exploitation)
-4. Update model with new results and repeat
+1. Build probabilistic surrogate model of objective function f(θ)
+   - Gaussian Process (GP): Models f(θ) ~ GP(μ, k) with mean μ and kernel k
+   - Tree-structured Parzen Estimator (TPE): Models p(θ|y) using p(y|θ)p(θ)
+2. Use acquisition function to select next point θ_next
+   - Expected Improvement (EI): E[max(f(θ) - f(θ*), 0)]
+   - Upper Confidence Bound (UCB): μ(θ) + κσ(θ)
+   - Balances exploitation (high mean) vs exploration (high uncertainty)
+3. Evaluate f(θ_next) and observe result y_next
+4. Update surrogate model with (θ_next, y_next) and repeat
 
 **When Bayesian optimization is worth the overhead:**
 - Each trial is expensive (>1 minute to train)
-- Limited budget (<100 trials due to time/cost constraints)
+- Limited budget (20-300 trials optimal range)
 - Hyperparameters have complex interactions
-- Objective function is smooth (not random/noisy)
+- Objective function is smooth (Lipschitz continuous or nearly so)
+- Signal-to-noise ratio is reasonable (SNR > 0.1)
 
 **When to stick with random search:**
-- Fast models (<10 seconds per trial) - overhead not worth it
-- Very noisy objective function (Bayesian models struggle)
-- Large budget (>500 trials) - random search catches up
-- Simple hyperparameter relationships
+- Fast models (<10 seconds per trial) - surrogate model overhead dominates
+- Very noisy objective function (validation score variance >> improvement potential)
+- Large budget (>500 trials) - random search achieves similar coverage
+- Simple hyperparameter relationships (additive effects, no interactions)
+- High-dimensional search (>20 dimensions) - curse of dimensionality affects GP
 
 **Libraries:**
 - Optuna (recommended, easy to use)
@@ -477,14 +488,20 @@ print(f"Best score: {halving_search.best_score_:.3f}")
 ### How It Works
 
 ```
+Round 1: n configs × r^0 resource → Keep top n/η
+Round 2: n/η configs × r^1 resource → Keep top n/η²
+Round 3: n/η² configs × r^2 resource → Keep top 1
+
+Example with n=27, η=3, r=n_samples:
 Round 1: 27 configs × 33% data → Keep top 9
 Round 2:  9 configs × 66% data → Keep top 3
 Round 3:  3 configs × 100% data → Keep top 1
 
-Much faster than trying all 27 configs on full data!
+Total cost: 27×(1/3) + 9×(2/3) + 3×1 = 9 + 6 + 3 = 18 "full trainings"
+vs full grid: 27×1 = 27 "full trainings" (33% reduction)
 ```
 
-**Critical assumption:** Performance on small subset/few iterations correlates with final performance. This works well for:
+**Critical assumption:** Early performance strongly correlates with final performance (rank correlation ρ > 0.7). This works well for:
 - Increasing n_estimators (more trees generally helps monotonically)
 - Neural network training (early learning curves are predictive)
 - Increasing training data (more data usually helps)
@@ -671,7 +688,14 @@ grid_search = GridSearchCV(
 # Easy to overfit to validation set during tuning
 ```
 
-**Important:** Even with CV, extensive hyperparameter tuning can overfit to the CV folds themselves. For unbiased performance estimates when tuning many hyperparameters:
+**Important:** Even with CV, extensive hyperparameter tuning introduces optimistic bias. The bias grows with the number of hyperparameter configurations tested.
+
+**Expected bias:** For m configurations tested with CV validation score s and true variance σ²:
+- Expected optimistic bias ≈ σ × √(2 log m)
+- Example: Testing m=100 configs with σ=0.02 → bias ≈ 0.02 × √(2 log 100) ≈ 0.06
+- This means your CV score may be ~6% higher than true generalization performance
+
+**Nested CV eliminates this bias:**
 
 ```python
 from sklearn.model_selection import cross_val_score
@@ -692,10 +716,10 @@ final_model = grid_search.best_estimator_
 ```
 
 **When to use nested CV:**
-- Comparing multiple tuning strategies and need fair comparison
-- Reporting performance in publication/research
-- Extensive hyperparameter search (>100 combinations)
-- Want to know true expected performance, not optimistically biased estimate
+- Comparing multiple tuning strategies (requires fair comparison)
+- Reporting performance in publication/research (unbiased estimates required)
+- Extensive hyperparameter search (>50 combinations)
+- Want to quantify true expected performance, not selection-biased estimate
 
 ### 2. Tune on Training Set, Evaluate on Test Set
 
@@ -815,13 +839,17 @@ grid_search = GridSearchCV(model, param_grid, cv=5)
 # CV protects against overfitting to single validation set
 ```
 
-**Why this is a problem (multiple comparisons):**
-- Each hyperparameter trial is like a hypothesis test
-- With 100 trials and validation score ≈ 0.85, you expect some scores near 0.88 just by random chance
-- This is the ML equivalent of p-hacking in statistics
-- The best validation score becomes an overly optimistic estimate of true performance
+**Why this is a problem (multiple comparisons / selection bias):**
+- Each hyperparameter trial is an independent draw from a noisy estimator
+- Maximum of m draws from N(μ, σ²) has expected value μ + σ × √(2 log m)
+- This is the ML equivalent of p-hacking / multiple hypothesis testing in statistics
+- The best validation score is biased upward by O(σ√log m)
 
-**Example:** If your model's true accuracy is 85% and you try 100 random hyperparameter sets, the best validation score will likely be around 87-88% due to random variation alone. This 2-3% gap is pure overfitting to the validation set.
+**Quantitative example:**
+- True accuracy μ = 0.85, validation noise σ = 0.02 (typical for n_val ≈ 1000)
+- Test 100 configurations: expected max ≈ 0.85 + 0.02 × √(2 log 100) ≈ 0.85 + 0.06 = 0.91
+- Test 1000 configurations: expected max ≈ 0.85 + 0.02 × √(2 log 1000) ≈ 0.85 + 0.075 = 0.925
+- This 4-7.5% optimistic bias is pure selection bias, not generalization improvement
 
 **Solutions:**
 - Use cross-validation (helps but doesn't eliminate the problem)

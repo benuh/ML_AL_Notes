@@ -99,16 +99,27 @@ print(f"Training Error (High Variance): {np.mean((y - y_pred_variance)**2):.2f}"
 
 ### The Mathematical Decomposition
 
-Expected error can be decomposed into three parts:
+**Formal decomposition** of expected prediction error for a point x:
 
 ```
-Expected Test Error = Bias² + Variance + Irreducible Error
+E[(y - ŷ(x))²] = Bias[ŷ(x)]² + Var[ŷ(x)] + σ²
+```
+
+More explicitly:
+```
+E[(y - ŷ(x))²] = (E[ŷ(x)] - f(x))² + E[(ŷ(x) - E[ŷ(x)])²] + σ²
 ```
 
 Where:
-- **Bias²**: Error from wrong assumptions
-- **Variance**: Error from sensitivity to training set
-- **Irreducible Error**: Noise in data that cannot be reduced
+- **y**: True target value, y = f(x) + ε where ε ~ N(0, σ²)
+- **f(x)**: True underlying function
+- **ŷ(x)**: Model prediction (random variable over training sets)
+- **E[ŷ(x)]**: Expected prediction across all possible training sets
+- **Bias[ŷ(x)]² = (E[ŷ(x)] - f(x))²**: Squared bias - error from wrong model assumptions
+- **Var[ŷ(x)] = E[(ŷ(x) - E[ŷ(x)])²]**: Variance - expected squared deviation from mean prediction
+- **σ²**: Irreducible error - inherent noise in data (Var[ε])
+
+**Key insight:** This decomposition shows that even with infinite data (eliminating variance), we still have bias + irreducible error. With a perfect model (zero bias), we still have variance + irreducible error.
 
 ```python
 def compute_bias_variance(model_class, X_train, y_train, X_test, y_test,
@@ -254,17 +265,29 @@ plt.show()
 ```
 
 **Key Observations:**
-1. As complexity increases, training error decreases monotonically
-2. Test error first decreases, then increases (U-shaped curve)
-3. Bias decreases with complexity
-4. Variance increases with complexity
-5. Optimal complexity minimizes bias² + variance
+1. As complexity increases, training error decreases monotonically (model has more capacity to fit training data)
+2. Test error first decreases, then increases (classical U-shaped curve)
+3. Bias decreases monotonically with complexity (more flexible models make fewer assumptions)
+4. Variance increases monotonically with complexity (more parameters → more sensitivity to training data)
+5. Optimal complexity minimizes bias² + variance (sweet spot typically where test error is minimized)
 
-**Important notes:**
-- This classical U-shaped curve applies to traditional ML models (trees, polynomials, SVMs)
-- Modern deep learning can exhibit "double descent": test error may decrease again after the interpolation threshold
-- For neural networks, implicit regularization from SGD and architecture can prevent variance from increasing monotonically
-- The tradeoff is less pronounced when using proper regularization techniques
+**Important caveats and modern perspectives:**
+
+**Classical regime (traditional ML):**
+- Applies to: decision trees, polynomials, SVMs, k-NN with varying k
+- Clear U-shaped test error curve
+- Interpolation (zero training error) generally means overfitting
+
+**Modern regime (overparameterized models):**
+- **Double descent phenomenon** (Belkin et al., 2019): Test error can exhibit second descent after interpolation threshold
+  - Classical regime: underparameterized (m > p, samples > parameters)
+  - Interpolation threshold: m ≈ p (can fit training data exactly)
+  - Modern regime: overparameterized (m < p, more parameters than samples)
+- Neural networks often operate in overparameterized regime but still generalize well
+- **Implicit regularization:** SGD, architecture inductive biases, and initialization prevent variance from growing unboundedly
+- With proper techniques (data augmentation, dropout, batch norm), can achieve low bias AND low variance simultaneously
+
+**Practical implication:** The classical bias-variance tradeoff is fundamental but not the complete picture for modern deep learning.
 
 ---
 
@@ -377,12 +400,20 @@ plot_decision_boundary(model_good, X_train, y_train,
 
 | Characteristic | Underfitting | Good Fit | Overfitting |
 |---------------|--------------|----------|-------------|
-| Train Error | High | Low | Very Low |
-| Test Error | High | Low | High |
-| Gap | Small | Small | Large |
+| Train Error | High (~10-20%) | Low (~1-5%) | Very Low (~0-1%) |
+| Test Error | High (~10-20%) | Low (~3-7%) | High (~15-30%) |
+| Gap (Train-Test) | Small (~0-2%) | Small (~2-5%) | Large (~10-25%) |
 | Bias | High | Balanced | Low |
 | Variance | Low | Balanced | High |
 | Complexity | Too Simple | Just Right | Too Complex |
+| Typical Fixes | Add features, increase complexity | None needed | Regularization, more data |
+
+**Note on quantitative thresholds:**
+- Percentages shown are illustrative for classification problems and vary by domain
+- "Gap" threshold depends on problem difficulty and dataset size
+- For small datasets (n < 1000): gap > 10% indicates likely overfitting
+- For large datasets (n > 100k): even gap of 3-5% may be concerning
+- Context matters: medical diagnosis may require gap < 1%, while recommender systems may tolerate gap of 10%
 
 ---
 

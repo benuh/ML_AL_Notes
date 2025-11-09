@@ -79,9 +79,9 @@ Loss = Data Loss + λ × Regularization Term
 ```
 
 Where:
-- **Data Loss**: How well model fits training data (e.g., MSE)
-- **λ (lambda)**: Regularization strength (hyperparameter)
-- **Regularization Term**: Penalty for model complexity
+- **Data Loss**: Empirical risk on training data (e.g., MSE = (1/n)Σ(yi - ŷi)²)
+- **λ (lambda)**: Regularization strength (hyperparameter, λ ≥ 0)
+- **Regularization Term**: Penalty for model complexity (e.g., norm of weights)
 
 **Effect:**
 - Forces model to balance fitting data and staying simple
@@ -97,10 +97,16 @@ Where:
 ### Formula
 
 ```
-Loss = MSE + λ × Σ(wi²)
+Loss = (1/n)Σ(yi - ŷi)² + λ × Σ(wi²)
+     = MSE + λ × ||w||₂²
 ```
 
-Penalizes sum of squared weights.
+Where:
+- **n**: Number of training samples
+- **||w||₂²**: L2 norm squared of weight vector (sum of squared weights)
+- **λ**: Regularization parameter (higher λ = stronger regularization)
+
+Penalizes sum of squared weights, encouraging small but non-zero coefficients.
 
 ### Implementation
 
@@ -228,10 +234,15 @@ plt.show()
 ### Formula
 
 ```
-Loss = MSE + λ × Σ|wi|
+Loss = (1/n)Σ(yi - ŷi)² + λ × Σ|wi|
+     = MSE + λ × ||w||₁
 ```
 
-Penalizes sum of absolute values of weights.
+Where:
+- **||w||₁**: L1 norm of weight vector (sum of absolute values)
+- **λ**: Regularization parameter (higher λ = more sparsity)
+
+Penalizes sum of absolute values of weights. The L1 penalty creates sparsity because its derivative is constant (±1 for non-zero weights), driving small coefficients to exactly zero.
 
 ### Implementation
 
@@ -319,13 +330,17 @@ plt.show()
 - ✅ Good for high-dimensional data
 
 **Disadvantages:**
-- ❌ Can be unstable with correlated features (small data changes → large coefficient changes)
-- ❌ Arbitrarily selects one feature from correlated group (non-deterministic selection)
-- ❌ Slower to compute than Ridge (no closed-form solution, requires iterative optimization)
-- ❌ May struggle when p > n (more features than samples) without additional constraints
+- ❌ Unstable with correlated features (small data changes → large coefficient changes)
+- ❌ Arbitrarily selects one feature from correlated group
+- ❌ Slower to compute than Ridge (no closed-form solution, requires iterative optimization like coordinate descent or LARS)
+- ❌ May struggle when p > n (more features than samples)
 
 **Why instability with correlated features?**
-When features are highly correlated, Lasso tends to arbitrarily pick one and ignore others. For example, if features X₁ and X₂ are identical, Lasso might give all weight to X₁ in one run and all to X₂ in another run with slightly different data. Ridge, by contrast, distributes weight equally among correlated features.
+When features are highly correlated (Pearson correlation |ρ| > 0.9), Lasso exhibits selection instability:
+- For perfectly correlated features (ρ = 1), Lasso arbitrarily assigns weight to one feature
+- Example: If X₁ and X₂ are identical, solutions can range from (w₁=k, w₂=0) to (w₁=0, w₂=k)
+- Small perturbations in data can cause drastic changes in which feature is selected
+- Ridge regression distributes weight equally: (w₁=k/2, w₂=k/2) for identical features
 
 **When to use:**
 - High-dimensional data (many features)
@@ -343,14 +358,20 @@ When features are highly correlated, Lasso tends to arbitrarily pick one and ign
 
 ```
 Loss = MSE + λ₁ × Σ|wi| + λ₂ × Σ(wi²)
+     = MSE + λ₁ × ||w||₁ + λ₂ × ||w||₂²
 ```
 
-Or equivalently:
+Or equivalently (sklearn parameterization):
 ```
-Loss = MSE + λ × (α × Σ|wi| + (1-α) × Σ(wi²))
+Loss = MSE + λ × (α × ||w||₁ + (1-α)/2 × ||w||₂²)
 ```
 
-Where α is the mixing parameter (0 ≤ α ≤ 1).
+Where:
+- **α** (l1_ratio): Mixing parameter between L1 and L2 (0 ≤ α ≤ 1)
+  - α = 1: Pure Lasso
+  - α = 0: Pure Ridge
+  - 0 < α < 1: Elastic Net
+- **λ** (alpha): Overall regularization strength
 
 ### Implementation
 
@@ -433,12 +454,18 @@ plt.show()
 ### How It Works
 
 During training:
-1. Randomly set some neurons to 0 (with probability p)
-2. Scale remaining neurons by 1/(1-p)
-3. Forces network to not rely on any single neuron
+1. For each forward pass, randomly deactivate each neuron with probability p (dropout rate)
+2. Scale active neuron outputs by 1/(1-p) to maintain expected value
+3. This creates an ensemble effect: each mini-batch trains a different sub-network
+4. Prevents co-adaptation: neurons cannot rely on presence of specific other neurons
 
-During testing:
-- Use all neurons (no dropout)
+During inference (testing):
+- Use all neurons without dropout (p=0)
+- No scaling needed because training already scaled by 1/(1-p)
+
+**Mathematical formulation:**
+- Training: h = mask ⊙ activation, where mask ~ Bernoulli(1-p), then scale by 1/(1-p)
+- Inference: h = activation (all neurons active)
 
 ```python
 import tensorflow as tf
@@ -582,8 +609,11 @@ print(df_dropout.to_string(index=False))
 
 **When to use:**
 - Deep neural networks
-- Network is overfitting
-- Typical dropout rates: 0.2-0.5 for hidden layers, 0.5 for input layer
+- Network is overfitting (large train-validation gap)
+- Typical dropout rates:
+  - Hidden layers: 0.2-0.5 (commonly 0.3-0.4)
+  - Input layer: 0.1-0.2 (more conservative)
+  - Recurrent layers: 0.1-0.3 (lower rates for RNNs/LSTMs)
 
 ---
 
@@ -860,21 +890,48 @@ for name, model in [('Without BN', model_no_bn), ('With BN', model_bn)]:
 
 ## Weight Decay
 
-**Gradually decrease weights towards zero** (equivalent to L2 for SGD)
+**Directly shrinks weights during optimization**
+
+### Distinction from L2 Regularization
+
+While often confused, weight decay and L2 regularization differ:
+
+**L2 Regularization (in loss function):**
+```
+Loss = MSE + (λ/2) × ||w||₂²
+Gradient: ∇w = ∇MSE + λw
+Update: w ← w - η(∇MSE + λw)
+```
+
+**Weight Decay (in optimizer):**
+```
+Update: w ← w - η∇MSE - ηλw
+      = (1 - ηλ)w - η∇MSE
+```
+
+For standard SGD, these are equivalent. However, for adaptive optimizers (Adam, RMSprop):
+- L2 regularization: Penalty added before adaptive scaling
+- Weight decay: Applied after adaptive learning rate computation
+
+**Result:** Weight decay provides more effective regularization for Adam/AdamW.
+
+### Implementation
 
 ```python
-# Weight decay in optimizer
+# Weight decay in optimizer (recommended approach for Adam)
 model = keras.Sequential([
     keras.layers.Dense(128, activation='relu', input_shape=(20,)),
     keras.layers.Dense(128, activation='relu'),
     keras.layers.Dense(1)
 ])
 
-# Adam with weight decay
+# Adam with weight decay (also called AdamW)
 optimizer = keras.optimizers.Adam(learning_rate=0.001, weight_decay=0.01)
 
 model.compile(optimizer=optimizer, loss='mse')
 ```
+
+**Typical weight decay values:** 0.0001 to 0.01 (commonly 0.0001 for transformers, 0.01 for CNNs)
 
 ---
 

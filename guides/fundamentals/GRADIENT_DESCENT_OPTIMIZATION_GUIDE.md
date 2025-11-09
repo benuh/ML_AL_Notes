@@ -26,15 +26,18 @@ A comprehensive practical guide to gradient descent variants and modern optimiza
 ### The Core Idea
 
 ```
-θ = θ - α × ∇J(θ)
+θ_{t+1} = θ_t - α × ∇J(θ_t)
 ```
 
 Where:
-- **θ**: Parameters (weights)
-- **α**: Learning rate
-- **∇J(θ)**: Gradient of loss function
+- **θ_t**: Parameters (weights) at iteration t
+- **α**: Learning rate (step size, α > 0)
+- **∇J(θ)**: Gradient of loss function with respect to θ, i.e., [∂J/∂θ₁, ∂J/∂θ₂, ..., ∂J/∂θₙ]ᵀ
 
-**Intuition:** The gradient points in the direction of steepest ascent. We move in the opposite direction (negative gradient) to find the minimum.
+**Intuition:** The gradient ∇J(θ) points in the direction of steepest ascent. Moving in the opposite direction -∇J(θ) yields steepest descent. The learning rate α controls the step size.
+
+**Convergence guarantee (for convex, L-smooth functions):**
+With α ≤ 1/L where L is the Lipschitz constant of ∇J, gradient descent converges at rate O(1/t).
 
 ### Implementing from Scratch
 
@@ -460,12 +463,22 @@ for batch_size, label in zip(batch_sizes, batch_labels):
 - Typical batch sizes: 32, 64, 128, 256
 
 **Batch size selection guide:**
-- **Small batches (16-32)**: More noise → better generalization but slower convergence per epoch. Better for small datasets.
-- **Medium batches (64-128)**: Good balance for most tasks. Sweet spot for many problems.
-- **Large batches (256-512+)**: Faster training but may generalize worse. Requires higher learning rate (linear scaling rule: if you multiply batch size by k, multiply learning rate by k). Can get stuck in sharp minima.
+- **Small batches (8-32)**: Higher gradient noise → acts as regularization, better generalization. Slower per-epoch (more updates). Memory efficient.
+- **Medium batches (64-128)**: Balanced noise vs efficiency. Sweet spot for many tasks.
+- **Large batches (256-1024+)**: Lower noise → faster convergence per epoch, but may generalize worse. Requires learning rate scaling and longer training.
 
-**Why large batches may generalize worse:**
-Research (Keskar et al., 2017) suggests large batches converge to sharp minima (high curvature) while small batches find flat minima (low curvature). Flat minima tend to generalize better to test data. This is still an active research area.
+**Large batch training requires adjustments:**
+1. **Learning rate scaling:** Linear scaling rule (Goyal et al., 2017): LR × (BatchSize/BaseBatchSize)
+   - Example: If LR=0.1 works for batch=256, use LR=0.4 for batch=1024
+   - With warmup to prevent early instability
+2. **More epochs:** Large batches see fewer parameter updates per epoch
+3. **Batch normalization:** Statistics computed over larger batches may differ
+
+**Why large batches may generalize worse (sharp vs flat minima hypothesis):**
+- Keskar et al. (2017): Large batches tend to converge to sharp minima (high eigenvalues of Hessian)
+- Small batches find flat minima (low eigenvalues of Hessian)
+- Flat minima → more robust to parameter perturbations → better generalization
+- **Caveat:** This is empirically observed but theoretically not fully settled. Some work (Hoffer et al., 2017) shows gap can be closed with proper tuning.
 
 ---
 
@@ -475,17 +488,31 @@ Research (Keskar et al., 2017) suggests large batches converge to sharp minima (
 
 ### Formula
 
+**Parameterization 1 (used in this guide):**
 ```
-v_t = β × v_{t-1} + α × ∇J(θ)
-θ = θ - v_t
+v_t = β × v_{t-1} + α × g_t
+θ_{t+1} = θ_t - v_t
+```
+
+**Parameterization 2 (common in papers/libraries):**
+```
+v_t = β × v_{t-1} + g_t
+θ_{t+1} = θ_t - α × v_t
 ```
 
 Where:
-- **v**: Velocity (accumulated gradients)
-- **β**: Momentum coefficient (typically 0.9)
+- **v_t**: Velocity (exponentially weighted moving average of gradients)
+- **g_t = ∇J(θ_t)**: Gradient at step t
+- **β**: Momentum coefficient (typically 0.9, controls decay: 0.9 = 90% of previous velocity)
 - **α**: Learning rate
 
-**Note:** Some implementations use `v_t = β × v_{t-1} + ∇J(θ)` and `θ = θ - α × v_t` (learning rate applied during update). Both are mathematically equivalent but affect how you tune hyperparameters.
+**Important:** These are mathematically equivalent (just absorb α into v differently), but:
+- Parameterization 1: Tune learning rate α similar to vanilla SGD
+- Parameterization 2: Need smaller α than vanilla SGD (by factor of ~1/(1-β))
+- Always check which version your library uses!
+
+**Intuition:** Momentum accumulates past gradients with exponential decay. At equilibrium with constant gradient g:
+v_∞ = g/(1-β) for param 2, or α×g/(1-β) for param 1.
 
 ### Implementation
 
@@ -654,9 +681,21 @@ print(f"  Nesterov: {loss_nag[-1]:.2f}")
 ### Formula
 
 ```
-G_t = G_{t-1} + (∇J(θ))²
-θ = θ - (α / √(G_t + ε)) × ∇J(θ)
+G_t = G_{t-1} + g_t²
+θ_{t+1} = θ_t - (α / √(G_t + ε)) ⊙ g_t
 ```
+
+Where:
+- **G_t**: Cumulative sum of squared gradients (element-wise), G_t ∈ ℝⁿ
+- **g_t = ∇J(θ_t)**: Gradient at step t
+- **ε**: Small constant for numerical stability (typically 10⁻⁸)
+- **⊙**: Element-wise multiplication
+
+**Key insight:** Each parameter gets learning rate inversely proportional to √(sum of its squared historical gradients).
+- Frequently updated parameters (large Σg²) → small effective learning rate
+- Rarely updated parameters (small Σg²) → large effective learning rate
+
+**Fatal flaw:** G_t grows monotonically, so effective learning rate α/√(G_t) → 0 as t → ∞, eventually stopping all learning.
 
 ### Implementation
 
@@ -735,9 +774,26 @@ print(f"  Effective learning rates: {0.5 / (np.sqrt(G) + 1e-8)}")
 ### Formula
 
 ```
-E[g²]_t = β × E[g²]_{t-1} + (1-β) × (∇J(θ))²
-θ = θ - (α / √(E[g²]_t + ε)) × ∇J(θ)
+v_t = β × v_{t-1} + (1-β) × g_t²
+θ_{t+1} = θ_t - (α / √(v_t + ε)) ⊙ g_t
 ```
+
+Alternative notation:
+```
+E[g²]_t = β × E[g²]_{t-1} + (1-β) × g_t²
+θ_{t+1} = θ_t - (α / √(E[g²]_t + ε)) ⊙ g_t
+```
+
+Where:
+- **v_t** (or **E[g²]_t**): Exponentially weighted moving average of squared gradients
+- **β**: Decay rate (typically 0.9), controls memory length ≈ 1/(1-β) steps
+- **g_t = ∇J(θ_t)**: Current gradient
+
+**Fixes AdaGrad:** Instead of summing all past squared gradients, uses exponentially decaying average:
+- AdaGrad: G_t = Σ_{i=1}^t g_i² (grows forever)
+- RMSprop: v_t ≈ (1-β) × Σ_{i=1}^t β^{t-i} g_i² (forgets distant past)
+
+With β=0.9, gradients from 10 steps ago have weight ~0.35, from 20 steps ago ~0.12.
 
 ### Implementation
 
@@ -836,13 +892,19 @@ v̂_t = v_t / (1 - β₂ᵗ)                      # Bias correction
 **Why bias correction is essential:**
 Since m₀ = 0 and v₀ = 0, the moment estimates are biased toward zero, especially in early iterations.
 
-Example: With β₁=0.9 and constant gradient g:
-- Step 1: m₁ = 0.9×0 + 0.1×g = 0.1g (severely underestimated, should be close to g)
-- Step 2: m₂ = 0.9×0.1g + 0.1×g = 0.19g (still underestimated)
-- Without correction: Would take many steps to reach true estimate
-- With correction m₁/(1-0.9¹) = 0.1g/0.1 = g (correct estimate immediately!)
+**Mathematical justification:** For constant gradient g, the expected value is:
+- True first moment: E[g] = g
+- Biased estimate: m_t = (1-β₁) Σ_{i=1}^t β₁^{t-i} g = (1-β₁^t) g
+- Bias: E[m_t] = (1-β₁^t) g ≠ g
+- Corrected: E[m̂_t] = E[m_t/(1-β₁^t)] = g ✓
 
-The bias is most severe early in training and diminishes as t increases (since β₁ᵗ → 0 as t → ∞).
+**Numerical example** with β₁=0.9 and constant gradient g:
+- Step 1: m₁ = 0.1g, bias=(1-0.9¹)=0.1, m̂₁ = 0.1g/0.1 = g ✓
+- Step 2: m₂ = 0.19g, bias=(1-0.9²)=0.19, m̂₂ = 0.19g/0.19 = g ✓
+- Step 10: m₁₀ ≈ 0.651g, bias≈0.651, m̂₁₀ ≈ g ✓
+- Step ∞: m∞ → g, bias → 1, correction → 1 (no effect)
+
+**Decay of bias:** β₁ᵗ decays exponentially. For β₁=0.9: after t=10 steps → bias factor ≈0.65, after t=50 → ≈0.005 (negligible).
 
 ### Implementation
 
