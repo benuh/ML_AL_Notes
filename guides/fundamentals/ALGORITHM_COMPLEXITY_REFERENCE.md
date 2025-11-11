@@ -22,19 +22,27 @@
 
 **Time Complexity:**
 ```
-O(f(n)): Upper bound (worst-case)
-Ω(f(n)): Lower bound (best-case)
-Θ(f(n)): Tight bound (average-case)
+Asymptotic Notation (Formal Definitions):
+- O(f(n)): ∃c>0, n₀: ∀n≥n₀, T(n) ≤ c·f(n)  (Upper bound, worst-case)
+- Ω(f(n)): ∃c>0, n₀: ∀n≥n₀, T(n) ≥ c·f(n)  (Lower bound, best-case)
+- Θ(f(n)): ∃c₁,c₂>0, n₀: ∀n≥n₀, c₁·f(n) ≤ T(n) ≤ c₂·f(n)  (Tight bound)
+- o(f(n)): lim[n→∞] T(n)/f(n) = 0  (Strictly less than)
+- ω(f(n)): lim[n→∞] T(n)/f(n) = ∞  (Strictly greater than)
 
-Common complexities (best to worst):
-O(1)         - Constant
-O(log n)     - Logarithmic
-O(n)         - Linear
-O(n log n)   - Linearithmic
-O(n²)        - Quadratic
-O(n³)        - Cubic
-O(2^n)       - Exponential
-O(n!)        - Factorial
+Common complexities (from best to worst):
+O(1)         - Constant (array access, hash lookup)
+O(log n)     - Logarithmic (binary search, balanced tree ops)
+O(√n)        - Sublinear (primality testing)
+O(n)         - Linear (single pass through data)
+O(n log n)   - Linearithmic (optimal comparison sort)
+O(n²)        - Quadratic (nested loops, naive matrix mult)
+O(n³)        - Cubic (3-nested loops, matrix multiplication)
+O(2^n)       - Exponential (subset enumeration)
+O(n!)        - Factorial (permutation enumeration)
+
+Important: Hidden constants matter in practice!
+- O(n log n) sorting: ~20n log n operations
+- O(n²) bubble sort: ~n²/2 comparisons
 ```
 
 **Space Complexity:**
@@ -65,24 +73,34 @@ T: Number of iterations/epochs
 
 **Linear Regression (Ordinary Least Squares)**
 ```
-Problem: min ||Xw - y||²
-         w
+Problem: min_w ||Xw - y||²₂
 
 Closed-form solution: w = (X^T X)^(-1) X^T y
 
 Training Complexity:
-- Matrix multiplication X^T X: O(nd²)
-- Matrix inversion: O(d³)
-- Matrix multiplication X^T y: O(nd)
+- X^T X computation: O(nd²) FLOPs, exactly nd² - d(d+1)/2 mult (symmetric)
+- Matrix inversion (Cholesky): O(d³/3) FLOPs (exploiting symmetry)
+- X^T y computation: O(nd) FLOPs
 - Total: O(nd² + d³)
+  - Dominated by O(nd²) when n >> d (typical)
+  - Dominated by O(d³) when d >> n (high-dimensional)
 
-Prediction: O(nd)
-Space: O(nd) for data + O(d²) for X^T X
+Prediction: O(nd) for n samples, O(d) per sample
+Space:
+- Input data: O(nd)
+- Gram matrix X^T X: O(d²)
+- Total: O(nd + d²)
+
+**Numerical stability:**
+- Direct inversion: Condition number κ(X^T X) = κ(X)²
+- QR decomposition: O(nd²), κ(R) = κ(X) (better stability)
+- SVD: O(nd² + d³), most stable but slowest
 
 Variants:
-- Ridge Regression: Same as OLS
-- Lasso Regression (coordinate descent): O(T·nd) where T = iterations
-- Elastic Net: O(T·nd)
+- Ridge Regression: O(nd² + d³), same as OLS (adds λI to X^T X)
+- Lasso (coordinate descent): O(T·nd·s) where s = sparsity, T ~ O(100-1000)
+- Elastic Net: O(T·nd·s)
+- Gradient Descent: O(T·nd) where T depends on condition number κ(X)
 ```
 
 **Logistic Regression**
@@ -143,21 +161,47 @@ Popular Kernels:
 
 **CART (Classification and Regression Trees)**
 ```
-Training:
-- At each node: Find best split
-  - For each feature: Sort values O(n log n)
-  - Evaluate split: O(n)
-  - Total per node: O(d · n log n)
+Training Algorithm:
+At each node: Find best split over all features and thresholds
 
-- Tree depth: O(log n) balanced, O(n) worst-case
-- Number of nodes: O(n) worst-case
+**Naive approach (resort at each node):**
+- For each feature j:
+  - Sort n values: O(n log n)
+  - Scan for best threshold: O(n)
+  - Total per feature: O(n log n)
+- All d features: O(d · n log n) per node
 
-Total Training:
-- Balanced tree: O(n · d · log n)
-- Worst-case (degenerate): O(n² · d)
+Tree structure:
+- Depth: h ∈ [log₂ n, n]
+  - Balanced: h = O(log n), nodes = O(n)
+  - Degenerate: h = O(n), nodes = O(n)
 
-Prediction: O(log n) balanced, O(n) worst-case
-Space: O(n) for tree structure
+Total Training Complexity:
+- Best-case (balanced): O(d · n · log² n)
+  - log n depth × n log n per level
+- Worst-case (degenerate): O(d · n²)
+  - n depth × n per level
+- Average-case: O(d · n · log n)
+  - Assumes presorted arrays (see optimization below)
+
+**Optimized (presort once):**
+- Presort all features: O(d · n log n)
+- At each node: O(d · n) to scan presorted arrays
+- Total: O(d · n log n + d · n²) = O(d · n²)
+  - Worse asymptotically but better constants in practice for small trees
+
+**Modern implementation (sklearn):**
+- Uses presort for small n (< 2000), naive for large n
+- Hybrid approach balances time and space
+
+Prediction:
+- O(h) = O(log n) balanced, O(n) worst-case
+- Each node: O(1) comparison
+- Expected: O(log n) for balanced trees
+
+Space:
+- Tree structure: O(#nodes) = O(n)
+- Presort storage: O(d · n) if using presort optimization
 ```
 
 **Optimized Decision Trees (Histogram-based)**
@@ -395,9 +439,10 @@ Memory: 2 · O(T · h)
 
 ### Transformer Architecture
 
-**Self-Attention**
+**Self-Attention (Detailed Analysis)**
 ```
 Input: (batch_size, seq_len, d_model)
+Notation: b = batch_size, n = seq_len, d = d_model, h = num_heads
 Query, Key, Value: (batch_size, seq_len, d_k)
 
 Attention(Q, K, V) = softmax(QK^T / √d_k) V

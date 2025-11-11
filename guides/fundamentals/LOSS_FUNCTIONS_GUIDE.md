@@ -502,9 +502,55 @@ Convergence rate (GD):
 - Convex case: O(1/k) for ε-accuracy
 - Locally strongly convex: O(log(1/ε))
 
-Numerical stability:
-- Direct computation can cause overflow: exp(z) for large z
-- Log-sum-exp trick: log(Σ exp(z_i)) = max_i(z_i) + log(Σ exp(z_i - max_i(z_i)))
+**Numerical stability:**
+Critical issue: Direct computation causes overflow/underflow.
+
+**Problem:**
+```
+Softmax: ŷ_i = exp(z_i) / Σ_j exp(z_j)
+
+For z = [1000, 1001, 1002]:
+exp(1000) ≈ 10^434 → overflow!
+exp(-1000) ≈ 10^-434 → underflow!
+```
+
+**Solution - Log-Sum-Exp trick:**
+```
+log(Σ exp(z_i)) = c + log(Σ exp(z_i - c))
+
+where c = max_i(z_i)
+
+Implementation:
+1. Compute c = max(z)
+2. Compute z' = z - c  (now max(z') = 0)
+3. Compute log(Σ exp(z'_i))
+4. Result = c + log(Σ exp(z'_i))
+
+For z = [1000, 1001, 1002]:
+z' = [0, 1, 2]  ✓ (stable!)
+exp(z') = [1, 2.718, 7.389]  ✓
+```
+
+**Softmax stability:**
+```
+Numerically stable implementation:
+z' = z - max(z)
+ŷ = exp(z') / sum(exp(z'))
+
+This ensures:
+- Largest logit becomes 0 → exp(0) = 1 (stable)
+- All other logits are negative → exp(negative) ∈ (0,1) (stable)
+- Denominator ≥ 1 (no division by tiny numbers)
+```
+
+**Cross-entropy stability:**
+```
+Avoid: L = -log(softmax(z)_y)
+
+Use: L = -z_y + log_sum_exp(z)
+
+This combines operations for better numerical precision.
+```
 ```
 
 **Behavior Analysis:**
@@ -588,19 +634,38 @@ Properties:
 - Non-smooth (has corners)
 - Regularization λ||w||² makes it strongly convex
 
-Convergence (Subgradient Descent):
-- Rate: O(1/√k) for non-smooth convex
-- Slower than smooth losses
+**Convergence (Subgradient Descent):**
+- Rate: O(1/√k) for non-smooth convex functions
+- After k iterations: f(w̄_k) - f(w*) ≤ R·G/√k
+  - R = ||w_0 - w*|| (initial distance)
+  - G = bound on subgradient norm
+  - w̄_k = (1/k)Σ w_i (average iterate)
+- Slower than smooth losses (O(1/k) or O((1-1/κ)^k))
+- Requires diminishing step size: α_k = α_0/√k
 
-Coordinate descent / SMO:
-- More efficient for SVMs
-- Exploits structure of problem
-- Convergence: O(1/ε²) worst-case, faster in practice
+**Coordinate descent / SMO (Sequential Minimal Optimization):**
+- More efficient for SVMs than subgradient methods
+- Exploits structure: updates 2 variables at a time
+- Convergence rate:
+  - Worst-case: O(1/ε²) iterations
+  - Typical practice: O(1/ε) or better
+  - Each iteration: O(n) for linear kernel
+- Advantages:
+  - No learning rate tuning needed
+  - Exact line search per coordinate
+  - Handles constraints naturally
 
-Dual formulation:
-- Often more efficient
-- Kernel trick applicable
-- QP solvers: polynomial time
+**Dual formulation:**
+```
+Primal: min_{w,b} ½||w||² + C·Σ_i max(0, 1 - y_i(w^T x_i + b))
+
+Dual: max_α Σ_i α_i - ½Σ_{i,j} α_i α_j y_i y_j k(x_i, x_j)
+      s.t. 0 ≤ α_i ≤ C, Σ_i α_i y_i = 0
+
+- Kernel trick: k(x_i, x_j) = φ(x_i)^T φ(x_j)
+- QP solvers: Polynomial time O(n²) to O(n³)
+- Sparse solution: Most α_i = 0 (support vectors)
+```
 ```
 
 **Comparison with Cross-Entropy:**
@@ -697,10 +762,23 @@ Properties:
 - Similar convergence to cross-entropy
 - May need more iterations
 
-Hyperparameter sensitivity:
-- γ = 2 works for most cases
-- α_t = 0.25 for positive class often good
-- Less sensitive than might expect
+**Hyperparameter sensitivity:**
+- γ: Controls focusing strength
+  - Typical range: [0, 5]
+  - Robust choice: γ = 2 (from RetinaNet paper)
+  - Higher γ = more aggressive down-weighting
+- α_t: Balances class importance
+  - Formula for positive class: α = n_neg/(n_pos + n_neg)
+  - Typical range: [0.25, 0.75]
+  - Start with 0.25, tune on validation set
+- Grid search recommended: γ ∈ {0.5, 1, 2, 3}, α ∈ {0.25, 0.5, 0.75}
+- Less sensitive than expected: [1.5, 2.5] × [0.2, 0.3] usually works
+
+**Computational overhead:**
+- Extra operations: (1-p_t)^γ and γ·p_t·log(p_t) terms
+- Overhead: ~15-25% vs standard cross-entropy
+- Memory: Same as cross-entropy (no extra storage)
+- Backward pass: More complex gradient but well-optimized in modern frameworks
 ```
 
 **Hyperparameter selection guide:**
