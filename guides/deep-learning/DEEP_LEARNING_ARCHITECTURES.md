@@ -31,36 +31,75 @@
 Input Layer → Hidden Layer(s) → Output Layer
 ```
 
-**Forward Propagation:**
+**Forward Propagation (Layer-wise):**
 ```
+For layer l ∈ {1, 2, ..., L}:
+
 z^[l] = W^[l] a^[l-1] + b^[l]
 a^[l] = g^[l](z^[l])
+
+where a^[0] = x (input)
 ```
 
-Where:
-- `z^[l]`: Pre-activation of layer l
-- `W^[l]`: Weight matrix for layer l
-- `b^[l]`: Bias vector for layer l
-- `a^[l]`: Activation of layer l
-- `g^[l]`: Activation function
+**Notation:**
+- `z^[l] ∈ ℝ^(n_l)`: Pre-activation (linear combination) at layer l
+- `W^[l] ∈ ℝ^(n_l × n_(l-1))`: Weight matrix for layer l
+- `b^[l] ∈ ℝ^(n_l)`: Bias vector for layer l
+- `a^[l] ∈ ℝ^(n_l)`: Post-activation (nonlinear transformation) at layer l
+- `g^[l]: ℝ^(n_l) → ℝ^(n_l)`: Element-wise activation function
+- `n_l`: Number of neurons in layer l
 
-**Backpropagation:**
+**Universal Approximation Theorem:**
+A feedforward network with:
+- Single hidden layer with finite neurons
+- Non-polynomial activation function (e.g., sigmoid, ReLU)
+can approximate any continuous function on compact subsets of ℝⁿ to arbitrary precision.
 
+**Formal statement (Cybenko, 1989):**
+For any continuous f: [0,1]ⁿ → ℝ and ε > 0, ∃ network with single hidden layer:
+||F(x) - f(x)|| < ε for all x ∈ [0,1]ⁿ
+
+where F(x) = Σ_{i=1}^N α_i σ(w_i^T x + b_i) for some N, α_i, w_i, b_i
+
+**Backpropagation (Reverse-Mode Automatic Differentiation):**
+
+**Algorithm:**
 1. **Compute output layer error:**
    ```
-   δ^[L] = ∇_a L ⊙ g'^[L](z^[L])
+   δ^[L] = ∇_{a^[L]} L ⊙ g'^[L](z^[L])
+   ```
+   For cross-entropy + softmax: δ^[L] = a^[L] - y (simplified!)
+
+2. **Propagate error backwards (chain rule):**
+   ```
+   For l = L-1, L-2, ..., 1:
+   δ^[l] = ((W^[l+1])^T δ^[l+1]) ⊙ g'^[l](z^[l])
    ```
 
-2. **Propagate error backwards:**
+3. **Compute parameter gradients:**
    ```
-   δ^[l] = (W^[l+1])^T δ^[l+1] ⊙ g'^[l](z^[l])
+   ∂L/∂W^[l] = δ^[l] (a^[l-1])^T / m
+   ∂L/∂b^[l] = (1/m) Σ_i δ_i^[l]
    ```
+   where m is batch size
 
-3. **Compute gradients:**
-   ```
-   ∂L/∂W^[l] = δ^[l] (a^[l-1])^T
-   ∂L/∂b^[l] = δ^[l]
-   ```
+**Mathematical foundation (Chain rule):**
+```
+∂L/∂W^[l] = (∂L/∂z^[l]) × (∂z^[l]/∂W^[l])
+          = δ^[l] × (a^[l-1])^T
+
+where δ^[l] = ∂L/∂z^[l] is computed recursively:
+δ^[l] = (∂L/∂z^[l+1]) × (∂z^[l+1]/∂a^[l]) × (∂a^[l]/∂z^[l])
+      = δ^[l+1] × W^[l+1] × g'^[l](z^[l])
+```
+
+**Computational complexity:**
+- Forward pass: O(Σ_l n_l × n_(l-1))
+- Backward pass: O(Σ_l n_l × n_(l-1)) (same as forward!)
+- Memory: O(Σ_l n_l) to store activations
+
+**Key insight:** Backpropagation computes all gradients in one backward pass,
+avoiding naive application of chain rule which would be O(L × Σ_l n_l × n_(l-1)).
 
 ### Implementation from Scratch
 
@@ -229,20 +268,42 @@ if __name__ == "__main__":
 
 **Formula:**
 ```
-f(x) = max(0, x)
-f'(x) = 1 if x > 0 else 0
+f(x) = max(0, x) = {x  if x > 0
+                    {0  if x ≤ 0
+
+f'(x) = {1  if x > 0
+        {0  if x ≤ 0
+        {undefined at x = 0 (use subgradient ∈ [0,1])
 ```
 
+**Mathematical properties:**
+- Non-saturating for x > 0 (f'(x) = 1)
+- Piecewise linear (locally linear everywhere except origin)
+- Non-differentiable at x = 0 (use subgradient in practice)
+- Convex function
+- Range: [0, ∞)
+
 **Advantages:**
-- Computationally efficient
-- Mitigates vanishing gradient
-- Sparse activation (biological plausibility)
+- O(1) computational complexity (simple threshold)
+- Mitigates vanishing gradient (constant gradient for x > 0)
+- Induces sparsity: ~50% of neurons typically inactive
+- Biological plausibility: similar to neural firing rates
 
 **Disadvantages:**
-- Dying ReLU problem (neurons can get stuck at 0)
-- Not zero-centered
+- **Dying ReLU problem:** If z^[l] ≤ 0 for all samples, then:
+  - Gradient ∂L/∂W^[l] = 0 forever
+  - Neuron becomes permanently inactive
+  - Can affect 10-40% of neurons in practice
+  - Caused by: large learning rates, poor initialization, or data shifts
+- Not zero-centered: outputs always ≥ 0
+  - Gradient updates always same sign for weights in same layer
+  - Can slow down optimization (zig-zagging)
+- Unbounded output: can lead to exploding activations
 
-**When to use:** Default choice for hidden layers in most architectures
+**When to use:**
+- Default choice for hidden layers in most architectures
+- Works well with He initialization: W ~ N(0, 2/n_in)
+- Combine with batch normalization to reduce dying ReLU
 
 #### **2. Leaky ReLU**
 
@@ -271,18 +332,43 @@ f'(x) = 1 if x > 0 else f(x) + α
 
 #### **4. GELU (Gaussian Error Linear Unit)**
 
-**Formula:**
+**Exact formula:**
 ```
-f(x) = x · Φ(x)
-```
-Where Φ(x) is CDF of standard normal distribution
+f(x) = x · Φ(x) = x · P(X ≤ x) where X ~ N(0,1)
 
-**Approximation:**
+where Φ(x) = (1/√(2π)) ∫_{-∞}^x e^(-t²/2) dt
+```
+
+**Fast approximation (tanh-based):**
 ```
 f(x) ≈ 0.5x(1 + tanh[√(2/π)(x + 0.044715x³)])
 ```
 
-**Used in:** BERT, GPT, modern transformers
+**Faster approximation (sigmoid-based):**
+```
+f(x) ≈ x · σ(1.702x) where σ(z) = 1/(1 + e^(-z))
+```
+
+**Derivative:**
+```
+f'(x) = Φ(x) + x · φ(x)
+
+where φ(x) = (1/√(2π)) e^(-x²/2) (standard normal PDF)
+```
+
+**Properties:**
+- Smooth, differentiable everywhere (unlike ReLU)
+- Non-monotonic: slight negative values allowed for x < 0
+- Stochastic interpretation: Expected transformation of x scaled by dropout
+  - GELU(x) ≈ E[x · 1_{X > -x}] where X ~ N(0,1)
+- Asymptotic behavior:
+  - x → +∞: f(x) → x (linear)
+  - x → -∞: f(x) → 0 (ReLU-like)
+
+**Used in:**
+- BERT, GPT-2/3, modern transformers
+- Shows improved performance over ReLU in language models
+- Particularly effective in deep networks (20+ layers)
 
 #### **5. Swish / SiLU**
 

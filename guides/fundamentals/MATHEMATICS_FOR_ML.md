@@ -69,11 +69,24 @@ dot_product = a @ b
 dot_product = np.sum(a * b)
 
 # Geometric meaning:
-# dot(a, b) = |a| × |b| × cos(θ)
-# Measures similarity between vectors
+# dot(a, b) = ||a|| × ||b|| × cos(θ)
+# where θ is the angle between vectors
 
-# ML application: Similarity between embeddings
-similarity = word_embedding_1 @ word_embedding_2
+# Mathematical properties:
+# 1. Commutativity: a·b = b·a
+# 2. Distributivity: a·(b+c) = a·b + a·c
+# 3. Cauchy-Schwarz inequality: |a·b| ≤ ||a|| ||b||
+# 4. When a·b = 0: vectors are orthogonal (perpendicular)
+# 5. When a·b > 0: angle θ < 90° (similar direction)
+# 6. When a·b < 0: angle θ > 90° (opposite direction)
+
+# Normalized dot product (cosine similarity):
+# cos(θ) = (a·b) / (||a|| ||b||) ∈ [-1, 1]
+
+# ML application: Cosine similarity between embeddings
+cosine_sim = (word_embedding_1 @ word_embedding_2) / (
+    np.linalg.norm(word_embedding_1) * np.linalg.norm(word_embedding_2)
+)
 ```
 
 **Matrix Multiplication**:
@@ -109,11 +122,21 @@ A_T = A.T  # 3×2
 #  [3, 6]]
 
 # Properties:
-# (A^T)^T = A
-# (AB)^T = B^T A^T
+# 1. (A^T)^T = A (involution)
+# 2. (AB)^T = B^T A^T (reversal rule)
+# 3. (A + B)^T = A^T + B^T (linearity)
+# 4. (cA)^T = cA^T for scalar c
+# 5. For symmetric matrix: A^T = A
 
-# ML application: Backpropagation
-# dL/dW = X^T @ dL/dY
+# Special matrices:
+# - Symmetric: A = A^T (covariance matrices)
+# - Skew-symmetric: A = -A^T (cross-product matrices)
+# - Orthogonal: A^T A = I (rotation matrices)
+
+# ML application: Backpropagation gradient computation
+# For Y = XW, gradient of loss L w.r.t. W:
+# ∂L/∂W = X^T @ (∂L/∂Y)
+# Shape: (d_in, d_out) = (n, d_in)^T @ (n, d_out)
 ```
 
 ### Advanced Concepts
@@ -121,7 +144,10 @@ A_T = A.T  # 3×2
 **Eigenvalues and Eigenvectors**:
 ```python
 # Definition: Av = λv
-# v is eigenvector, λ is eigenvalue
+# where v ≠ 0 is eigenvector, λ ∈ ℂ is eigenvalue
+
+# Characteristic equation: det(A - λI) = 0
+# For n×n matrix: n eigenvalues (counting multiplicity)
 
 A = np.array([[4, 2],
               [1, 3]])
@@ -132,7 +158,19 @@ eigenvalues, eigenvectors = np.linalg.eig(A)
 # eigenvectors: [[0.89, -0.71],
 #                [0.45,  0.71]]
 
-# Meaning: v is a direction that only gets scaled (not rotated) by A
+# Geometric meaning:
+# v is a direction that only gets scaled (not rotated) by transformation A
+# λ is the scaling factor
+
+# Properties:
+# 1. tr(A) = Σλ_i (trace equals sum of eigenvalues)
+# 2. det(A) = Πλ_i (determinant equals product of eigenvalues)
+# 3. For symmetric A: all eigenvalues are real
+# 4. For positive definite A: all eigenvalues > 0
+# 5. Eigenvectors corresponding to distinct eigenvalues are orthogonal (for symmetric A)
+
+# Spectral theorem (symmetric matrices):
+# A = QΛQ^T where Q is orthogonal, Λ is diagonal with eigenvalues
 
 # ML applications:
 # 1. Principal Component Analysis (PCA)
@@ -148,19 +186,40 @@ eigenvalues, eigenvectors = np.linalg.eig(A)
 
 **Singular Value Decomposition (SVD)**:
 ```python
-# Any matrix A (m×n) can be decomposed:
-# A = U Σ V^T
+# Singular Value Decomposition (SVD)
+# Theorem: Any matrix A ∈ ℝ^(m×n) can be decomposed as:
+# A = UΣV^T
+
+# where:
+# - U ∈ ℝ^(m×m): Left singular vectors (U^T U = I)
+# - Σ ∈ ℝ^(m×n): Diagonal matrix with singular values σ_i ≥ 0
+# - V ∈ ℝ^(n×n): Right singular vectors (V^T V = I)
+
+# Relationship to eigendecomposition:
+# - A^T A = V Σ^T Σ V^T  (eigendecomposition of A^T A)
+# - A A^T = U Σ Σ^T U^T  (eigendecomposition of A A^T)
+# - σ_i² are eigenvalues of both A^T A and A A^T
 
 A = np.random.rand(4, 3)
 U, S, VT = np.linalg.svd(A, full_matrices=False)
 
-# U (4×3): Left singular vectors (orthonormal)
-# S (3,): Singular values (diagonal of Σ)
-# VT (3×3): Right singular vectors (orthonormal)
+# U (4×3): Left singular vectors (orthonormal columns)
+# S (3,): Singular values σ₁ ≥ σ₂ ≥ ... ≥ σ_r > 0, r = rank(A)
+# VT (3×3): Right singular vectors (orthonormal rows)
+
+# Properties:
+# 1. Singular values are unique and non-negative
+# 2. rank(A) = number of non-zero singular values
+# 3. ||A||₂ = σ₁ (largest singular value)
+# 4. ||A||_F = √(σ₁² + ... + σ_r²) (Frobenius norm)
+# 5. cond(A) = σ₁/σ_r (condition number)
 
 # Reconstruction:
 A_reconstructed = U @ np.diag(S) @ VT
-# A_reconstructed ≈ A (within numerical precision)
+# A_reconstructed ≈ A (within numerical precision ~1e-15)
+
+# Best rank-k approximation (Eckart-Young theorem):
+# A_k = Σ_{i=1}^k σ_i u_i v_i^T minimizes ||A - A_k||₂ and ||A - A_k||_F
 
 # ML applications:
 
@@ -197,19 +256,41 @@ def pca_via_svd(X, n_components):
 A = np.array([[1, 2],
               [3, 4]])
 
-# Frobenius norm (most common)
+# Formal definition: ||A|| is a norm if it satisfies:
+# 1. ||A|| ≥ 0, equality iff A = 0 (positive definiteness)
+# 2. ||cA|| = |c| ||A|| for scalar c (absolute homogeneity)
+# 3. ||A + B|| ≤ ||A|| + ||B|| (triangle inequality)
+# 4. ||AB|| ≤ ||A|| ||B|| (submultiplicativity)
+
+# Frobenius norm (element-wise L2)
+# ||A||_F = √(Σ_{i,j} a_{ij}²) = √(tr(A^T A))
 frobenius_norm = np.linalg.norm(A, 'fro')
-# = sqrt(1² + 2² + 3² + 4²) = sqrt(30) ≈ 5.48
+# = √(1² + 2² + 3² + 4²) = √30 ≈ 5.477
+
+# Induced p-norms: ||A||_p = max_{x≠0} ||Ax||_p / ||x||_p
 
 # L1 norm (maximum absolute column sum)
-l1_norm = np.linalg.norm(A, 1)  # 6
+# ||A||₁ = max_j Σ_i |a_{ij}|
+l1_norm = np.linalg.norm(A, 1)  # max(|1|+|3|, |2|+|4|) = 6
 
-# L2 norm (largest singular value)
-l2_norm = np.linalg.norm(A, 2)  # ≈ 5.46
+# L∞ norm (maximum absolute row sum)
+# ||A||_∞ = max_i Σ_j |a_{ij}|
+linf_norm = np.linalg.norm(A, np.inf)  # max(|1|+|2|, |3|+|4|) = 7
 
-# ML application: Regularization
-# L2 regularization: minimize ||w||²
-# Frobenius norm for weight decay: minimize ||W||_F²
+# L2 norm / Spectral norm (largest singular value)
+# ||A||₂ = σ_max(A) = √(λ_max(A^T A))
+l2_norm = np.linalg.norm(A, 2)  # ≈ 5.465
+
+# Nuclear norm (sum of singular values)
+# ||A||_* = Σ_i σ_i
+nuclear_norm = np.linalg.norm(A, 'nuc')
+
+# ML applications:
+# 1. L2 regularization (weight decay): min L(θ) + λ||θ||₂²
+# 2. Frobenius norm for matrix regularization: ||W||_F²
+# 3. Nuclear norm for low-rank matrix completion: ||M||_*
+# 4. Spectral norm for Lipschitz constraint: ||∇f|| ≤ L
+# 5. Condition number: κ(A) = ||A||₂ · ||A⁻¹||₂ = σ_max/σ_min
 ```
 
 ### Practical ML Examples
@@ -354,12 +435,35 @@ Calculus enables optimization - the core of training ML models. Understanding de
 
 ### Derivatives
 
-**Definition**: Rate of change
-```
-f'(x) = lim (h→0) [f(x+h) - f(x)] / h
+**Definition**: Rate of change of a function
 
-Geometric meaning: Slope of tangent line
-ML meaning: How much loss changes when we change a parameter
+**Formal definition:**
+```
+f'(x) = lim_{h→0} [f(x+h) - f(x)] / h
+
+Equivalent formulation:
+f'(x₀) = lim_{x→x₀} [f(x) - f(x₀)] / (x - x₀)
+```
+
+**Interpretation:**
+- Geometric: Slope of tangent line to f at x
+- Physical: Instantaneous rate of change
+- ML: Sensitivity of loss to parameter changes
+
+**Existence conditions:**
+- f is differentiable at x if the limit exists and is finite
+- Differentiable ⟹ Continuous (but not vice versa)
+- Counter-example: f(x) = |x| is continuous but not differentiable at x=0
+
+**Higher-order derivatives:**
+- f''(x): Second derivative (curvature, acceleration)
+- f'''(x): Third derivative (jerk)
+- f^(n)(x): n-th derivative
+
+**Applications in ML:**
+- First derivative ∇L: Direction of steepest ascent
+- Second derivative H (Hessian): Curvature, used in Newton's method
+- Lipschitz constant L: max ||f'(x)|| bounds learning rate
 ```
 
 **Common Derivatives**:
@@ -402,14 +506,47 @@ print(f"Analytical: {f_prime_analytical:.6f}")  # 6.000000
 ### Gradients (Multivariate Derivatives)
 
 **Gradient**: Vector of partial derivatives
+
+**Formal definition:**
 ```
-f(x, y) = x² + y²
+For f: ℝⁿ → ℝ, the gradient is:
 
-Gradient: ∇f = [∂f/∂x, ∂f/∂y] = [2x, 2y]
+∇f(x) = [∂f/∂x₁, ∂f/∂x₂, ..., ∂f/∂xₙ]^T ∈ ℝⁿ
 
-Meaning: Direction of steepest increase
-ML meaning: Which direction to move parameters to increase loss
-           (we move opposite direction to decrease loss!)
+Example: f(x, y) = x² + y²
+∇f = [∂f/∂x, ∂f/∂y]^T = [2x, 2y]^T
+```
+
+**Geometric interpretation:**
+- Direction: Points in direction of steepest increase of f
+- Magnitude: ||∇f|| is the rate of increase in that direction
+- Orthogonality: ∇f ⟂ level curves {x : f(x) = c}
+
+**Mathematical properties:**
+1. Directional derivative: D_v f(x) = ∇f(x) · v for unit vector v
+2. Maximum directional derivative: max_{||v||=1} D_v f = ||∇f||
+3. At local minimum/maximum: ∇f = 0 (critical point)
+4. Convex function: f(y) ≥ f(x) + ∇f(x)^T(y-x) for all x,y
+
+**Gradient descent update:**
+```
+x_{k+1} = x_k - α∇f(x_k)
+
+where:
+- α: Learning rate (step size)
+- -∇f: Negative gradient (direction of steepest decrease)
+
+Convergence guarantee (for L-smooth, μ-strongly convex f):
+||x_k - x*||² ≤ (1 - μ/L)^k ||x_0 - x*||²
+
+where κ = L/μ is condition number
+```
+
+**ML interpretation:**
+- Loss L(θ): Gradient ∇L tells us how to adjust parameters θ
+- Backpropagation: Efficient algorithm to compute ∇L
+- Batch gradient: ∇L = (1/n)Σ_i ∇L_i (average over samples)
+- Stochastic gradient: ∇̂L = ∇L_i (estimate from single sample)
 ```
 
 **Gradient Descent**:
