@@ -16,11 +16,61 @@ Master time series analysis and forecasting from classical methods to deep learn
 
 ### Understanding Time Series Data
 
-**Components of Time Series:**
-1. **Trend** - Long-term increase/decrease
-2. **Seasonality** - Regular periodic patterns
-3. **Cyclical** - Long-term oscillations (not fixed period)
-4. **Irregular/Noise** - Random variations
+**Components of Time Series (Decomposition):**
+
+**Additive Model:**
+```
+Y_t = T_t + S_t + C_t + I_t
+
+where:
+- Y_t: Observed value at time t
+- T_t: Trend component (long-term direction)
+- S_t: Seasonal component (fixed period oscillations)
+- C_t: Cyclical component (long-term, non-fixed period oscillations)
+- I_t: Irregular/Random component (white noise)
+```
+
+**Multiplicative Model:**
+```
+Y_t = T_t × S_t × C_t × I_t
+
+Equivalent to additive on log scale:
+log(Y_t) = log(T_t) + log(S_t) + log(C_t) + log(I_t)
+
+Use when variance increases with level of series
+```
+
+**Component Characteristics:**
+
+1. **Trend (T_t):**
+   - Systematic linear or nonlinear increase/decrease
+   - Long-term movement (low frequency)
+   - Examples: GDP growth, population increase
+   - Mathematical forms:
+     * Linear: T_t = β₀ + β₁t
+     * Polynomial: T_t = β₀ + β₁t + β₂t²
+     * Exponential: T_t = β₀ exp(β₁t)
+
+2. **Seasonality (S_t):**
+   - Fixed period m (12 for monthly, 4 for quarterly, 7 for daily)
+   - Repeating pattern: S_t = S_{t+m} for all t
+   - Σ_{i=1}^m S_i = 0 (additive) or Π_{i=1}^m S_i = 1 (multiplicative)
+   - Examples: Retail sales (holiday peaks), temperature (summer/winter)
+   - Can have multiple seasonalities (daily + weekly + yearly)
+
+3. **Cyclical (C_t):**
+   - Long-term oscillations without fixed period
+   - Period typically > 1 year
+   - Often confused with seasonality but distinguishable:
+     * Seasonality: Fixed period, predictable
+     * Cyclical: Variable period (m varies), less predictable
+   - Examples: Business cycles, economic recessions
+
+4. **Irregular/Noise (I_t):**
+   - Random fluctuations: I_t ~ iid(0, σ²)
+   - White noise: E[I_t] = 0, Var(I_t) = σ², Cov(I_t, I_s) = 0 for t ≠ s
+   - Cannot be predicted
+   - Examples: Unexpected events, measurement errors
 
 ```python
 import pandas as pd

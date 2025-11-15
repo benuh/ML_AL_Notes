@@ -23,40 +23,113 @@ Learn how to combine multiple models to achieve superior performance.
 **Theoretical Foundation:**
 
 **Bias-Variance Decomposition:**
-For regression, expected prediction error can be decomposed:
+For regression with squared loss, the expected prediction error decomposes as:
 ```
 E[(y - f̂(x))²] = Bias²[f̂(x)] + Var[f̂(x)] + σ²
 
+Formal definitions:
+- y = f(x) + ε where ε ~ (0, σ²) is irreducible noise
+- f̂(x): Predictor trained on random sample S ~ D
+- E[·]: Expectation over all possible training sets S
+
+Components:
+1. Bias²[f̂(x)] = (E_S[f̂(x)] - f(x))²
+   Systematic error: average prediction vs true function
+
+2. Var[f̂(x)] = E_S[(f̂(x) - E_S[f̂(x)])²]
+   Prediction variability across different training sets
+
+3. σ² = E[ε²]
+   Irreducible error: inherent noise in y|x
+```
+
+**Ensemble Effect on Bias-Variance (Quantitative):**
+
+**Bagging (Bootstrap Aggregating):**
+```
+Let f̂₁, f̂₂, ..., f̂_M be M models trained on bootstrap samples
+Ensemble: f̂_ens = (1/M) Σ_{i=1}^M f̂ᵢ
+
+Bias: Bias[f̂_ens] = E[f̂_ens] - f = (1/M)Σ E[f̂ᵢ] - f ≈ Bias[f̂] (unchanged)
+
+Variance: Var[f̂_ens] = Var[(1/M) Σ f̂ᵢ]
+
+If models are independent (ρ = 0):
+  Var[f̂_ens] = (1/M²) Σ Var[f̂ᵢ] = Var[f̂] / M
+
+If models are correlated with correlation ρ:
+  Var[f̂_ens] = ρ·σ² + (1-ρ)·σ²/M
+
+  where σ² = Var[f̂ᵢ] (assumed equal)
+
+Variance reduction factor: 1/M if ρ=0, diminishes as ρ→1
+Typical Random Forest: ρ ≈ 0.3-0.6, so improvement = 2-4x with M=10-50
+```
+
+**Boosting:**
+```
+Sequential additive model: F_M = Σ_{m=1}^M ν·h_m
+
+Effect on bias:
+- Each iteration fits residuals: r_i = y_i - F_{m-1}(x_i)
+- Bias[F_M] → 0 as M → ∞ (can fit training data perfectly)
+- Learning rate ν controls bias reduction rate
+
+Effect on variance:
+- Var[F_M] increases with M (more complex model)
+- Regularization techniques control variance:
+  * Small learning rate ν (e.g., 0.01-0.1)
+  * Tree depth constraint (max_depth = 3-6)
+  * Subsampling (subsample = 0.5-0.8)
+
+Bias-variance tradeoff with M:
+- Small M: High bias, low variance (underfitting)
+- Optimal M: Balanced (cross-validation)
+- Large M: Low bias, high variance (overfitting)
+```
+
+**Statistical Learning Theory (Condorcet's Jury Theorem):**
+For an ensemble of M classifiers with individual error rate ε < 0.5 using majority vote:
+```
+P(ensemble error) = Σ_{k=⌈M/2⌉}^M (M choose k) × ε^k × (1-ε)^(M-k)
+
+Assumption: Independent errors (strong assumption, rarely holds in practice)
+
+Bounds:
+- Hoeffding's inequality: P(ensemble error) ≤ exp(-2M(0.5 - ε)²)
+- For ε = 0.4, M = 11: P(error) ≤ 0.034 (3.4%)
+- For ε = 0.4, M = 51: P(error) ≤ 2.3 × 10⁻⁵ (0.0023%)
+
+Exponential decrease requires:
+1. ε < 0.5 (each classifier better than random)
+2. Errors are independent (diversity)
+
+If errors are perfectly correlated (ρ = 1):
+  P(ensemble error) = ε (no improvement!)
+```
+
+**Diversity-Accuracy Tradeoff (Krogh-Vedelsby decomposition):**
+For regression with squared loss:
+```
+E_ensemble = Ē - Ā
+
 Where:
-- Bias²[f̂(x)] = (E[f̂(x)] - f(x))²: How far off is the average prediction?
-- Var[f̂(x)] = E[(f̂(x) - E[f̂(x)])²]: How much do predictions vary?
-- σ²: Irreducible error (noise in data)
-```
+- E_ensemble: Ensemble MSE
+- Ē = (1/M) Σ_{i=1}^M E_i: Average individual MSE
+- Ā = (1/M) Σ_{i=1}^M (f_i - f̄)²: Ensemble ambiguity (diversity measure)
+- f̄ = (1/M) Σ f_i: Ensemble prediction
 
-**Ensemble Effect on Bias-Variance:**
-- **Bagging**: Reduces variance, keeps bias constant
-  - Var[avg of M models] ≈ Var[single model] / M (if uncorrelated)
-- **Boosting**: Reduces both bias and variance
-  - Sequential focus on errors reduces bias
-  - Regularization controls variance
+Interpretation:
+Ensemble error = Average error - Diversity
+More diverse models → better ensemble (if individual errors are reasonable)
 
-**Statistical Learning Theory:**
-For an ensemble of M classifiers with error rate ε < 0.5 (better than random):
-```
-P(ensemble error) = Σ(k=⌈M/2⌉ to M) C(M,k) × ε^k × (1-ε)^(M-k)
-
-This decreases exponentially with M if ε < 0.5!
-```
-
-**Diversity-Accuracy Tradeoff:**
-Ensemble error bounded by:
-```
-E_ensemble ≤ Ē - λ·D̄
+For classification (0-1 loss):
+E_ensemble ≤ Ē - c·D̄
 
 Where:
-- Ē: Average individual model error
-- D̄: Average pairwise diversity
-- λ: Weight depending on problem
+- D̄: Average pairwise disagreement D_{ij} = P(f_i(x) ≠ f_j(x))
+- c ≥ 0: Problem-dependent constant
+- Typically: D̄ = (2/(M(M-1))) Σ_{i<j} D_{ij}
 ```
 
 ```python
@@ -197,32 +270,104 @@ Key Parameter:
 
 **Out-of-Bag (OOB) Error Estimate:**
 ```
-For each observation (x_i, y_i):
-- ~63.2% of bootstrap samples include it (1 - (1-1/n)^n ≈ 1 - e^(-1))
-- ~36.8% don't include it (OOB samples)
+Bootstrap sampling probability:
+P(sample i in bootstrap b) = 1 - (1 - 1/n)^n → 1 - e^(-1) ≈ 0.632 as n → ∞
 
-OOB Prediction for x_i:
-ŷ_i^OOB = aggregate predictions from trees not trained on (x_i, y_i)
+Therefore:
+- Expected proportion in-bag: 63.2%
+- Expected proportion out-of-bag: 36.8%
+
+For finite n:
+- n = 100: in-bag ≈ 63.4%, OOB ≈ 36.6%
+- n = 1000: in-bag ≈ 63.2%, OOB ≈ 36.8%
+- n = 10000: in-bag ≈ 63.21%, OOB ≈ 36.79%
+
+OOB Prediction for sample i:
+Let B_i^c = {b : i ∉ bootstrap sample b} (OOB trees for sample i)
+|B_i^c| ≈ 0.368 × B (expected number of OOB trees)
+
+ŷ_i^OOB = (1/|B_i^c|) Σ_{b ∈ B_i^c} T_b(x_i)  [regression]
+ŷ_i^OOB = mode{T_b(x_i) : b ∈ B_i^c}  [classification]
 
 OOB Error:
-OOB_err = (1/n) Σ^n_i=1 L(y_i, ŷ_i^OOB)
+OOB_err = (1/n) Σ_{i=1}^n L(y_i, ŷ_i^OOB)
 
-This provides unbiased estimate of test error without separate validation set!
+Theoretical guarantee (Breiman 1996):
+E[OOB_err] ≈ E[test_err] as n, B → ∞
+
+Bias of OOB estimate:
+- Slight pessimistic bias: trains on ~63% of data vs 100% for test
+- Typical: |OOB_err - test_err| < 0.01 for large n
+- Variance: O(1/B) decreases with more trees
+
+Practical advantage: Free cross-validation!
+No need to hold out validation set → use full data for training
 ```
 
 **Computational Complexity:**
+
+**Training complexity:**
 ```
-Training: O(B · n · p · log n)
-- B: Number of trees
-- n: Number of samples
-- p: Number of features
-- log n: Tree depth (balanced tree)
+Per tree (CART with m features per split):
+- Build tree on n samples: O(n · m · log n)
+  - For each of ~log n levels
+  - For each of m candidate features
+  - Sort n samples: O(n log n)
+  - Best split: O(n)
 
-Prediction: O(B · log n)
-- Evaluate B trees, each O(log n) depth
+Total for B trees: O(B · n · m · log n)
 
-Space: O(B · n_nodes · p)
-- Store B trees with average n_nodes nodes per tree
+With p total features and m = √p:
+  O(B · n · √p · log n)
+
+Typical values (n=10⁶, p=100, B=100, m=10):
+  10⁸ × 10 × 20 = 2 × 10¹⁰ operations
+  ~20-200 seconds on modern CPU
+
+Parallelization: Embarrassingly parallel
+- B independent trees
+- Linear speedup with cores: T_parallel ≈ T_sequential / n_cores
+```
+
+**Prediction complexity:**
+```
+Per sample: O(B · log n)
+- Evaluate B trees: B iterations
+- Each tree traverse: O(log n) comparisons for balanced tree
+- O(n) worst case for degenerate tree (rare with min_samples_leaf)
+
+Batch of m samples: O(m · B · log n)
+
+Typical (m=1000, B=100, log n ≈ 20):
+  2 × 10⁶ operations
+  ~1-10 ms on modern CPU
+
+Optimization: Vectorization across samples in batch
+```
+
+**Space complexity:**
+```
+Storage: O(B · avg_nodes)
+
+Where avg_nodes ≈ 2^(depth+1) - 1 for complete binary tree
+
+Per node storage:
+- Feature index: 4 bytes
+- Threshold: 8 bytes (float64)
+- Left/right pointers: 8 bytes each
+- Sample count: 4 bytes
+- Total: ~32 bytes per node
+
+Typical RF (B=100, depth=20):
+  100 × (2²¹ - 1) × 32 bytes ≈ 6.7 TB (impractical!)
+
+Practical RF (B=100, avg_nodes=1000):
+  100 × 1000 × 32 bytes = 3.2 MB (reasonable)
+
+Key: Trees don't grow to max depth due to:
+- min_samples_leaf constraint
+- min_samples_split constraint
+- Purity stopping criterion
 ```
 
 ```python
@@ -386,29 +531,106 @@ class SimpleAdaBoost:
 
 **Strategy:** Sequentially fit models to residuals (errors) of previous models.
 
-**Mathematical Framework:**
+**Mathematical Framework (Functional Gradient Descent):**
 ```
-Goal: Minimize loss L(y, F(x))
+Goal: Find function F* that minimizes expected loss
+F* = argmin_F E_{x,y}[L(y, F(x))]
 
-Gradient Boosting Algorithm:
-1. Initialize: F_0(x) = argmin_γ Σ L(y_i, γ)
-2. For m = 1 to M:
-   a) Compute pseudo-residuals: r_im = -[∂L(y_i, F(x_i))/∂F(x_i)]_{F=F_{m-1}}
-   b) Fit base learner h_m(x) to pseudo-residuals r_im
-   c) Find step size: γ_m = argmin_γ Σ L(y_i, F_{m-1}(x_i) + γ·h_m(x_i))
-   d) Update: F_m(x) = F_{m-1}(x) + γ_m·h_m(x)
+Empirical approximation:
+F* ≈ argmin_F (1/n) Σ_{i=1}^n L(y_i, F(x_i))
 
-Final model: F_M(x) = F_0(x) + Σ γ_m·h_m(x)
+Gradient Boosting Algorithm (Friedman, 2001):
 
-Key Insight: Gradient boosting performs gradient descent in function space!
+1. Initialize with constant:
+   F_0(x) = argmin_γ Σ_{i=1}^n L(y_i, γ)
+
+   Examples:
+   - Squared loss: F_0(x) = ȳ (mean)
+   - Log loss: F_0(x) = log(p/(1-p)) (log-odds)
+
+2. For m = 1, 2, ..., M:
+
+   a) Compute negative gradients (pseudo-residuals):
+      r_{im} = -[∂L(y_i, F(x_i))/∂F(x_i)]_{F=F_{m-1}}
+
+      This is steepest descent direction at current F_{m-1}
+
+   b) Fit base learner h_m to {(x_i, r_{im})}_{i=1}^n:
+      h_m = argmin_h Σ_{i=1}^n (r_{im} - h(x_i))²
+
+      Approximate gradient with function from hypothesis space H
+
+   c) Line search for optimal step size:
+      γ_m = argmin_γ Σ_{i=1}^n L(y_i, F_{m-1}(x_i) + γ·h_m(x_i))
+
+      Find best γ along direction h_m
+
+   d) Update ensemble:
+      F_m(x) = F_{m-1}(x) + ν·γ_m·h_m(x)
+
+      where ν ∈ (0,1] is learning rate (shrinkage parameter)
+
+3. Output: F_M(x) = F_0(x) + Σ_{m=1}^M ν·γ_m·h_m(x)
+
+Connection to gradient descent:
+- Standard GD: θ_{t+1} = θ_t - α·∇_θ L(θ_t)
+- Functional GD: F_{m+1} = F_m - ν·∇_F L(F_m) ≈ F_m + ν·h_m
+  where h_m approximates -∇_F L(F_m)
+
+Convergence rate (for convex L):
+  E[F_M] - E[F*] = O(1/M) with ν = 1
+  Slower with ν < 1 but better generalization
 ```
 
-**Common Loss Functions:**
-- Squared loss (regression): L(y,F) = (y - F)²/2
-  - Pseudo-residual: r = y - F(x) (simple residual)
-- Logistic loss (classification): L(y,F) = log(1 + exp(-y·F))
-  - Pseudo-residual: r = y/(1 + exp(y·F))
-- Exponential loss (AdaBoost): L(y,F) = exp(-y·F)
+**Common Loss Functions and Gradients:**
+
+**1. Squared Loss (L2 regression):**
+```
+L(y, F) = (1/2)(y - F)²
+
+Gradient: ∂L/∂F = -(y - F) = F - y
+Pseudo-residual: r = -∂L/∂F = y - F (residual)
+Line search: γ_m = 1 (analytical solution)
+```
+
+**2. Absolute Loss (L1 regression, robust):**
+```
+L(y, F) = |y - F|
+
+Gradient: ∂L/∂F = sign(F - y)
+Pseudo-residual: r = sign(y - F)
+Line search: γ_m = median{y_i - F_{m-1}(x_i) : x_i ∈ leaf}
+```
+
+**3. Huber Loss (robust regression):**
+```
+L(y, F) = {(y-F)²/2           if |y-F| ≤ δ
+          {δ(|y-F| - δ/2)     if |y-F| > δ
+
+Gradient: ∂L/∂F = {F - y         if |y-F| ≤ δ
+                   {δ·sign(F-y)  if |y-F| > δ
+```
+
+**4. Binomial Deviance (binary classification):**
+```
+L(y, F) = log(1 + exp(-2yF))  where y ∈ {-1, +1}
+
+Gradient: ∂L/∂F = -2y/(1 + exp(2yF))
+Pseudo-residual: r = 2y/(1 + exp(2yF)) ∈ [-2, 2]
+Probability: p(x) = 1/(1 + exp(-2F(x)))
+```
+
+**5. Multinomial Deviance (multi-class):**
+```
+For K classes, learn K functions F_k(x)
+
+L(y, F) = -Σ_{k=1}^K y_k log(p_k)
+
+where p_k = exp(F_k) / Σ_j exp(F_j) (softmax)
+
+Gradient: ∂L/∂F_k = p_k - y_k
+Pseudo-residual: r_k = y_k - p_k
+```
 
 ```python
 from sklearn.ensemble import GradientBoostingClassifier
