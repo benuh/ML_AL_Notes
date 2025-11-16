@@ -1400,6 +1400,159 @@ def remove_correlated_features(X, threshold=0.95):
     return X[:, mask]
 ```
 
+### Statistical Inference Theory
+
+**Confidence Intervals**:
+```
+Definition: A (1-α)100% confidence interval for parameter θ is an interval [L, U] where:
+
+P(L ≤ θ ≤ U) = 1 - α
+
+Common values: α = 0.05 (95% CI), α = 0.01 (99% CI)
+
+Interpretation (Frequentist):
+- If we repeat the experiment many times and construct CIs each time,
+  approximately (1-α)100% of intervals will contain true θ
+- NOT: "θ has 95% probability of being in this interval" (θ is fixed, not random!)
+
+For Sample Mean (σ known):
+X̄ₙ ~ N(μ, σ²/n) by CLT
+
+95% CI: X̄ₙ ± z_{α/2} × σ/√n
+where z_{0.025} = 1.96 for 95% CI
+
+For Sample Mean (σ unknown):
+Use sample std s: 95% CI: X̄ₙ ± t_{n-1,α/2} × s/√n
+where t_{n-1,α/2} is t-distribution critical value with n-1 degrees of freedom
+
+Standard Error (SE):
+SE(X̄ₙ) = σ/√n (known variance)
+SE(X̄ₙ) = s/√n (estimated variance)
+
+Margin of Error: ME = z_{α/2} × SE
+
+Precision: ∝ 1/√n (quadruple sample size → double precision)
+```
+
+**Hypothesis Testing Framework**:
+```
+Formal Structure:
+
+1. Null Hypothesis H₀: Default assumption (e.g., "no effect", "μ = μ₀")
+2. Alternative Hypothesis H₁: What we want to test (e.g., "effect exists", "μ ≠ μ₀")
+3. Test Statistic T: Function of data that measures evidence against H₀
+4. Significance Level α: Threshold for rejecting H₀ (typically 0.05 or 0.01)
+5. p-value: P(observe T as extreme as observed | H₀ is true)
+6. Decision Rule: Reject H₀ if p-value < α
+
+Types of Tests:
+- Two-sided: H₁: μ ≠ μ₀ (detect any difference)
+- One-sided: H₁: μ > μ₀ or H₁: μ < μ₀ (directional)
+
+Error Types:
+┌─────────────┬──────────────────┬──────────────────┐
+│             │ H₀ True          │ H₀ False         │
+├─────────────┼──────────────────┼──────────────────┤
+│ Reject H₀   │ Type I Error (α) │ Correct (Power)  │
+│             │ False Positive   │ True Positive    │
+├─────────────┼──────────────────┼──────────────────┤
+│ Fail to     │ Correct (1-α)    │ Type II Error (β)│
+│ Reject H₀   │ True Negative    │ False Negative   │
+└─────────────┴──────────────────┴──────────────────┘
+
+Definitions:
+- Significance Level α = P(Type I Error) = P(Reject H₀ | H₀ true)
+- Type II Error Rate β = P(Type II Error) = P(Fail to reject H₀ | H₁ true)
+- Statistical Power = 1 - β = P(Reject H₀ | H₁ true)
+
+Power Analysis:
+Power depends on:
+1. Sample size n (larger n → higher power)
+2. Effect size δ = |μ₁ - μ₀|/σ (larger effect → higher power)
+3. Significance level α (larger α → higher power, but more false positives)
+
+For t-test with known σ:
+Power = Φ(√n × δ/σ - z_{α/2}) + Φ(-√n × δ/σ - z_{α/2})
+
+To achieve power = 0.8 for two-sided test (α = 0.05):
+n ≈ 16 × (σ/δ)² (rule of thumb)
+
+Example: To detect effect size δ = 0.5σ with 80% power:
+n ≈ 16 × (σ/0.5σ)² = 64 samples per group
+
+p-value Interpretation:
+- p < 0.001: Very strong evidence against H₀
+- 0.001 ≤ p < 0.01: Strong evidence against H₀
+- 0.01 ≤ p < 0.05: Moderate evidence against H₀
+- 0.05 ≤ p < 0.10: Weak evidence against H₀
+- p ≥ 0.10: Little to no evidence against H₀
+
+Common Misconceptions:
+✗ p-value is NOT P(H₀ is true | data)
+✓ p-value IS P(data as extreme | H₀ is true)
+
+✗ p < 0.05 does NOT mean "important" or "large effect"
+✓ Statistical significance ≠ Practical significance
+
+✗ p > 0.05 does NOT prove H₀ is true
+✓ Absence of evidence ≠ Evidence of absence
+
+Multiple Testing Correction:
+When testing m hypotheses:
+- Bonferroni: Use α/m for each test (conservative)
+- Holm-Bonferroni: Sequential procedure (less conservative)
+- False Discovery Rate (FDR): Control expected proportion of false positives
+  Benjamini-Hochberg: Ensures FDR ≤ q (e.g., q = 0.05)
+
+Family-Wise Error Rate (FWER):
+P(at least one Type I error) = 1 - (1-α)^m ≈ m×α for small α
+Example: m=20 tests, α=0.05 → FWER ≈ 0.64 (64% chance of false positive!)
+```
+
+**Sufficient Statistics and Fisher Information**:
+```
+Sufficient Statistic T(X):
+A statistic T(X) is sufficient for θ if and only if:
+P(X | T(X), θ) = P(X | T(X))
+
+(Data X contains no more information about θ beyond T(X))
+
+Factorization Theorem (Neyman-Fisher):
+T(X) is sufficient for θ ⟺ p(x|θ) = g(T(x), θ) × h(x)
+
+Example: For X₁, ..., Xₙ ~ N(μ, σ²):
+- T(X) = X̄ is sufficient for μ (when σ² known)
+- T(X) = (X̄, S²) is sufficient for (μ, σ²)
+
+Fisher Information:
+I(θ) = E[(∂/∂θ log p(X|θ))²] = -E[∂²/∂θ² log p(X|θ)]
+
+Measures: Information about θ contained in single observation
+
+Properties:
+1. I(θ) ≥ 0 (non-negative)
+2. For n i.i.d. observations: Iₙ(θ) = n × I(θ) (additivity)
+3. Under reparameterization θ → φ(θ): I_φ = I_θ × (dθ/dφ)²
+
+Cramér-Rao Lower Bound:
+For any unbiased estimator θ̂ of θ:
+
+Var(θ̂) ≥ 1/I(θ)
+
+Efficient Estimator: Achieves equality (minimum variance among unbiased estimators)
+
+Example: For X ~ N(μ, σ²) with σ² known:
+Fisher information: I(μ) = 1/σ²
+Sample mean X̄ₙ: Var(X̄ₙ) = σ²/n = 1/(n×I(μ))
+Therefore X̄ₙ is efficient! ✓
+
+ML Application:
+Fisher information appears in:
+- Natural gradient descent: θ_{t+1} = θ_t - α × I(θ)⁻¹ × ∇L
+- Uncertainty quantification in neural networks
+- Bayesian posterior approximation (Laplace approximation)
+```
+
 ### Hypothesis Testing
 
 **t-test** (Compare two means):
@@ -1770,7 +1923,7 @@ x_min = newtons_method(f, grad_f, hess_f, x0=np.array([5.0]))
 # Converges in 1 iteration! (function is quadratic)
 ```
 
-**Constrained Optimization** (Lagrange Multipliers):
+**Constrained Optimization (Lagrange Multipliers)**:
 ```python
 # Minimize f(x) subject to g(x) = 0
 
@@ -1812,6 +1965,156 @@ def lagrange_example():
 
 lagrange_example()
 # Output: x=0.500, y=0.500, maximum=0.250
+```
+
+### Advanced Constrained Optimization
+
+**Karush-Kuhn-Tucker (KKT) Conditions**:
+```
+General Constrained Problem:
+minimize f(x)
+subject to:
+  gᵢ(x) ≤ 0  for i = 1, ..., m  (inequality constraints)
+  hⱼ(x) = 0  for j = 1, ..., p  (equality constraints)
+
+Lagrangian:
+L(x, λ, μ) = f(x) + Σᵢ λᵢgᵢ(x) + Σⱼ μⱼhⱼ(x)
+
+where λᵢ ≥ 0 (inequality multipliers), μⱼ ∈ ℝ (equality multipliers)
+
+KKT Necessary Conditions (for x* to be optimal):
+Assume f, gᵢ, hⱼ are differentiable and constraint qualification holds
+
+1. Stationarity:
+   ∇f(x*) + Σᵢ λᵢ*∇gᵢ(x*) + Σⱼ μⱼ*∇hⱼ(x*) = 0
+
+2. Primal Feasibility:
+   gᵢ(x*) ≤ 0  for all i
+   hⱼ(x*) = 0  for all j
+
+3. Dual Feasibility:
+   λᵢ* ≥ 0  for all i
+
+4. Complementary Slackness:
+   λᵢ* × gᵢ(x*) = 0  for all i
+   (Either constraint is inactive (gᵢ < 0) or multiplier is positive (λᵢ > 0))
+
+KKT Sufficient Conditions:
+If f and gᵢ are convex, hⱼ are affine, and x* satisfies KKT conditions,
+then x* is a global minimum!
+
+Constraint Qualification:
+Common conditions ensuring KKT conditions are necessary:
+- Linear Independence Constraint Qualification (LICQ)
+- Slater's Condition (for convex problems)
+- Mangasarian-Fromovitz Constraint Qualification (MFCQ)
+
+Example: Support Vector Machines (SVM)
+Primal Problem:
+minimize  (1/2)||w||² + C Σᵢ ξᵢ
+subject to:
+  yᵢ(w·xᵢ + b) ≥ 1 - ξᵢ  for all i
+  ξᵢ ≥ 0  for all i
+
+Dual Problem (via KKT):
+maximize  Σᵢ αᵢ - (1/2) Σᵢⱼ αᵢαⱼyᵢyⱼ(xᵢ·xⱼ)
+subject to:
+  Σᵢ αᵢyᵢ = 0
+  0 ≤ αᵢ ≤ C  for all i
+
+Complementary Slackness:
+αᵢ[yᵢ(w·xᵢ + b) - 1 + ξᵢ] = 0
+- αᵢ = 0 → Non-support vector (correctly classified with margin)
+- 0 < αᵢ < C → Support vector on margin (ξᵢ = 0)
+- αᵢ = C → Support vector inside margin or misclassified (ξᵢ > 0)
+```
+
+**Subgradient Methods (Non-smooth Optimization)**:
+```
+Problem: Many ML loss functions are non-differentiable
+- L1 norm: |x| not differentiable at x = 0
+- Hinge loss: max(0, 1 - y·f(x)) not differentiable at y·f(x) = 1
+- ReLU: max(0, x) not differentiable at x = 0
+
+Subgradient:
+For convex function f, g is a subgradient at x if:
+f(y) ≥ f(x) + g^T(y - x)  for all y
+
+Subdifferential:
+∂f(x) = {all subgradients of f at x}
+
+Properties:
+1. If f is differentiable at x: ∂f(x) = {∇f(x)} (singleton)
+2. For L1 norm at 0: ∂|x| = [-1, 1]
+3. For max(f, g): ∂max(f,g) ⊆ ∂f ∪ ∂g
+
+Subgradient Descent:
+x_{k+1} = x_k - α_k × g_k
+
+where g_k ∈ ∂f(x_k) is any subgradient
+
+Convergence (for convex f):
+With diminishing step sizes α_k such that:
+- Σ α_k = ∞ (step sizes sum to infinity)
+- Σ α_k² < ∞ (squared step sizes converge)
+
+Then: f(x_k) - f(x*) = O(1/√k)
+
+Example: α_k = c/√k satisfies both conditions
+
+Note: Slower than gradient descent (O(1/√k) vs O(1/k))
+But works for non-smooth functions!
+
+Proximal Gradient Method:
+For f(x) = g(x) + h(x) where g is smooth, h is non-smooth convex:
+
+x_{k+1} = prox_{α_k h}(x_k - α_k∇g(x_k))
+
+Proximal operator:
+prox_h(y) = argmin_x [h(x) + (1/2)||x - y||²]
+
+Example: Lasso regression
+f(w) = ||Xw - y||² + λ||w||₁
+      └──g(w)──┘   └─h(w)─┘
+
+Proximal operator of h(w) = λ||w||₁:
+prox_h(w)ᵢ = sign(wᵢ) × max(|wᵢ| - λ, 0)  (soft thresholding)
+
+Convergence: O(1/k) like gradient descent!
+```
+
+**Practical Optimization Tips**:
+```
+1. Choose Right Algorithm:
+   - Smooth unconstrained → Gradient Descent / Adam
+   - Non-smooth → Subgradient / Proximal Gradient
+   - Constrained → Projected Gradient / Interior Point
+   - Large scale → Stochastic methods (SGD, Adam)
+
+2. Hyperparameter Tuning:
+   - Learning rate: Most important! Use grid search or learning rate schedules
+   - Batch size: Larger → more stable but slower, smaller → noisy but faster
+   - Momentum: 0.9 or 0.99 usually good defaults
+
+3. Convergence Diagnostics:
+   - Monitor: Loss, gradient norm, parameter changes
+   - Plot: Loss vs iteration (should decrease monotonically for convex)
+   - Check: KKT residuals for constrained problems
+
+4. Numerical Stability:
+   - Scale features to similar ranges
+   - Use numerically stable formulations (log-sum-exp trick)
+   - Add small epsilon to denominators (e.g., Adam: 1e-8)
+
+5. Initialization:
+   - Random initialization to break symmetry
+   - Xavier/He initialization for neural networks
+   - Warm start from previous solutions
+
+6. Regularization:
+   - L2 (Ridge): Improves conditioning, smooth optimization landscape
+   - L1 (Lasso): Sparse solutions, use proximal gradient
+   - Early stopping: Implicit regularization
 ```
 
 ---
