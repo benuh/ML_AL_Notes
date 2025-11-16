@@ -837,21 +837,59 @@ Probability underpins machine learning - from Bayesian inference to generative m
 
 ### Fundamentals
 
-**Probability Axioms**:
+**Probability Axioms (Kolmogorov, 1933)**:
 ```
-1. P(A) ≥ 0  (non-negative)
-2. P(Ω) = 1  (total probability = 1)
-3. P(A ∪ B) = P(A) + P(B) if A and B are disjoint
+Formal Framework:
+(Ω, F, P) is a probability space where:
+- Ω: Sample space (set of all possible outcomes)
+- F: σ-algebra on Ω (collection of events, closed under complements and countable unions)
+- P: Probability measure satisfying:
 
-Sample space Ω: All possible outcomes
-Event A: Subset of Ω
+Axiom 1 (Non-negativity): P(A) ≥ 0 for all A ∈ F
+
+Axiom 2 (Normalization): P(Ω) = 1
+
+Axiom 3 (Countable Additivity): For countable disjoint events A₁, A₂, ...
+P(⋃ᵢ₌₁^∞ Aᵢ) = Σᵢ₌₁^∞ P(Aᵢ)
+
+Derived Properties:
+1. P(∅) = 0 (probability of impossible event)
+2. P(Aᶜ) = 1 - P(A) (complement rule)
+3. If A ⊆ B, then P(A) ≤ P(B) (monotonicity)
+4. P(A ∪ B) = P(A) + P(B) - P(A ∩ B) (inclusion-exclusion)
+5. P(A) ≤ 1 for all events A (boundedness)
+
+Measure Theory Connection:
+Probability is a normalized measure (total measure = 1)
+Integration: E[X] = ∫ X dP (expectation as integral)
 ```
 
 **Conditional Probability**:
 ```
-P(A|B) = P(A ∩ B) / P(B)
+Definition: P(A|B) = P(A ∩ B) / P(B) for P(B) > 0
 
-"Probability of A given B has occurred"
+Interpretation: Probability of A given B has occurred
+
+Properties:
+1. P(A|B) ≥ 0 (non-negative)
+2. P(Ω|B) = 1 (normalization)
+3. P(·|B) is a valid probability measure
+
+Independence:
+Events A and B are independent if and only if:
+P(A ∩ B) = P(A) × P(B)
+
+Equivalent characterizations:
+- P(A|B) = P(A) (knowing B doesn't change probability of A)
+- P(B|A) = P(B) (knowing A doesn't change probability of B)
+
+Pairwise vs Mutual Independence:
+- Pairwise: P(Aᵢ ∩ Aⱼ) = P(Aᵢ)P(Aⱼ) for all i ≠ j
+- Mutual: P(⋂ᵢ∈S Aᵢ) = ∏ᵢ∈S P(Aᵢ) for all subsets S
+- Mutual ⟹ Pairwise, but not vice versa!
+
+Chain Rule (Law of Multiplication):
+P(A₁ ∩ A₂ ∩ ... ∩ Aₙ) = P(A₁) × P(A₂|A₁) × P(A₃|A₁∩A₂) × ... × P(Aₙ|A₁∩...∩Aₙ₋₁)
 
 Example: Email spam detection
 P(spam | contains "FREE") = P(spam ∩ contains "FREE") / P(contains "FREE")
@@ -1118,6 +1156,165 @@ print(f"MLE estimates: μ={mu_hat:.3f}, σ²={sigma2_hat:.3f}")
 # This is exactly MSE!
 
 # MLE for linear regression = Least squares solution
+```
+
+### Convergence Theorems (Limit Laws)
+
+These fundamental theorems justify many ML practices like averaging predictions and empirical risk minimization.
+
+**Law of Large Numbers (LLN)**:
+```
+Weak Law of Large Numbers (WLLN):
+Let X₁, X₂, ..., Xₙ be i.i.d. random variables with E[Xᵢ] = μ and Var(Xᵢ) = σ² < ∞
+
+Sample mean: X̄ₙ = (1/n) Σᵢ₌₁ⁿ Xᵢ
+
+Then: X̄ₙ →ᵖ μ as n → ∞
+
+(Convergence in probability: lim P(|X̄ₙ - μ| > ε) = 0 for all ε > 0)
+
+Strong Law of Large Numbers (SLLN):
+X̄ₙ → μ almost surely (a.s.)
+
+(P(lim X̄ₙ = μ) = 1)
+
+Proof Sketch (Weak Law via Chebyshev):
+By Chebyshev inequality: P(|X̄ₙ - μ| ≥ ε) ≤ Var(X̄ₙ)/ε²
+
+Var(X̄ₙ) = Var((1/n)Σ Xᵢ) = (1/n²) × n × σ² = σ²/n
+
+Therefore: P(|X̄ₙ - μ| ≥ ε) ≤ σ²/(nε²) → 0 as n → ∞  ✓
+
+ML Applications:
+1. Empirical Risk Minimization (ERM):
+   Sample loss (1/n)Σ L(θ; xᵢ) → Expected loss E[L(θ; X)] as n → ∞
+
+2. Monte Carlo Estimation:
+   Sample average → True expectation
+
+3. Ensemble Methods:
+   Average of predictions → Expected prediction
+```
+
+**Central Limit Theorem (CLT)**:
+```
+Let X₁, X₂, ..., Xₙ be i.i.d. with E[Xᵢ] = μ and Var(Xᵢ) = σ² < ∞
+
+Sample mean: X̄ₙ = (1/n) Σᵢ₌₁ⁿ Xᵢ
+
+Standardized sum: Zₙ = √n(X̄ₙ - μ)/σ
+
+Then: Zₙ →ᵈ N(0,1) as n → ∞
+
+(Convergence in distribution to standard normal)
+
+Equivalently: X̄ₙ ≈ N(μ, σ²/n) for large n
+
+Berry-Esseen Theorem (Quantitative CLT):
+Let ρ = E[|Xᵢ - μ|³] < ∞
+
+Then: sup_x |P(Zₙ ≤ x) - Φ(x)| ≤ Cρ/(σ³√n)
+
+where Φ is standard normal CDF, C ≈ 0.4748
+
+Convergence Rate: O(1/√n)
+
+Practical Rule: n ≥ 30 usually sufficient for normal approximation
+
+ML Applications:
+1. Confidence Intervals:
+   X̄ₙ ± 1.96 × σ/√n gives 95% CI for μ
+
+2. Hypothesis Testing:
+   Test statistic √n(X̄ₙ - μ₀)/σ ~ N(0,1) under H₀
+
+3. Bootstrap Distribution:
+   Sampling distribution of statistics approximately normal
+
+4. Gradient Descent Noise:
+   Stochastic gradient ∇̂L ≈ N(∇L, Σ/n) for large batch size n
+
+5. Neural Network Outputs:
+   Sum of many small contributions → approximately normal
+```
+
+**Example Application**:
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+# Demonstrate CLT with non-normal distribution
+def clt_demo(n_samples, n_means=10000, distribution='uniform'):
+    """
+    Demonstrate Central Limit Theorem
+
+    Even for non-normal distributions, sample means are approximately normal!
+    """
+    # Generate data from various distributions
+    sample_means = []
+
+    for _ in range(n_means):
+        if distribution == 'uniform':
+            # Uniform [0, 1]: μ=0.5, σ²=1/12
+            sample = np.random.uniform(0, 1, n_samples)
+            mu, sigma2 = 0.5, 1/12
+        elif distribution == 'exponential':
+            # Exponential(λ=1): μ=1, σ²=1
+            sample = np.random.exponential(1, n_samples)
+            mu, sigma2 = 1.0, 1.0
+        elif distribution == 'bernoulli':
+            # Bernoulli(p=0.3): μ=0.3, σ²=0.21
+            sample = np.random.binomial(1, 0.3, n_samples)
+            mu, sigma2 = 0.3, 0.3*0.7
+
+        sample_means.append(np.mean(sample))
+
+    sample_means = np.array(sample_means)
+
+    # Theoretical normal distribution
+    theoretical_mean = mu
+    theoretical_std = np.sqrt(sigma2 / n_samples)
+
+    # Plot
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.hist(sample_means, bins=50, density=True, alpha=0.7, edgecolor='black')
+    x = np.linspace(sample_means.min(), sample_means.max(), 100)
+    plt.plot(x, norm.pdf(x, theoretical_mean, theoretical_std),
+             'r-', linewidth=2, label=f'N({theoretical_mean:.2f}, {theoretical_std:.4f}²)')
+    plt.xlabel('Sample Mean')
+    plt.ylabel('Density')
+    plt.title(f'CLT Demo: {distribution.capitalize()} Distribution (n={n_samples})')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Q-Q plot
+    plt.subplot(1, 2, 2)
+    from scipy.stats import probplot
+    probplot(sample_means, dist="norm", plot=plt)
+    plt.title('Q-Q Plot (Normal)')
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+    # Numerical verification
+    empirical_mean = np.mean(sample_means)
+    empirical_std = np.std(sample_means, ddof=1)
+
+    print(f"Distribution: {distribution}")
+    print(f"Sample size n = {n_samples}")
+    print(f"Theoretical: μ = {theoretical_mean:.4f}, σ = {theoretical_std:.4f}")
+    print(f"Empirical:   μ = {empirical_mean:.4f}, σ = {empirical_std:.4f}")
+    print(f"Error: |μ_emp - μ_theory| = {abs(empirical_mean - theoretical_mean):.6f}")
+
+# Try with different sample sizes
+for n in [5, 30, 100]:
+    print(f"\n{'='*60}")
+    clt_demo(n_samples=n, distribution='exponential')
+    # As n increases, empirical matches theoretical better!
 ```
 
 ---
