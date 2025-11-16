@@ -353,6 +353,160 @@ df_agg = df.groupby(['user_id', 'date']).agg({
 
 ## Outlier Detection and Treatment
 
+### Statistical Theory of Outliers
+
+**Definition and Types:**
+```
+Outlier: Observation that deviates significantly from other observations
+
+Types:
+1. Point (Global) Outliers: Deviate from entire dataset
+   Example: Income = $10M when median = $50K
+
+2. Contextual (Conditional) Outliers: Normal in one context, outlier in another
+   Example: Temperature = 30°C in summer (normal), winter (outlier)
+
+3. Collective Outliers: Individual points normal, but group is unusual
+   Example: Unusual spike pattern in time series
+
+Statistical Framework:
+Under normality assumption X ~ N(μ, σ²):
+- P(|X - μ| > 2σ) ≈ 0.05 (5% outside ±2σ)
+- P(|X - μ| > 3σ) ≈ 0.003 (0.3% outside ±3σ)
+
+If we observe |x - μ| > 3σ:
+→ Either rare event (p=0.003) or x is outlier
+```
+
+**Theoretical Justification for IQR Method:**
+```
+Tukey's Fences (1977):
+Lower fence: Q₁ - k × IQR
+Upper fence: Q₃ + k × IQR
+
+where k = 1.5 (standard), k = 3.0 (extreme outliers only)
+
+Mathematical Basis (for normal distribution):
+1. Q₁ ≈ μ - 0.675σ (25th percentile)
+2. Q₃ ≈ μ + 0.675σ (75th percentile)
+3. IQR = Q₃ - Q₁ ≈ 1.35σ
+
+Lower fence: Q₁ - 1.5×IQR ≈ μ - 0.675σ - 1.5×1.35σ ≈ μ - 2.7σ
+Upper fence: Q₃ + 1.5×IQR ≈ μ + 0.675σ + 1.5×1.35σ ≈ μ + 2.7σ
+
+Expected proportion beyond fences (for normal data):
+P(X < μ - 2.7σ or X > μ + 2.7σ) ≈ 0.7%
+
+Robustness:
+- Quartiles unaffected by values beyond Q₁ and Q₃
+- Breakdown point: 25% (can tolerate 25% outliers before failing)
+- Compare: Mean/std breakdown point: 0% (single outlier affects them)
+
+Why k=1.5?
+- Balance between sensitivity and specificity
+- k=1.0: Too sensitive (flags ~7% as outliers)
+- k=2.0: Too permissive (flags ~0.1% as outliers)
+- k=1.5: Reasonable compromise (~0.7% flagged)
+```
+
+**Z-Score Method (Parametric):**
+```
+Z-score: z = (x - μ) / σ
+
+Measures: How many standard deviations x is from mean
+
+Threshold Selection:
+- |z| > 2: Unusual (outside 95% of normal distribution)
+- |z| > 2.5: Outlier (outside 98.8%)
+- |z| > 3: Strong outlier (outside 99.7%)
+
+Statistical Test Interpretation:
+Under H₀: x ~ N(μ, σ²)
+P(|Z| > 3) = 0.0027
+
+If observed |z| > 3:
+→ Either rare event (p=0.003) OR reject H₀ (x is outlier)
+
+Multiple Testing Correction:
+For n observations, probability at least one exceeds threshold by chance:
+P(at least one |z| > 3) = 1 - (1 - 0.0027)ⁿ
+
+Examples:
+n=100: P ≈ 0.24 (24% chance of false positive!)
+n=1000: P ≈ 0.94 (94% chance of false positive!)
+
+Bonferroni correction:
+Use threshold z* where P(|Z| > z*) = α/n
+For α=0.05, n=100: z* ≈ 3.89 (more stringent)
+
+Limitations:
+1. Assumes normality (invalid for skewed/heavy-tailed distributions)
+2. Sensitive to outliers (outliers inflate σ, masking themselves!)
+3. Not robust (single outlier can corrupt μ and σ)
+```
+
+**Modified Z-Score (Robust):**
+```
+Formula: M = 0.6745 × (x - median) / MAD
+
+where MAD = median(|xᵢ - median(x)|)
+and 0.6745 ≈ Φ⁻¹(0.75) makes MAD consistent estimator of σ
+
+Why 0.6745?
+For X ~ N(μ, σ²):
+MAD → σ × Φ⁻¹(0.75) ≈ 0.6745σ
+
+Therefore: MAD / 0.6745 → σ (consistent estimator)
+
+Advantages over standard z-score:
+1. Median: 50% breakdown point (vs 0% for mean)
+2. MAD: 50% breakdown point (vs 0% for std dev)
+3. Robust to outliers (outliers don't corrupt median or MAD)
+
+Example:
+Data: [1, 2, 3, 4, 5, 100]
+
+Standard z-score:
+μ = 19.17, σ = 38.9
+z(100) = (100 - 19.17)/38.9 = 2.08 (barely flags as outlier!)
+
+Modified z-score:
+median = 3.5, MAD = median(|[1-3.5, 2-3.5, ..., 100-3.5]|) = 1.5
+M(100) = 0.6745 × (100-3.5)/1.5 = 43.4 (strongly flags as outlier!)
+
+Threshold:
+Typically use |M| > 3.5 (slightly higher than z-score threshold)
+```
+
+**Grubbs' Test (Single Outlier):**
+```
+Formal hypothesis test for single outlier
+
+H₀: No outliers in data
+H₁: Exactly one outlier
+
+Test statistic:
+G = max|xᵢ - x̄| / s
+
+where x̄ = sample mean, s = sample std dev
+
+Critical value (significance level α, sample size n):
+G_crit = [(n-1) / √n] × √[t²_{α/(2n), n-2} / (n - 2 + t²_{α/(2n), n-2})]
+
+Decision: Reject H₀ (outlier present) if G > G_crit
+
+Properties:
+- Assumes normality
+- Tests only most extreme point
+- Iterative: After removing outlier, can test again
+- Conservative (Type I error controlled at level α)
+
+Limitation: Masking effect
+- If multiple outliers present, they mask each other
+- Outliers inflate s, reducing G
+- May fail to detect any outliers even when present!
+```
+
 ### Statistical Methods
 
 **IQR Method:**
@@ -707,9 +861,113 @@ for train_idx, val_idx in kf.split(df):
 - Trees are invariant to monotonic transformations of features
 - Each feature evaluated independently in split decisions
 
+### Mathematical Theory of Feature Scaling
+
+**Convergence Analysis for Gradient Descent:**
+```
+Consider quadratic loss: L(w) = (1/2) w^T H w - b^T w
+
+where H is Hessian (second derivative matrix)
+
+Without scaling:
+- Condition number κ = λ_max / λ_min can be very large
+- Convergence rate: O((1 - 1/κ)^k) → slow when κ >> 1
+
+With scaling (standardization):
+- Features have similar scales → H closer to identity matrix
+- Condition number κ ≈ 1 → faster convergence
+- Convergence rate: O(exp(-k)) → exponentially fast
+
+Quantitative Example:
+Feature 1: range [0, 1], variance = 0.1
+Feature 2: range [0, 1000], variance = 10000
+
+Hessian eigenvalues: λ₁ ≈ 0.1, λ₂ ≈ 10000
+Condition number: κ ≈ 10000 / 0.1 = 100,000
+
+Gradient descent iterations to converge:
+- Without scaling: O(100,000) iterations
+- With scaling: O(10-100) iterations (1000× speedup!)
+
+Formal Theorem:
+For L-smooth, μ-strongly convex loss with κ = L/μ:
+- GD converges as: ||w_k - w*|| ≤ (1 - μ/L)^k ||w_0 - w*||
+- After scaling: μ ≈ L → κ ≈ 1 → (1 - 1/1)^k → very fast!
+```
+
+**Distance Metric Distortion:**
+```
+Euclidean distance without scaling:
+d(x, y) = √[Σ(xᵢ - yᵢ)²]
+
+Problem: Features with large variance dominate distance
+
+Example:
+Feature 1 (age): x₁ = 25, y₁ = 30, diff = 5
+Feature 2 (income): x₂ = 50000, y₂ = 55000, diff = 5000
+
+d(x,y) = √(5² + 5000²) = √25,000,025 ≈ 5000
+
+Distance contribution:
+- Age: 5²/25,000,025 ≈ 0.0001% (effectively ignored!)
+- Income: 5000²/25,000,025 ≈ 99.9999% (dominates)
+
+After standardization (assuming σ_age=10, σ_income=20000):
+- Age_scaled: (30-25)/10 = 0.5
+- Income_scaled: (55000-50000)/20000 = 0.25
+
+d_scaled = √(0.5² + 0.25²) = √0.3125 ≈ 0.56
+
+Distance contribution:
+- Age: 0.5²/0.3125 ≈ 80%
+- Income: 0.25²/0.3125 ≈ 20%
+Both features now contribute meaningfully!
+```
+
+**Regularization Bias:**
+```
+L2 regularization: L(w) = MSE(w) + λ||w||²
+
+Without scaling:
+- Large-scale feature f₁ ∈ [0, 1000] gets small weight w₁ ≈ 0.001
+- Small-scale feature f₂ ∈ [0, 1] gets large weight w₂ ≈ 1
+- Regularization penalty: λ(0.001² + 1²) ≈ λ(1) (dominated by w₂)
+- Model unfairly penalizes small-scale features!
+
+Mathematical bias:
+Optimal weight scales as w_i* ∝ 1/scale(fᵢ)
+→ Features with larger scales get artificially reduced importance
+
+After scaling:
+- All features have comparable scale → all weights comparable
+- Regularization penalty distributed fairly across features
+- Model can learn true feature importance without scale bias
+```
+
 ### StandardScaler (Z-score normalization)
 
 **Formula:** x_scaled = (x - μ) / σ
+
+**Mathematical Properties:**
+```
+Transformation: z = (x - μ) / σ
+
+Properties:
+1. E[z] = E[(x - μ)/σ] = (E[x] - μ)/σ = 0  (zero mean)
+2. Var(z) = Var((x - μ)/σ) = Var(x)/σ² = σ²/σ² = 1  (unit variance)
+3. Shape preservation: Does not change distribution shape
+4. Linearity: Affine transformation preserves linear relationships
+5. Outlier sensitivity: μ and σ affected by outliers
+
+Statistical Interpretation:
+z represents number of standard deviations from mean:
+- z = 0: at mean
+- z = ±1: one std dev from mean (68% of data within [-1,1] for normal)
+- z = ±2: two std devs from mean (95% within [-2,2] for normal)
+- z = ±3: three std devs from mean (99.7% within [-3,3] for normal)
+
+For normal distribution: z ~ N(0, 1) (standard normal)
+```
 
 ```python
 from sklearn.preprocessing import StandardScaler
