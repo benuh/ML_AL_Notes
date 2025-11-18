@@ -874,9 +874,401 @@ df['diabetes_risk'] = (
 
 ---
 
+## Mathematical Foundations of Feature Engineering
+
+Understanding the theoretical basis for feature engineering helps make principled decisions about which transformations to apply.
+
+### Information-Theoretic View
+
+**Mutual Information:**
+```
+Definition: I(X; Y) = H(Y) - H(Y|X)
+
+Measures: How much knowing X reduces uncertainty about Y
+
+Properties:
+1. I(X; Y) ≥ 0 (non-negative)
+2. I(X; Y) = 0 ⟺ X and Y are independent
+3. I(X; Y) = I(Y; X) (symmetric)
+4. I(X; Y) ≤ min(H(X), H(Y)) (bounded by individual entropies)
+
+Decomposition:
+I(X; Y) = H(X) + H(Y) - H(X, Y)
+        = ΣΣ p(x,y) log[p(x,y) / (p(x)p(y))]
+
+Feature Engineering Goal:
+Create feature f(X) that maximizes I(f(X); Y)
+
+Why Good Features Have High Mutual Information:
+- High I(f(X); Y) → f(X) highly predictive of Y
+- I(f(X); Y) = 0 → f(X) useless for predicting Y
+- I(f(X); Y) = H(Y) → f(X) perfectly determines Y
+
+Example:
+Original feature X = temperature (°F)
+Target Y = ice_cream_sales
+
+Feature transformations:
+1. f₁(X) = X (original): I(X; Y) = 0.4 bits
+2. f₂(X) = X² (squared): I(X²; Y) = 0.3 bits (worse!)
+3. f₃(X) = 𝟙[X > 70] (indicator): I(f₃; Y) = 0.5 bits (better!)
+
+Data Processing Inequality:
+For transformation chain X → f(X) → g(f(X)):
+
+I(Y; g(f(X))) ≤ I(Y; f(X)) ≤ I(Y; X)
+
+Implication: Features can only lose information, never gain it!
+→ Choose transformations that preserve relevant information
+```
+
+**Redundancy and Relevance:**
+```
+Feature set quality measured by:
+
+Relevance: I(Xᵢ; Y) (how much feature i tells about target)
+Redundancy: I(Xᵢ; Xⱼ) (how much features i,j overlap)
+
+Optimal Feature Set:
+Maximize: Σᵢ I(Xᵢ; Y) - λ Σᵢ≠ⱼ I(Xᵢ; Xⱼ)
+          └─ total relevance ┘   └─ total redundancy ┘
+
+Trade-off parameter λ controls relevance vs redundancy
+
+mRMR (minimum Redundancy Maximum Relevance):
+Select features maximizing:
+
+mRMR = (1/|S|) Σᵢ∈S I(Xᵢ; Y) - (1/|S|²) Σᵢ,ⱼ∈S I(Xᵢ; Xⱼ)
+
+Greedy Algorithm:
+1. Start with S = ∅
+2. While |S| < k:
+   Add feature i* = argmax[I(Xᵢ; Y) - (1/|S|)Σⱼ∈S I(Xᵢ; Xⱼ)]
+3. Return S
+
+Example:
+Features: [age, income, years_education, job_level]
+Target: loan_default
+
+Individual MI:
+I(age; Y) = 0.2
+I(income; Y) = 0.5
+I(years_education; Y) = 0.3
+I(job_level; Y) = 0.4
+
+Redundancy:
+I(years_education; job_level) = 0.25 (high correlation!)
+I(income; job_level) = 0.15
+
+mRMR selection:
+1. Select income (highest MI: 0.5)
+2. Select age (I=0.2, no redundancy yet)
+3. Select job_level (I=0.4 - 0.15/2 = 0.325) vs years_education (I=0.3 - 0.25/2 = 0.175)
+   → Choose job_level (higher mRMR score)
+```
+
+### Dimensionality and Sample Complexity
+
+**Curse of Dimensionality:**
+```
+Problem: As dimension d increases, data becomes sparse
+
+Volume of hypercube: [0,1]ᵈ
+Volume of hypersphere: V_d ∝ r^d / d!
+
+For r=1:
+d=2: V ≈ 3.14 (78% of cube)
+d=10: V ≈ 0.0025 (0.25% of cube!)
+d=100: V ≈ 10⁻⁷⁰ (essentially 0%)
+
+Sample Complexity:
+To maintain same density:
+n_d = n₁ × c^d
+
+where c > 1 (exponential growth!)
+
+Example: n₁ = 100 samples sufficient for 1D
+For d=10 with c=2: Need n₁₀ = 100 × 2¹⁰ = 102,400 samples!
+
+Distance Concentration:
+In high dimensions, all points become equidistant:
+
+max_dist / min_dist → 1 as d → ∞
+
+Practical consequence: k-NN, clustering fail in high dimensions
+
+Feature Engineering Solution:
+Reduce effective dimensionality through:
+1. Feature selection (keep d small)
+2. Feature extraction (PCA, etc.)
+3. Domain knowledge (engineer low-d features)
+```
+
+**Rademacher Complexity with Features:**
+```
+Model class complexity depends on feature dimension:
+
+R̂_n(H) = O(√(d/n))
+
+where d = number of features
+
+Generalization bound:
+error_true ≤ error_train + O(√(d/n)) + O(√(log(1/δ)/n))
+
+Impact of feature engineering:
+- Adding relevant features: ↑d but ↓error_train (net positive if signal > noise)
+- Adding irrelevant features: ↑d and error_train unchanged → worse generalization!
+- Removing redundant features: ↓d and error_train unchanged → better generalization!
+
+Optimal Feature Count:
+d* ≈ √n (rule of thumb)
+
+Examples:
+n=100: d* ≈ 10 features
+n=10,000: d* ≈ 100 features
+n=1,000,000: d* ≈ 1,000 features
+
+Exceeding d* leads to overfitting unless features are truly informative
+```
+
+### Transformation Invariances
+
+**Monotonic Transformations:**
+```
+Property: f is monotonic if x₁ < x₂ ⟹ f(x₁) < f(x₂)
+
+Invariant Models:
+- Tree-based: Decision boundaries based on thresholds
+  → Invariant to any monotonic transformation
+
+Example: age vs log(age) vs √age
+All give identical tree structure and predictions!
+
+Non-Invariant Models:
+- Linear models: Coefficients change with transformation
+- Distance-based: k-NN, SVM with RBF kernel affected
+- Neural networks: Non-linear activations affected
+
+When to Use:
+- Tree models: Don't need monotonic transforms (waste of time)
+- Linear models: Use transforms to capture non-linearity
+  Example: log(income) for right-skewed income distribution
+```
+
+**Scale Invariance:**
+```
+Definition: Model performance unchanged by feature scaling
+
+Invariant:
+- Tree-based models (split on thresholds)
+- Scale-free distance metrics (cosine similarity)
+
+Not Invariant:
+- Linear models with regularization
+- Euclidean distance (k-NN, k-means)
+- Gradient descent-based optimization
+
+Mathematical Example:
+Linear regression: y = w₁x₁ + w₂x₂
+
+Scale x₂ → 1000×x₂:
+Optimal weights: w₂* → w₂*/1000
+Predictions: Identical (w₁x₁ + w₂×1000x₂/1000 = w₁x₁ + w₂x₂)
+
+With L2 regularization: min ||y - Xw||² + λ||w||²
+Penalizes w₂*/1000 much less than w₂*
+→ Biased towards large-scale features!
+```
+
+### Interaction Detection Theory
+
+**Statistical Interaction:**
+```
+Definition: Effect of X₁ on Y depends on value of X₂
+
+No interaction model:
+E[Y|X₁, X₂] = f₁(X₁) + f₂(X₂)
+
+Interaction model:
+E[Y|X₁, X₂] = f₁(X₁) + f₂(X₂) + f₁₂(X₁, X₂)
+
+Linear interaction:
+E[Y|X₁, X₂] = β₀ + β₁X₁ + β₂X₂ + β₃X₁X₂
+                                   └─ interaction term
+
+Testing for interaction:
+H₀: β₃ = 0 (no interaction)
+H₁: β₃ ≠ 0 (interaction present)
+
+t-test: t = β̂₃ / SE(β̂₃) ~ t_{n-4}
+
+Example: Price prediction
+X₁ = sqft, X₂ = location_quality
+
+No interaction:
+price = 100×sqft + 50000×location
+
+With interaction:
+price = 100×sqft + 50000×location + 20×(sqft × location)
+→ Each sqft worth more in better locations!
+
+Effect of sqft on price:
+∂price/∂sqft = 100 + 20×location (depends on location!)
+
+ANOVA for interactions:
+SS_total = SS_X₁ + SS_X₂ + SS_X₁:X₂ + SS_error
+
+F-test for interaction:
+F = MS_X₁:X₂ / MS_error ~ F_{df₁, df₂}
+```
+
+**Interaction Strength Measures:**
+```
+H-statistic (Friedman & Popescu, 2008):
+Measures interaction strength between features
+
+H²_jk = Σᵢ [f_jk(xᵢⱼ, xᵢₖ) - f_j(xᵢⱼ) - f_k(xᵢₖ)]² / Σᵢ f²(xᵢ)
+
+Properties:
+- H²_jk = 0: No interaction
+- H²_jk = 1: Pure interaction (no main effects)
+- 0 < H²_jk < 1: Partial interaction
+
+Interpretation:
+H²_jk > 0.1: Meaningful interaction → create X_j × X_k feature
+H²_jk < 0.05: Weak interaction → probably not worth adding
+
+Computational complexity: O(n × d²) for all pairwise interactions
+For d=100: 4,950 pairs to test!
+
+Screening strategies:
+1. Test main effects first (univariate MI)
+2. Only test interactions for top-k main effects
+3. Use LASSO to identify sparse interaction set
+```
+
+---
+
 ## Feature Selection
 
 After creating features, select the best ones.
+
+### Mathematical Framework for Feature Selection
+
+**Optimization Formulation:**
+```
+General Problem:
+min_{S⊆{1,...,d}, |S|=k} L(w, X_S, y) + λR(w)
+
+where:
+- S: selected feature subset
+- X_S: data with only features in S
+- L: loss function
+- R: regularization term
+
+Combinatorial Complexity:
+Number of subsets: C(d,k) = d!/(k!(d-k)!)
+
+Examples:
+d=20, k=10: C(20,10) = 184,756 subsets
+d=100, k=10: C(100,10) ≈ 10¹³ subsets (intractable!)
+
+Approaches:
+1. Filter methods: O(d) - score each feature independently
+2. Wrapper methods: O(2^d) - evaluate subsets with model
+3. Embedded methods: O(d) - selection during training (LASSO)
+
+Optimal subset is NP-hard → need approximations
+```
+
+**Filter Methods Theory:**
+```
+Score each feature independently: s(Xᵢ, Y)
+
+Common scores:
+1. Mutual Information: I(Xᵢ; Y)
+2. Pearson correlation: ρ(Xᵢ, Y)
+3. F-statistic: F = Var(E[Xᵢ|Y]) / E[Var(Xᵢ|Y)]
+4. Chi-square: χ² = Σ (O_ij - E_ij)² / E_ij
+
+Select top-k by score: S = {i : s(Xᵢ, Y) ≥ threshold}
+
+Advantages:
+- Fast: O(d) complexity
+- Model-agnostic
+- No overfitting from selection
+
+Disadvantages:
+- Ignores feature interactions
+- Ignores redundancy
+- May select correlated features
+
+Theoretical Guarantee (for independent features):
+If features independent given Y:
+Top-k by I(Xᵢ; Y) = optimal for maximizing I(X_S; Y)
+```
+
+**Wrapper Methods (RFE):**
+```
+Recursive Feature Elimination:
+
+Algorithm:
+1. Train model on all d features
+2. Rank features by importance |wᵢ| or ∂L/∂Xᵢ
+3. Remove least important feature
+4. Repeat until k features remain
+
+Complexity: O(d × T_train)
+where T_train = time to train model
+
+Guarantees (for linear models):
+Removes features in order of increasing |wᵢ*|
+where wᵢ* = optimal weight for feature i
+
+Greedy approximation ratio:
+Selected subset S satisfies:
+L(S) ≤ (1 + ε) × L(S*) + O(1/√n)
+
+where S* = optimal subset, ε depends on condition number
+
+Practical consideration:
+Cross-validate at each step to avoid overfitting:
+RFE-CV: O(d × k_folds × T_train)
+```
+
+**LASSO Feature Selection:**
+```
+L1 regularization induces sparsity:
+
+min_w ||y - Xw||² + λ||w||₁
+
+As λ increases: More weights → exactly 0
+
+Why L1 induces sparsity:
+- L1 ball has corners at axes
+- Contours of loss intersect L1 constraint at corners
+- Corner intersection → some wᵢ = 0
+
+Mathematical property:
+For appropriate λ:
+P(wᵢ = 0 | wᵢ* = 0) → 1 as n → ∞
+
+(Consistent for variable selection under conditions)
+
+Regularization path:
+λ = 0: All features included
+λ → ∞: Only intercept (no features)
+
+Cross-validation selects λ:
+λ* = argmin_λ CV_error(λ)
+
+Selected features: S = {i : wᵢ(λ*) ≠ 0}
+
+Advantage over subset selection:
+- Convex optimization (polynomial time)
+- Continuous regularization path
+- Built-in shrinkage (reduces overfitting)
+```
 
 ### 1. Remove Low-Variance Features
 
