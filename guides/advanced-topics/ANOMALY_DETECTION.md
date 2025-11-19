@@ -114,6 +114,232 @@ for type_name, description in demo.types.items():
 
 Classical statistical approaches for anomaly detection.
 
+### Statistical Detection Theory Foundations
+
+**Formal Framework:**
+```
+Problem: Binary hypothesis testing
+
+H₀: x ~ p₀(x)  (normal/null hypothesis)
+H₁: x ~ p₁(x)  (anomaly/alternative hypothesis)
+
+Given observation x, decide: H₀ or H₁
+
+Decision Rule: δ(x) ∈ {0, 1}
+- δ(x) = 0: Accept H₀ (classify as normal)
+- δ(x) = 1: Accept H₁ (classify as anomaly)
+
+Error Types:
+- Type I Error (False Positive): P(δ(x)=1 | H₀) = α (false alarm rate)
+- Type II Error (False Negative): P(δ(x)=0 | H₁) = β (miss rate)
+
+Statistical Power: 1 - β = P(δ(x)=1 | H₁) (detection rate)
+
+Trade-off: Decreasing α typically increases β
+Goal: Minimize both errors subject to constraints
+```
+
+**Neyman-Pearson Lemma:**
+```
+Theorem (Neyman-Pearson, 1933):
+For fixed false alarm rate α, the test that maximizes power (1-β) is:
+
+Likelihood Ratio Test (LRT):
+δ*(x) = 1  if  L(x) = p₁(x)/p₀(x) > τ
+         0  otherwise
+
+where τ chosen such that P(L(X) > τ | H₀) = α
+
+Proof Sketch:
+1. Let δ be any other test with same FPR α
+2. Compare E[δ*(X) | H₁] vs E[δ(X) | H₁]
+3. Show E[(δ* - δ)(L - τ)] ≥ 0
+4. This implies δ* has higher TPR → optimal
+
+Practical Meaning:
+- LRT is most powerful test for given FPR
+- Regions where p₁(x)/p₀(x) is high → anomaly region
+- Can't do better than LRT (under constraints)
+
+Log-Likelihood Ratio:
+λ(x) = log[p₁(x)/p₀(x)]
+     = log p₁(x) - log p₀(x)
+
+Decision: λ(x) > log(τ) → anomaly
+```
+
+**Bayesian Decision Theory:**
+```
+Prior Probabilities:
+π₀ = P(H₀) (normal data probability)
+π₁ = P(H₁) (anomaly probability)
+
+Posterior Probability:
+P(H₁|x) = p₁(x)π₁ / [p₁(x)π₁ + p₀(x)π₀]
+
+Bayes Optimal Decision (MAP):
+δ_Bayes(x) = argmax P(Hᵢ|x)
+
+Equivalent to LRT with:
+τ = (π₀/π₁) × (C₁₀/C₀₁)
+
+where C₁₀ = cost of false positive, C₀₁ = cost of false negative
+
+Expected Cost (Risk):
+R(δ) = C₁₀·α·π₀ + C₀₁·β·π₁
+
+Bayes rule minimizes expected cost
+
+Example: Medical Test
+π₀ = 0.99 (99% healthy)
+π₁ = 0.01 (1% diseased)
+C₁₀ = 10 (unnecessary treatment cost)
+C₀₁ = 10000 (missed disease cost)
+
+τ = (0.99/0.01) × (10/10000) = 0.099
+
+Much lower threshold due to high cost of missing disease!
+```
+
+**Sequential Detection (SPRT):**
+```
+Sequential Probability Ratio Test (Wald, 1945):
+
+Instead of fixed sample size, decide after each observation:
+- Continue sampling
+- Accept H₀
+- Accept H₁
+
+Log-Likelihood Ratio Sum:
+Λₙ = Σᵢ₌₁ⁿ log[p₁(xᵢ)/p₀(xᵢ)]
+
+Decision Boundaries:
+- If Λₙ ≥ B: Accept H₁ (anomaly detected)
+- If Λₙ ≤ A: Accept H₀ (normal)
+- If A < Λₙ < B: Continue observing
+
+Thresholds:
+A ≈ log[β/(1-α)]
+B ≈ log[(1-β)/α]
+
+Properties:
+1. Achieves same error rates as fixed-sample LRT
+2. Requires fewer samples on average (Wald's optimality)
+3. Expected sample size: E[N] = O(1/KL(p₁||p₀))
+
+where KL divergence measures distributions' separability
+
+Online Anomaly Detection:
+SPRT naturally suited for streaming data
+Update Λₙ incrementally as new data arrives
+```
+
+**Change Point Detection:**
+```
+Problem: Detect when distribution changes
+
+Before change (t < τ): x_t ~ p₀
+After change (t ≥ τ): x_t ~ p₁
+
+CUSUM (Cumulative Sum):
+Sₙ = max(0, Sₙ₋₁ + log[p₁(xₙ)/p₀(xₙ)] - ν)
+
+where ν > 0 is drift parameter
+
+Alarm: Sₙ > h (threshold)
+
+Expected Detection Delay (for optimal h, ν):
+E[τ_d - τ | change at τ] = O(log h / KL(p₁||p₀))
+
+False Alarm Rate:
+E[τ_alarm | no change] ≈ e^h
+
+Trade-off: Higher h → fewer false alarms but longer detection delay
+
+Shiryaev-Roberts Statistic:
+Rₙ = Σₖ₌₁ⁿ exp(Σᵢ₌ₖⁿ log[p₁(xᵢ)/p₀(xᵢ)])
+
+Statistically optimal for Bayesian change point detection
+
+Applications:
+- Network intrusion detection
+- Fraud detection
+- Manufacturing quality control
+- System monitoring
+```
+
+**Gaussian Anomaly Detection:**
+```
+Special case: Normal data ~ N(μ₀, Σ₀)
+
+One-Class Problem: Only p₀ known, p₁ unknown
+Assume: Anomalies have different mean or covariance
+
+Mahalanobis Distance:
+D²(x) = (x - μ₀)ᵀ Σ₀⁻¹ (x - μ₀)
+
+Under H₀: D² ~ χ²_d (chi-squared with d degrees of freedom)
+
+Decision Rule:
+δ(x) = 1 if D²(x) > χ²_{d,1-α}
+
+where χ²_{d,1-α} is (1-α) quantile of χ²_d
+
+Probability: P(Type I Error) = α exactly
+
+Multivariate Extension:
+For x ∈ ℝᵈ, anomaly score is Mahalanobis distance
+
+Advantages:
+- Accounts for correlations (unlike univariate z-score)
+- Exact distribution under normality
+- Reduces to z-score² for d=1
+
+Computational Complexity:
+- Σ₀⁻¹ computation: O(d³) (one-time)
+- Per-sample scoring: O(d²) (matrix-vector product)
+
+Robust Variant:
+Use robust estimators:
+- μ₀ → median or trimmed mean
+- Σ₀ → minimum covariance determinant (MCD)
+
+Reduces breakdown point from 0% to ≈50%
+```
+
+**Density-Based Detection:**
+```
+Non-parametric Approach: Estimate p₀(x) from data
+
+Kernel Density Estimation:
+p̂₀(x) = (1/n) Σᵢ₌₁ⁿ K_h(x - xᵢ)
+
+where K_h is kernel with bandwidth h
+
+Anomaly Score: s(x) = -log p̂₀(x)
+High score → low density → anomaly
+
+Convergence Rate:
+E[|p̂₀(x) - p₀(x)|²] = O(h⁴ + 1/(nh^d))
+
+Optimal bandwidth: h* ~ n^(-1/(d+4))
+
+Curse of Dimensionality:
+For d=1: h* ~ n^(-1/5) → O(n^(4/5)) samples for fixed accuracy
+For d=10: h* ~ n^(-1/14) → O(n^(13/14)) samples needed
+
+Becomes impractical for high dimensions
+
+Alternative: Local Outlier Factor (LOF)
+Compares local density to neighbors' densities
+LOF(x) = [Σ_k LRD(neighbor)/LRD(x)] / k
+
+where LRD = local reachability density
+
+LOF > 1: Lower density than neighbors → anomaly
+LOF ≈ 1: Similar density → normal
+```
+
 ### Z-Score Method
 
 **Statistical Foundation:**
