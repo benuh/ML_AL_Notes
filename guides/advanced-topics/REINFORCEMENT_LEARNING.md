@@ -15,6 +15,176 @@ Master the art of training agents to make optimal decisions through trial and er
 
 ## RL Fundamentals
 
+### Mathematical Foundations of MDPs
+
+**Formal Definition:**
+```
+Markov Decision Process (MDP):
+M = (S, A, P, R, γ)
+
+Components:
+- S: State space (finite or infinite)
+- A: Action space (can be S-dependent: A(s))
+- P: Transition kernel P: S × A × S → [0,1]
+  P(s'|s,a) = Probability of transitioning to s' from s via a
+- R: Reward function R: S × A × S → ℝ
+  r(s,a,s') = immediate reward
+- γ ∈ [0,1): Discount factor
+
+Markov Property (memoryless):
+P(s_{t+1}, r_{t+1} | s_t, a_t, s_{t-1}, a_{t-1}, ..., s_0, a_0) = P(s_{t+1}, r_{t+1} | s_t, a_t)
+
+Future is independent of past given present
+
+Regularity Conditions:
+1. For finite S, A: |S| < ∞, |A| < ∞
+2. Rewards bounded: |R(s,a,s')| ≤ R_max < ∞
+3. Ergodicity: All states reachable from any starting state (for average reward)
+```
+
+**Policy Definitions:**
+```
+Policy π: Mapping from states to action distributions
+- Deterministic: π: S → A
+  π(s) = a (always take action a in state s)
+
+- Stochastic: π: S × A → [0,1]
+  π(a|s) = probability of action a in state s
+  Σ_a π(a|s) = 1 for all s
+
+Stationary Policy: π(a|s) doesn't depend on time t
+(Non-stationary policies can depend on t)
+
+Policy Value:
+V^π(s) = E_π[G_t | s_t = s]
+       = E_π[Σ_{k=0}^∞ γ^k r_{t+k} | s_t = s]
+
+where G_t = Σ_{k=0}^∞ γ^k r_{t+k} (return)
+
+Expectation taken over:
+- Policy π(a|s)
+- Transition dynamics P(s'|s,a)
+- Reward function r(s,a,s')
+```
+
+**Bellman Operators (Functional View):**
+```
+Value function as vector: V ∈ ℝ^|S|
+
+Bellman Expectation Operator T^π:
+(T^π V)(s) = Σ_a π(a|s) Σ_s' P(s'|s,a)[r(s,a,s') + γV(s')]
+           = E_π[r + γV(s') | s]
+
+Bellman Optimality Operator T*:
+(T* V)(s) = max_a Σ_s' P(s'|s,a)[r(s,a,s') + γV(s')]
+          = max_a E[r + γV(s') | s, a]
+
+Fixed Point Equations:
+1. V^π satisfies: T^π V^π = V^π (Bellman expectation equation)
+2. V* satisfies: T* V* = V* (Bellman optimality equation)
+
+Matrix-Vector Form (finite MDP):
+T^π V = R^π + γP^π V
+
+where:
+- R^π ∈ ℝ^|S|: Expected immediate reward vector
+  R^π(s) = Σ_a π(a|s) Σ_s' P(s'|s,a) r(s,a,s')
+
+- P^π ∈ ℝ^{|S|×|S|}: Transition probability matrix
+  P^π(s,s') = Σ_a π(a|s) P(s'|s,a)
+```
+
+**Contraction Mapping Theorem:**
+```
+Theorem: Both T^π and T* are contraction mappings in supremum norm
+
+Supremum Norm: ||V||_∞ = max_s |V(s)|
+
+Contraction Property:
+||T^π V - T^π U||_∞ ≤ γ||V - U||_∞
+||T* V - T* U||_∞ ≤ γ||V - U||_∞
+
+for all value functions V, U and 0 ≤ γ < 1
+
+Proof Sketch (for T^π):
+|(T^π V)(s) - (T^π U)(s)|
+= |E_π[γV(s') - γU(s') | s]|
+≤ E_π[γ|V(s') - U(s')| | s]
+≤ γ max_s' |V(s') - U(s')|
+= γ||V - U||_∞
+
+Take max over s: ||T^π V - T^π U||_∞ ≤ γ||V - U||_∞  ✓
+
+Banach Fixed Point Theorem:
+Every contraction mapping on complete metric space has unique fixed point
+
+Consequences:
+1. Unique solution: V^π exists and is unique
+2. Convergence: V_k → V^π exponentially fast
+   Applying T^π repeatedly: V_{k+1} = T^π V_k
+   ||V_k - V^π||_∞ ≤ γ^k ||V_0 - V^π||_∞
+
+3. Error bound: ||V_k - V^π||_∞ ≤ γ^k/(1-γ) ||T^π V_0 - V_0||_∞
+
+Convergence Rate: O(γ^k)
+- γ = 0.9: 10 iterations → factor 0.35
+- γ = 0.99: 100 iterations → factor 0.37
+- Closer γ to 1 → slower convergence
+```
+
+**Optimal Policy Existence:**
+```
+Theorem: For any MDP with bounded rewards and γ < 1:
+1. Optimal value function V* exists and is unique
+2. At least one optimal deterministic stationary policy π* exists
+3. V* and π* satisfy Bellman optimality equations
+
+Proof Outline:
+1. Uniqueness of V*:
+   - T* is contraction → unique fixed point V*
+
+2. Existence of optimal policy:
+   Define greedy policy: π*(s) = argmax_a Q*(s,a)
+
+   Then: V^π*(s) = max_a Q*(s,a) = V*(s) for all s
+
+   Therefore π* is optimal
+
+3. Deterministic suffices:
+   In argmax, can always select specific action
+   No need for randomization in finite MDP
+
+Policy Comparison:
+π ≥ π' if V^π(s) ≥ V^π'(s) for all s
+
+Theorem: There exists policy π* that dominates all others
+π* ≥ π for all policies π
+
+This π* is optimal policy
+```
+
+**Policy Improvement Theorem:**
+```
+Theorem: Let π, π' be policies such that:
+Q^π(s, π'(s)) ≥ V^π(s) for all s
+
+(Acting greedily w.r.t. Q^π improves or maintains value)
+
+Then: V^π'(s) ≥ V^π(s) for all s
+
+Moreover, if inequality is strict for some s, then V^π' > V^π
+
+Proof:
+V^π(s) ≤ Q^π(s, π'(s))
+       = E[r + γV^π(s') | s, π'(s)]
+       ≤ E[r + γQ^π(s', π'(s')) | s, π'(s)]  (apply recursively)
+       ≤ E[r + γE[r' + γV^π(s'') | s', π'(s')] | s, π'(s')]
+       ...
+       = V^π'(s)  (taking expectation under π')
+
+Consequence: Greedy policy improvement never worsens policy
+```
+
 ### Core Concepts
 
 **Reinforcement Learning** = Learning by interacting with an environment to maximize rewards.
