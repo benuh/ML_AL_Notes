@@ -393,6 +393,214 @@ class MCDropoutNN(nn.Module):
 
 Approximate intractable posterior distributions using optimization instead of sampling.
 
+### Theoretical Foundations of Variational Inference
+
+**Information-Theoretic View:**
+```
+KL Divergence as Information Projection:
+
+KL(q || p) = ∫ q(z) log[q(z)/p(z)] dz
+           = E_q[log q(z) - log p(z)]
+
+Properties:
+1. Non-negativity: KL(q || p) ≥ 0 (Gibbs' inequality)
+2. Equality: KL(q || p) = 0 ⟺ q = p almost everywhere
+3. Asymmetry: KL(q || p) ≠ KL(p || q) in general
+
+Proof of Non-negativity:
+KL(q || p) = -∫ q(z) log[p(z)/q(z)] dz
+           ≥ -log ∫ q(z) · [p(z)/q(z)] dz    (Jensen's inequality for log)
+           = -log ∫ p(z) dz
+           = -log(1) = 0  ✓
+
+Forward vs Reverse KL:
+- Forward: KL(p || q) = ∫ p(z) log[p(z)/q(z)] dz
+  Mode-seeking: q concentrates on modes of p
+  Problem: Requires sampling from p (intractable!)
+
+- Reverse: KL(q || p) = ∫ q(z) log[q(z)/p(z)] dz
+  Mean-seeking: q covers all modes of p (may be diffuse)
+  Advantage: Only requires sampling from q (tractable!)
+
+VI uses reverse KL → mean-seeking behavior
+```
+
+**Variational Gap Analysis:**
+```
+Decomposition:
+log p(x) = ELBO(q) + KL(q(z) || p(z|x))
+           └─ lower bound ┘  └─ approximation gap ┘
+
+Variational Gap: Δ = KL(q(z) || p(z|x))
+
+Tightness of ELBO:
+- Δ = 0: ELBO = log p(x) (exact inference)
+- Δ > 0: ELBO < log p(x) (approximate inference)
+
+How tight can ELBO be?
+
+Theorem (Variational Family Expressiveness):
+If variational family Q contains true posterior p(z|x):
+  min_q∈Q KL(q || p(z|x)) = 0
+
+Otherwise: Gap depends on expressiveness of Q
+
+Example: Gaussian q vs multimodal p(z|x)
+- Single Gaussian q: Large gap (can't capture multiple modes)
+- Mixture of Gaussians q: Smaller gap (can approximate modes)
+- Normalizing flow q: Potentially zero gap (universal approximator)
+
+Practical Implication:
+Choice of variational family Q critically affects approximation quality
+```
+
+**Convergence Guarantees:**
+```
+Coordinate Ascent Variational Inference (CAVI):
+
+Theorem (CAVI Convergence):
+Under mild regularity conditions:
+1. ELBO increases monotonically: ELBO^(t+1) ≥ ELBO^(t)
+2. CAVI converges to local optimum of ELBO
+3. Each coordinate update is optimal given other coordinates
+
+Proof Sketch:
+Let q^(t) = (q_1^(t), ..., q_d^(t)) at iteration t
+
+Update q_j^(t+1) by maximizing:
+ELBO(q_1^(t), ..., q_{j-1}^(t), q_j, q_{j+1}^(t), ..., q_d^(t))
+
+This is coordinate ascent on ELBO → monotonic improvement
+
+Convergence Rate:
+Generally O(1/t) for non-smooth objectives
+Can be linear for strongly concave ELBO
+
+Limitation: Local optimum (not global)
+ELBO is non-convex in general → initialization matters
+
+Stochastic VI (SVI):
+
+Robbins-Monro Conditions for step size α_t:
+1. Σ_t α_t = ∞ (sufficient decrease)
+2. Σ_t α_t² < ∞ (bounded variance)
+
+Typical choice: α_t = (t + τ)^(-κ)
+where τ ≥ 0 (delay), κ ∈ (0.5, 1] (controls decay)
+
+Convergence: E[ELBO^(t)] → ELBO* at rate O(1/√t)
+```
+
+**Black-Box Variational Inference (BBVI):**
+```
+Problem: Reparameterization trick only works for continuous variables
+
+General Solution: Score Function Estimator (REINFORCE)
+
+Gradient of ELBO:
+∇_φ E_q_φ[f(z)] = E_q_φ[f(z) · ∇_φ log q_φ(z)]
+
+Proof (Log-Derivative Trick):
+∇_φ ∫ q_φ(z) f(z) dz
+= ∫ ∇_φ q_φ(z) · f(z) dz
+= ∫ q_φ(z) · [∇_φ q_φ(z) / q_φ(z)] · f(z) dz
+= ∫ q_φ(z) · ∇_φ log q_φ(z) · f(z) dz
+= E_q_φ[f(z) · ∇_φ log q_φ(z)]  ✓
+
+Monte Carlo Estimator:
+∇_φ E_q_φ[f(z)] ≈ (1/L) Σ^L_{l=1} f(z^(l)) · ∇_φ log q_φ(z^(l))
+
+where z^(l) ~ q_φ(z)
+
+Variance Reduction:
+
+1. Baseline Subtraction (Control Variates):
+∇_φ E_q_φ[f(z)] = E_q_φ[(f(z) - b) · ∇_φ log q_φ(z)]
+
+where b is any baseline (doesn't depend on z)
+
+Optimal baseline: b* = E_q[f(z) · (∇_φ log q_φ(z))²] / E_q[(∇_φ log q_φ(z))²]
+
+Reduces variance without adding bias!
+
+2. Rao-Blackwellization:
+If f(z) = f(z_a, z_b) and we can marginalize z_b:
+Use E_{z_b}[f(z_a, z_b)] instead of f(z_a, z_b)
+
+Reduces variance by law of total variance:
+Var(E[X|Y]) ≤ Var(X)
+```
+
+**Importance Weighted Autoencoders (IWAE):**
+```
+Tighter Bound than VAE:
+
+IWAE Bound with K samples:
+log p(x) ≥ ELBO_K = E_z₁,...,z_K ~ q[log (1/K) Σ^K_{k=1} p(x,z_k)/q(z_k|x)]
+
+Properties:
+1. ELBO_K ≥ ELBO (tighter bound)
+2. lim_{K→∞} ELBO_K = log p(x) (exact as K → ∞)
+3. ELBO_1 = standard ELBO
+
+Proof that ELBO_K ≥ ELBO:
+log p(x) = log E_z~q[p(x,z)/q(z|x)]
+         = log E_z₁,...,z_K[(1/K)Σ_k p(x,z_k)/q(z_k|x)]
+         ≥ E[log (1/K)Σ_k p(x,z_k)/q(z_k|x)]    (Jensen)
+         = ELBO_K
+
+IWAE Gradient:
+∇_φ ELBO_K = E[Σ^K_{k=1} w_k · ∇_φ log q_φ(z_k|x)]
+
+where normalized importance weights:
+w_k = [p(x,z_k)/q(z_k|x)] / [Σ_j p(x,z_j)/q(z_j|x)]
+
+Signal-to-Noise Ratio:
+SNR increases with K → lower variance gradients
+
+Trade-off:
+- Larger K: Tighter bound, better gradients
+- Computational cost: O(K) forward passes
+
+Typical values: K ∈ {5, 10, 50}
+```
+
+**Amortized Inference:**
+```
+Standard VI: Optimize q_φ(z) separately for each x
+Computational cost: O(n × d) for n datapoints
+
+Amortized VI: Learn inference network φ(x) → q_φ(x)(z)
+Computational cost: O(d) per new datapoint (amortized over training)
+
+Encoder Network: h_φ: X → Parameters of q(z|x)
+Example: h_φ(x) = (μ_φ(x), σ_φ(x)) for Gaussian q
+
+Benefits:
+1. Fast inference at test time (single forward pass)
+2. Shares statistical strength across datapoints
+3. Enables generalization to new x
+
+Drawback:
+Amortization gap: q_φ(x)(z) may be less flexible than separately optimized q*_φ(z)
+
+Theoretical Analysis:
+Let q*_x = argmin_q KL(q(z) || p(z|x)) (optimal for x)
+Let q_φ(x) = inference network output
+
+Amortization gap: Δ_amort = E_x[KL(q_φ(x) || q*_x)]
+
+Gap depends on:
+- Encoder capacity (more parameters → smaller gap)
+- Distribution shift (train vs test)
+- Optimization (local minima)
+
+Reducing Gap:
+1. Increase encoder capacity
+2. Iterative amortized inference (refine q after encoder)
+3. Semi-amortized approaches (partial optimization per x)
+```
+
 **Mathematical Foundation:**
 
 **Bayesian Inference Problem:**
