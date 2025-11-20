@@ -208,22 +208,161 @@ plt.axhline(y=0, color='k', linestyle='--', linewidth=0.5)
 plt.show()
 ```
 
+### Rigorous Mathematical Theory of Ridge Regression
+
+**Bayesian Interpretation:**
+
+```
+Ridge regression is equivalent to Maximum A Posteriori (MAP) estimation
+with Gaussian prior on weights:
+
+Likelihood: p(y|X,w) = N(Xw, σ²I)
+Prior: p(w) = N(0, τ²I)
+
+Posterior: p(w|X,y) ∝ p(y|X,w) · p(w)
+
+Taking negative log:
+-log p(w|X,y) = (1/2σ²)||y - Xw||² + (1/2τ²)||w||² + const
+
+Ridge objective with λ = σ²/τ²:
+argmin_w [(1/2)||y - Xw||² + (λ/2)||w||²]
+
+Interpretation: Ridge assumes weights are normally distributed!
+Stronger regularization λ ⇔ tighter prior (smaller τ²)
+```
+
+**Closed-Form Solution with SVD Analysis:**
+
+```
+Ridge objective:
+L(w) = (1/2)||y - Xw||² + (λ/2)||w||²
+
+Setting gradient to zero:
+∇_w L = -Xᵀ(y - Xw) + λw = 0
+Xᵀy = (XᵀX + λI)w
+
+Closed-form solution:
+ŵ_ridge = (XᵀX + λI)⁻¹Xᵀy
+
+Compare to OLS: ŵ_OLS = (XᵀX)⁻¹Xᵀy
+
+SVD Analysis:
+Let X = UΣVᵀ be SVD of X (n×d matrix, rank r ≤ min(n,d))
+U: n×r orthonormal (left singular vectors)
+Σ: r×r diagonal with singular values σᵢ
+V: d×r orthonormal (right singular vectors)
+
+Then:
+XᵀX = VΣ²Vᵀ
+(XᵀX + λI)⁻¹ = V(Σ² + λI)⁻¹Vᵀ
+
+Ridge solution:
+ŵ_ridge = V(Σ² + λI)⁻¹ΣUᵀy
+        = Σᵢ₌₁ʳ [σᵢ/(σᵢ² + λ)] · (uᵢᵀy) · vᵢ
+
+OLS solution:
+ŵ_OLS = Σᵢ₌₁ʳ [1/σᵢ] · (uᵢᵀy) · vᵢ
+
+Shrinkage factor: σᵢ/(σᵢ² + λ) < 1/σᵢ
+
+Effect of λ on singular values:
+- Large σᵢ (strong signal): σᵢ²/(σᵢ² + λ) ≈ 1 (minimal shrinkage)
+- Small σᵢ (weak signal): σᵢ²/(σᵢ² + λ) ≈ σᵢ²/λ ≈ 0 (strong shrinkage)
+
+Key insight: Ridge shrinks components in weak directions more!
+
+Effective degrees of freedom:
+df(λ) = Σᵢ₌₁ʳ σᵢ²/(σᵢ² + λ)
+
+Properties:
+- λ = 0: df = r (full rank)
+- λ → ∞: df → 0 (shrink to 0)
+- Smooth function of λ
+```
+
+**Stability and Condition Number:**
+
+```
+Condition number of XᵀX:
+κ(XᵀX) = σ_max²/σ_min²
+
+For ill-conditioned problems (σ_min ≈ 0):
+- OLS unstable: (XᵀX)⁻¹ requires dividing by σ_min² ≈ 0
+- Coefficients have huge variance
+- Small data changes → large coefficient changes
+
+Ridge fixes this:
+κ(XᵀX + λI) = (σ_max² + λ)/(σ_min² + λ)
+
+As λ increases:
+- Condition number decreases
+- Solution becomes more stable
+- Variance of ŵ decreases
+
+Bias-Variance Tradeoff:
+E[ŵ_ridge] = (XᵀX + λI)⁻¹XᵀXw* ≠ w* (biased!)
+Var[ŵ_ridge] = σ²(XᵀX + λI)⁻¹XᵀX(XᵀX + λI)⁻¹ (lower than OLS!)
+
+MSE decomposition:
+MSE(ŵ) = Bias²(ŵ) + Var(ŵ) + σ²
+
+Optimal λ balances bias-variance:
+λ_optimal ≈ argmin_λ [Bias²(λ) + Var(λ)]
+
+Typically found via cross-validation
+```
+
+**Connections to Other Methods:**
+
+```
+Ridge as Constrained Optimization:
+Lagrangian formulation equivalent to:
+
+minimize   (1/2)||y - Xw||²
+subject to ||w||² ≤ t
+
+where t and λ are in one-to-one correspondence (larger λ ⇔ smaller t)
+
+Ridge as Kernel Ridge Regression:
+When n < d (more features than samples), use kernel trick:
+
+ŵ = Xᵀα where α = (XXᵀ + λI)⁻¹y
+
+Prediction: ŷ = Xŵ = Xᵀ(XXᵀ + λI)⁻¹y
+This is kernel ridge regression with linear kernel K = XXᵀ
+
+Computational advantage: Invert n×n matrix instead of d×d
+When n << d, this is much faster!
+
+Ridge as Tikhonov Regularization:
+Generalized form with penalty matrix Γ:
+
+ŵ = argmin_w [||y - Xw||² + ||Γw||²]
+
+Standard Ridge: Γ = √λ · I
+Can use other Γ to encode prior knowledge about w
+```
+
 ### Properties of Ridge
 
 **Advantages:**
 - ✅ Smooth, continuous shrinkage
-- ✅ Computationally efficient
+- ✅ Computationally efficient (closed-form solution)
 - ✅ Handles correlated features well
-- ✅ Always has a solution
+- ✅ Always has a solution (well-posed even when XᵀX singular)
+- ✅ Reduces condition number → numerical stability
+- ✅ Bayesian interpretation (Gaussian prior)
 
 **Disadvantages:**
 - ❌ Doesn't perform feature selection (keeps all features)
 - ❌ Coefficients never exactly zero
+- ❌ Biased estimator (E[ŵ] ≠ w*)
 
 **When to use:**
 - Many features with small-to-medium effects
-- Correlated features
+- Correlated features (multicollinearity)
 - When you want to keep all features
+- Ill-conditioned design matrices (numerical stability needed)
 
 ---
 
@@ -321,19 +460,204 @@ plt.axhline(y=0, color='k', linestyle='--', linewidth=0.5)
 plt.show()
 ```
 
+### Rigorous Mathematical Theory of Lasso
+
+**Why L1 Creates Sparsity - Subdifferential Analysis:**
+
+```
+Lasso objective:
+L(w) = (1/2)||y - Xw||² + λ||w||₁
+
+L1 norm is non-differentiable at wᵢ = 0!
+Use subdifferential ∂|wᵢ|:
+
+∂|wᵢ| = { +1      if wᵢ > 0
+        { -1      if wᵢ < 0
+        { [-1,1]  if wᵢ = 0
+
+Optimality condition (0 ∈ ∂L(ŵ)):
+For each coordinate i:
+0 ∈ -xᵢᵀ(y - Xŵ) + λ·∂|ŵᵢ|
+
+Case 1: ŵᵢ > 0
+-xᵢᵀ(y - Xŵ) + λ = 0
+⇒ xᵢᵀ(y - Xŵ) = λ
+
+Case 2: ŵᵢ < 0
+-xᵢᵀ(y - Xŵ) - λ = 0
+⇒ xᵢᵀ(y - Xŵ) = -λ
+
+Case 3: ŵᵢ = 0
+-λ ≤ xᵢᵀ(y - Xŵ) ≤ λ
+⇒ |xᵢᵀ(y - Xŵ)| ≤ λ
+
+Key Insight:
+If |xᵢᵀ(y - X₋ᵢŵ₋ᵢ)| < λ, then ŵᵢ = 0 exactly!
+
+This is why L1 produces exact zeros:
+The flat subdifferential at 0 allows ŵᵢ = 0 to satisfy optimality
+
+Compare to L2:
+∂(wᵢ²) = 2wᵢ (smooth, always defined)
+For wᵢ = 0: requires gradient = 0 (measure-zero event)
+⇒ Ridge never produces exact zeros!
+```
+
+**Soft-Thresholding Operator:**
+
+```
+For orthogonal X (XᵀX = I), Lasso has closed form!
+
+Coordinate-wise solution:
+ŵᵢ = S_λ(ŵᵢ^OLS)
+
+where S_λ is soft-thresholding operator:
+
+S_λ(z) = sign(z)·max(|z| - λ, 0)
+       = { z - λ    if z > λ
+         { 0        if |z| ≤ λ
+         { z + λ    if z < -λ
+
+Geometric interpretation:
+- If |ŵᵢ^OLS| ≤ λ: Shrink to exactly 0
+- If |ŵᵢ^OLS| > λ: Shrink by λ toward 0
+
+Compare to Ridge (for orthogonal X):
+ŵᵢ^Ridge = ŵᵢ^OLS / (1 + λ)  (proportional shrinkage)
+
+Visual comparison:
+Ridge: ŵ = cŵ^OLS where c < 1 (scale down)
+Lasso: ŵ = S_λ(ŵ^OLS) (shift toward 0, then truncate)
+```
+
+**Bayesian Interpretation:**
+
+```
+Lasso equivalent to MAP estimation with Laplace prior:
+
+Prior: p(wᵢ) = (1/2b)exp(-|wᵢ|/b)  [Laplace/double exponential]
+
+Taking negative log:
+-log p(w|X,y) ∝ (1/2σ²)||y - Xw||² + (1/b)Σ|wᵢ|
+
+Lasso with λ = σ²/b
+
+Laplace prior properties:
+- Peaked at 0 (encourages sparsity)
+- Heavy tails (allows large weights when needed)
+- L1 penalty is MAP with Laplace prior
+
+Gaussian vs Laplace prior:
+- Gaussian: p(w) ∝ exp(-w²/2τ²)  → Ridge (L2)
+- Laplace: p(w) ∝ exp(-|w|/b)   → Lasso (L1)
+
+Laplace has sharper peak at 0 → more mass on w=0 → sparsity!
+```
+
+**Coordinate Descent Algorithm:**
+
+```
+Lasso has no closed form for general X
+Use coordinate descent (very efficient!):
+
+Initialize: ŵ = 0
+Repeat until convergence:
+  For j = 1, ..., d:
+    # Partial residual (fixing all weights except wⱼ)
+    rⱼ = y - Σₖ≠ⱼ Xₖŵₖ
+
+    # Coordinate-wise update
+    ŵⱼ^OLS = xⱼᵀrⱼ / ||xⱼ||²
+
+    # Soft-threshold
+    ŵⱼ ← S_{λ/||xⱼ||²}(ŵⱼ^OLS)
+
+Convergence: Guaranteed for convex Lasso problem
+Complexity: O(nd) per pass through coordinates
+Typically converges in 10-100 passes
+
+Why coordinate descent works well:
+- Each subproblem has closed-form solution (soft-threshold)
+- Exploits sparsity (skip zero coordinates)
+- No matrix inversions needed
+- Very fast in practice
+```
+
+**Statistical Properties:**
+
+```
+Theorem (Lasso Consistency - Zhao & Yu, 2006):
+Under "irrepresentable condition" on X:
+
+With probability → 1 as n → ∞:
+(i)  Lasso correctly identifies support: {i : ŵᵢ ≠ 0} = {i : wᵢ* ≠ 0}
+(ii) ||ŵ - w*|| → 0 (consistent)
+
+Irrepresentable condition:
+Requires X_inactive not too correlated with X_active
+
+Warning: This is a strong condition!
+- Fails when features highly correlated
+- Explains Lasso instability with correlation
+
+Degrees of Freedom (Zou et al., 2007):
+For Lasso: df(λ) ≈ E[# non-zero coefficients]
+
+Not smooth like Ridge! Jumps when variables enter/leave model
+
+Prediction Error Bound:
+Under restricted eigenvalue condition:
+||Xŵ - Xw*||² ≤ C·s·log(d)/n
+
+where s = |{i : wᵢ* ≠ 0}| (true sparsity)
+
+Key: Error depends on log(d), not d!
+⇒ Lasso works even when d >> n (high-dimensional regime)
+```
+
+**Geometric Interpretation:**
+
+```
+Constrained formulation:
+minimize   (1/2)||y - Xw||²
+subject to ||w||₁ ≤ t
+
+L1 ball geometry:
+- In 2D: Diamond shape |w₁| + |w₂| ≤ t
+- Has corners at axes (w₁=0 or w₂=0)
+- Elliptical contours of ||y - Xw||² hit corners
+- ⇒ Solution often at corner (sparse!)
+
+L2 ball geometry:
+- In 2D: Circle w₁² + w₂² ≤ t²
+- No corners, smooth boundary
+- Solution rarely at axis (w₁=0 or w₂=0)
+- ⇒ No sparsity!
+
+General Lp penalty (p ∈ (0,2]):
+||w||_p^p = Σ|wᵢ|^p
+
+p < 1: Even sparser (non-convex!)
+p = 1: Lasso (sparsest convex penalty)
+p = 2: Ridge (no sparsity)
+```
+
 ### Properties of Lasso
 
 **Advantages:**
 - ✅ Performs automatic feature selection
-- ✅ Produces sparse models (many coefficients = 0)
+- ✅ Produces sparse models (many coefficients exactly = 0)
 - ✅ Interpretable (fewer features to explain)
-- ✅ Good for high-dimensional data
+- ✅ Good for high-dimensional data (d >> n)
+- ✅ Prediction error depends on log(d), not d
+- ✅ Bayesian interpretation (Laplace prior)
 
 **Disadvantages:**
-- ❌ Unstable with correlated features (small data changes → large coefficient changes)
+- ❌ Unstable with correlated features (violates irrepresentable condition)
 - ❌ Arbitrarily selects one feature from correlated group
-- ❌ Slower to compute than Ridge (no closed-form solution, requires iterative optimization like coordinate descent or LARS)
-- ❌ May struggle when p > n (more features than samples)
+- ❌ Slower to compute than Ridge (no closed form, needs coordinate descent)
+- ❌ May select at most n features when p > n
+- ❌ Biased for large coefficients (shrinks everything by λ)
 
 **Why instability with correlated features?**
 When features are highly correlated (Pearson correlation |ρ| > 0.9), Lasso exhibits selection instability:
@@ -341,12 +665,14 @@ When features are highly correlated (Pearson correlation |ρ| > 0.9), Lasso exhi
 - Example: If X₁ and X₂ are identical, solutions can range from (w₁=k, w₂=0) to (w₁=0, w₂=k)
 - Small perturbations in data can cause drastic changes in which feature is selected
 - Ridge regression distributes weight equally: (w₁=k/2, w₂=k/2) for identical features
+- Violates irrepresentable condition when X_inactive correlated with X_active
 
 **When to use:**
-- High-dimensional data (many features)
-- When you believe many features are irrelevant
-- When interpretability is important
+- High-dimensional data (d >> n)
+- When you believe many features are irrelevant (sparse ground truth)
+- When interpretability is important (want few features)
 - When you want automatic feature selection
+- When features not too correlated (|ρ| < 0.5)
 
 ---
 
