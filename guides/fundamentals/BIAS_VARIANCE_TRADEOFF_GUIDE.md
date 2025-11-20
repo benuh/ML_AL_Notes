@@ -121,6 +121,228 @@ Where:
 
 **Key insight:** This decomposition shows that even with infinite data (eliminating variance), we still have bias + irreducible error. With a perfect model (zero bias), we still have variance + irreducible error.
 
+### Rigorous Proof of Bias-Variance Decomposition
+
+```
+Theorem (Bias-Variance Decomposition for Squared Loss):
+For a fixed point x, let:
+- y ~ P(y|x) with E[y|x] = f(x) and Var[y|x] = σ²
+- ŷ = ŷ(x;D) be predictor trained on dataset D ~ P^n
+- Expectation E[·] is over both D and y|x
+
+Then:
+E_D,y[(y - ŷ)²] = Bias²(ŷ) + Var(ŷ) + σ²
+
+Proof:
+Step 1: Add and subtract E_D[ŷ] and f(x):
+(y - ŷ)² = (y - f(x) + f(x) - E_D[ŷ] + E_D[ŷ] - ŷ)²
+
+Step 2: Expand using (a+b+c)²:
+(y - ŷ)² = (y - f(x))² + (f(x) - E_D[ŷ])² + (E_D[ŷ] - ŷ)²
+          + 2(y - f(x))(f(x) - E_D[ŷ])
+          + 2(y - f(x))(E_D[ŷ] - ŷ)
+          + 2(f(x) - E_D[ŷ])(E_D[ŷ] - ŷ)
+
+Step 3: Take expectation E_D,y[·]:
+
+E_D,y[(y - f(x))²] = E_y[(y - f(x))²] = σ²
+  [Irreducible error, independent of D]
+
+E_D,y[(f(x) - E_D[ŷ])²] = (f(x) - E_D[ŷ])²
+  [Bias², deterministic once we take E_D]
+
+E_D,y[(E_D[ŷ] - ŷ)²] = E_D[(E_D[ŷ] - ŷ)²] = Var_D[ŷ]
+  [Variance, independent of y]
+
+Step 4: Show cross-terms vanish:
+
+E_D,y[(y - f(x))(f(x) - E_D[ŷ])]
+  = E_y[y - f(x)] · E_D[f(x) - E_D[ŷ]]
+  = 0 · (f(x) - E_D[ŷ])  [since E_y[y] = f(x)]
+  = 0 ✓
+
+E_D,y[(y - f(x))(E_D[ŷ] - ŷ)]
+  = E_y[y - f(x)] · E_D[E_D[ŷ] - ŷ]
+  = 0 · 0  [both expectations are 0]
+  = 0 ✓
+
+E_D,y[(f(x) - E_D[ŷ])(E_D[ŷ] - ŷ)]
+  = E_D[(f(x) - E_D[ŷ]) · (E_D[ŷ] - ŷ)]
+  = (f(x) - E_D[ŷ]) · E_D[E_D[ŷ] - ŷ]
+  = (f(x) - E_D[ŷ]) · 0  [since E_D[E_D[ŷ] - ŷ] = 0]
+  = 0 ✓
+
+Therefore:
+E_D,y[(y - ŷ)²] = σ² + (f(x) - E_D[ŷ])² + Var_D[ŷ]
+                 = Irreducible + Bias² + Variance ✓
+
+Corollary (Integrated MSE):
+Integrating over x ~ P(x):
+
+MSE = E_x,D,y[(y - ŷ)²]
+    = E_x[Bias²(x)] + E_x[Var(x)] + σ²
+
+Interpretation:
+- Bias²: Systematic error from model family limitations
+- Variance: Error from sensitivity to training data randomness
+- σ²: Fundamental limit from noise (cannot be reduced)
+```
+
+**Alternative Decomposition - Estimation and Approximation Error:**
+
+```
+Expected Risk:
+R(ŷ_D) = E_D,x,y[(y - ŷ_D(x))²]
+
+Decompose into:
+R(ŷ_D) = Approximation Error + Estimation Error + Noise
+
+Approximation Error (Bias from model class):
+E_app = min_{f ∈ F} E_x,y[(y - f(x))²] - σ²
+
+where F is hypothesis class (e.g., linear functions, degree-d polynomials)
+
+Measures: How well can best function in F approximate truth?
+
+Estimation Error (Variance from finite data):
+E_est = E_D,x,y[(y - ŷ_D(x))²] - min_{f ∈ F} E_x,y[(y - f(x))²]
+
+Measures: How far is learned function from best in F due to finite n?
+
+Properties:
+- E_app ↓ as F grows (more expressive)
+- E_est ↑ as F grows (harder to estimate)
+- Classic bias-variance tradeoff!
+
+Example:
+F = {degree-d polynomials}
+- Small d: Large E_app (can't fit complex functions), small E_est (easy to fit)
+- Large d: Small E_app (can fit complex functions), large E_est (overfits)
+- Optimal d* balances both
+```
+
+**Bias-Variance for Different Loss Functions:**
+
+```
+Squared Loss: E[(y - ŷ)²]
+Decomposition: Bias² + Variance + σ²
+Properties: Smooth, unique decomposition
+
+Absolute Loss: E[|y - ŷ|]
+Cannot decompose cleanly into bias/variance!
+Reason: |·| is not smooth
+
+0-1 Loss (Classification): E[I{y ≠ ŷ}]
+Complex decomposition involving covariance terms
+Kohavi & Wolpert (1996):
+
+E[I{y ≠ ŷ}] = Noise + Bias + Variance - covariance terms
+
+Bias² (Classification):
+(P(ŷ = 1) - P(y = 1))²
+
+Variance (Classification):
+P(ŷ = 1)(1 - P(ŷ = 1))
+
+Key difference: Variance bounded by 0.25 for binary classification!
+
+Log Loss (Cross-entropy): E[y log(1/ŷ) + (1-y)log(1/(1-ŷ))]
+Decomposition involves KL divergence:
+E[log loss] = KL(P(y|x) || P(ŷ|x)) + H(y|x)
+
+where H(y|x) is conditional entropy (irreducible)
+```
+
+**Statistical Learning Theory Perspective:**
+
+```
+Generalization Error:
+R(ŷ) = E_x,y[L(y, ŷ(x))]  [True risk]
+R_emp(ŷ) = (1/n)Σᵢ L(yᵢ, ŷ(xᵢ))  [Empirical risk]
+
+Generalization Gap:
+R(ŷ) - R_emp(ŷ)
+
+Fundamental Inequality (Uniform Convergence):
+|R(ŷ) - R_emp(ŷ)| ≤ 2·Rad_n(F) + O(√(log(1/δ)/n))
+
+where Rad_n(F) is Rademacher complexity of F
+
+Rademacher Complexity:
+Measures richness/flexibility of hypothesis class F
+
+Rad_n(F) = E_σ[sup_{f ∈ F} (1/n)|Σᵢ σᵢ f(xᵢ)|]
+
+where σᵢ ∈ {-1,+1} are Rademacher variables
+
+Properties:
+- Larger F → larger Rad_n(F) → worse generalization
+- Rad_n(F) ≈ O(√(d/n)) for d-dimensional linear functions
+- Rad_n(F) ≈ O(√(VCdim(F)/n)) in general
+
+Connection to Bias-Variance:
+- Approximation error ≈ Bias (from limited F)
+- Estimation error ≈ Variance (from Rad_n(F))
+- Rademacher complexity formalizes "effective parameters"
+
+VC Dimension:
+VCdim(F) = largest m such that F can shatter m points
+
+Examples:
+- Linear classifiers in ℝᵈ: VCdim = d + 1
+- Degree-k polynomials in ℝᵈ: VCdim = O(dᵏ)
+- Neural network with W weights: VCdim = O(W²)
+
+Sample Complexity:
+Need n = O(VCdim(F)/ε²) samples for ε-accurate learning
+
+Bias-Variance interpretation:
+- High VCdim → low bias (can fit complex functions)
+- High VCdim → high variance (needs more samples)
+```
+
+**Modern Insight: Double Descent Phenomenon:**
+
+```
+Classical View (U-shaped curve):
+Test error first decreases, then increases with model complexity
+
+Modern Deep Learning:
+Test error decreases, increases, then decreases again!
+
+Double Descent Curve:
+1. Underparameterized regime (d < n):
+   - Classical bias-variance tradeoff
+   - Test error has U-shape
+   - Minimum at optimal complexity d*
+
+2. Interpolation threshold (d ≈ n):
+   - Peak of test error
+   - Model barely fits training data
+   - Highly unstable
+
+3. Overparameterized regime (d >> n):
+   - Test error decreases again!
+   - Implicit regularization from optimization
+   - "Benign overfitting"
+
+Why does this happen?
+- Multiple interpolating solutions when d > n
+- SGD/GD picks "simplest" solution (implicit bias)
+- Inductive bias from architecture + optimizer
+- Effective dimension < actual dimension
+
+Reconciliation with bias-variance:
+- Classical theory: Fixed hypothesis class F
+- Modern: F changes with optimization algorithm
+- Effective complexity ≠ parameter count
+- Variance can decrease in overparameterized regime!
+
+Practical implication:
+More parameters can help, even with small datasets!
+(Contradicts classical advice to reduce model size)
+```
+
 ```python
 def compute_bias_variance(model_class, X_train, y_train, X_test, y_test,
                          n_iterations=100, **model_params):
