@@ -464,6 +464,171 @@ predictions = extra_trees.predict(X_test)
 
 **Strategy:** Sequentially train models, giving more weight to misclassified samples.
 
+**Rigorous Mathematical Theory:**
+
+```
+AdaBoost Algorithm (Freund & Schapire, 1997):
+Input: Training set {(x₁,y₁), ..., (xₙ,yₙ)} where yᵢ ∈ {-1,+1}
+       Weak learner algorithm WeakLearn
+       Number of rounds T
+
+Initialize: D₁(i) = 1/n for i = 1,...,n
+
+For t = 1 to T:
+  1. Train weak learner on distribution Dₜ:
+     hₜ = WeakLearn(S, Dₜ)
+
+  2. Calculate weighted error:
+     εₜ = Σᵢ Dₜ(i)·I{hₜ(xᵢ) ≠ yᵢ} = Pᵢ~Dₜ[hₜ(xᵢ) ≠ yᵢ]
+
+  3. If εₜ ≥ 1/2: Stop (weak learner assumption violated)
+
+  4. Calculate classifier weight:
+     αₜ = (1/2)·ln((1-εₜ)/εₜ)
+
+     Properties:
+     - εₜ < 1/2 ⇒ αₜ > 0 (correct predictions get positive weight)
+     - εₜ → 0 ⇒ αₜ → ∞ (perfect classifier gets infinite weight)
+     - εₜ → 1/2 ⇒ αₜ → 0 (random classifier gets zero weight)
+
+  5. Update distribution:
+     Dₜ₊₁(i) = (Dₜ(i)/Zₜ)·exp(-αₜ·yᵢ·hₜ(xᵢ))
+
+     where Zₜ = Σᵢ Dₜ(i)·exp(-αₜ·yᵢ·hₜ(xᵢ)) is normalization
+
+     Interpretation:
+     - Correct: yᵢ·hₜ(xᵢ) = +1 ⇒ exp(-αₜ) < 1 (decrease weight)
+     - Incorrect: yᵢ·hₜ(xᵢ) = -1 ⇒ exp(+αₜ) > 1 (increase weight)
+
+Output: H(x) = sign(Σₜ₌₁ᵀ αₜ·hₜ(x))
+
+Theorem 1 (Training Error Bound - Freund & Schapire 1997):
+The training error of AdaBoost is bounded by:
+
+ε_train ≤ ∏ₜ₌₁ᵀ Zₜ = ∏ₜ₌₁ᵀ 2√(εₜ(1-εₜ))
+
+Proof:
+Training error:
+ε_train = (1/n)Σᵢ I{H(xᵢ) ≠ yᵢ}
+
+For misclassified point: yᵢ·H(xᵢ) = yᵢ·Σₜ αₜhₜ(xᵢ) ≤ 0
+
+Therefore:
+I{H(xᵢ) ≠ yᵢ} ≤ exp(-yᵢ·Σₜ αₜhₜ(xᵢ))  [upper bound via exp]
+
+Taking average:
+ε_train ≤ (1/n)Σᵢ exp(-yᵢ·Σₜ αₜhₜ(xᵢ))
+        = (1/n)Σᵢ ∏ₜ exp(-αₜ·yᵢ·hₜ(xᵢ))
+
+Key observation: By induction on t, we can show:
+Dₜ₊₁(i) = (1/n)·exp(-Σₛ₌₁ᵗ αₛ·yᵢ·hₛ(xᵢ)) / ∏ₛ₌₁ᵗ Zₛ
+
+Therefore:
+Dₜ₊₁(i)·∏ₛ₌₁ᵗ Zₛ = (1/n)·exp(-Σₛ₌₁ᵗ αₛ·yᵢ·hₛ(xᵢ))
+
+At t = T:
+ε_train ≤ Σᵢ Dₜ₊₁(i)·∏ₜ Zₜ = ∏ₜ Zₜ·Σᵢ Dₜ₊₁(i) = ∏ₜ Zₜ  ✓
+
+Corollary (Exponential Convergence):
+If εₜ ≤ 1/2 - γ for all t (weak learning assumption with edge γ > 0):
+
+Zₜ = 2√(εₜ(1-εₜ)) ≤ 2√((1/2-γ)(1/2+γ)) = 2√(1/4 - γ²) = √(1-4γ²)
+
+Therefore:
+ε_train ≤ (√(1-4γ²))ᵀ ≈ exp(-2γ²T)
+
+Exponential decay! With γ = 0.1 and T = 100:
+ε_train ≤ exp(-2) ≈ 0.135 (13.5%)
+
+Key Insight: Even weak learners (slightly better than random) exponentially reduce training error!
+
+Theorem 2 (Margin-Based Generalization Bound - Schapire et al. 1998):
+Define margin of example (x,y):
+
+ρ(x,y) = (y·Σₜ αₜhₜ(x)) / (Σₜ αₜ)
+
+Measures confidence: ρ ∈ [-1,1]
+- ρ > 0: Correct classification
+- ρ → 1: High confidence correct
+- ρ < 0: Misclassification
+
+Theorem: With probability ≥ 1-δ over training set S of size n:
+
+P[ρ(x,y) ≤ θ] ≤ P̂[ρ(x,y) ≤ θ] + O(√((1/θ²)·(d·log²(n)·log(n/d) + log(1/δ))/n))
+
+where:
+- P̂: Empirical probability on training set
+- d: VC dimension of base hypothesis class
+- θ: Margin threshold
+
+Key Insights:
+1. Larger margins θ → better generalization (lower bound)
+2. Bound depends on 1/θ², not on number of rounds T!
+3. AdaBoost maximizes minimum margin (implicit margin maximization)
+4. This explains why AdaBoost doesn't overfit even with many rounds!
+
+Example:
+n = 1000, d = 10, θ = 0.5, δ = 0.05
+Bound ≈ P̂ + 0.15
+
+If 95% of training examples have margin > 0.5:
+Test error ≤ 5% + 15% = 20% (with 95% confidence)
+
+Connection to SVM:
+Both maximize margin, but different norms:
+- AdaBoost: Maximizes minimum L∞ margin
+- SVM: Maximizes minimum L₂ margin
+```
+
+**Statistical Interpretation:**
+
+```
+Forward Stagewise Additive Modeling (Friedman et al. 2000):
+AdaBoost is equivalent to forward stagewise fitting of additive model
+using exponential loss!
+
+Loss function:
+L(y, F(x)) = exp(-y·F(x))
+
+where F(x) = Σₜ αₜhₜ(x)
+
+At each round t, solve:
+(αₜ, hₜ) = argmin_{α,h} Σᵢ exp(-yᵢ·[Fₜ₋₁(xᵢ) + α·h(xᵢ)])
+
+Setting ∂L/∂α = 0 yields:
+αₜ = (1/2)log((1-εₜ)/εₜ)  [exactly AdaBoost's α!]
+
+Why exponential loss?
+- Differentiable (unlike 0-1 loss)
+- Convex (unique optimum)
+- Margin-maximizing property
+- Computationally tractable
+
+Drawback:
+- Not robust to outliers/noise
+- exp(-y·F) → ∞ for large margin violations
+- Logistic loss better for noisy data
+
+Comparison with other losses:
+┌──────────────┬─────────────────┬────────────┬────────────┐
+│ Loss         │ Formula         │ Robust?    │ Derivative │
+├──────────────┼─────────────────┼────────────┼────────────┤
+│ 0-1          │ I{yF < 0}       │ Yes        │ N/A        │
+│ Exponential  │ exp(-yF)        │ No         │ -y exp(-yF)│
+│ Logistic     │ log(1+exp(-yF)) │ Somewhat   │ -y/(1+e^yF)│
+│ Hinge (SVM)  │ max(0, 1-yF)    │ Yes        │ -y if yF<1 │
+└──────────────┴─────────────────┴────────────┴────────────┘
+
+Exponential vs Logistic:
+- Exponential: ∂L/∂F = -y·exp(-yF) (grows exponentially for mistakes)
+- Logistic: ∂L/∂F = -y/(1+exp(yF)) (bounded by y)
+
+AdaBoost variants for robustness:
+- LogitBoost: Uses logistic loss instead of exponential
+- Gentle AdaBoost: Uses modified exponential loss
+- Robust AdaBoost: Caps weights to handle outliers
+```
+
 ```python
 from sklearn.ensemble import AdaBoostClassifier
 
@@ -580,6 +745,192 @@ Connection to gradient descent:
 Convergence rate (for convex L):
   E[F_M] - E[F*] = O(1/M) with ν = 1
   Slower with ν < 1 but better generalization
+```
+
+**Rigorous Convergence Theory:**
+
+```
+Theorem 3 (Gradient Boosting Convergence - Friedman 2001):
+For convex loss L and base learner class H with approximation error ε_H:
+
+||∇_F L(F_M) - ∇_F L(F*)||² ≤ O(1/M)
+
+Proof Sketch:
+At each iteration, we solve:
+h_m = argmin_h Σᵢ (rᵢₘ - h(xᵢ))²
+
+where rᵢₘ = -∂L(yᵢ, F)/∂F|_{F=F_{m-1}}
+
+This is L2 projection of gradient onto H:
+h_m ≈ Proj_H(-∇_F L(F_{m-1}))
+
+If H can approximate any function to accuracy ε_H:
+||h_m - (-∇_F L(F_{m-1}))||² ≤ ε_H²
+
+Standard gradient descent analysis gives O(1/M) convergence
+
+Function Space Gradient Descent:
+Standard GD: θₜ₊₁ = θₜ - α∇L(θₜ)
+Boosting: Fₘ = Fₘ₋₁ - ν·hₘ where hₘ ≈ ∇_F L(Fₘ₋₁)
+
+Key difference: Optimization over function space, not parameter space!
+
+Statistical Rates:
+For well-specified model (F* ∈ span(H)):
+- Training error: Ê[L] - L* = O(1/M)
+- Generalization: E[L] - E[L*] = O(√(M·log(n)/n))
+
+Trade-off:
+- More rounds M → lower training error
+- But M too large → overfitting (variance ∝ √M)
+
+Optimal M: M* ≈ √n (balance bias-variance)
+
+Early Stopping as Regularization:
+Stopping at iteration M < ∞ is implicit regularization
+- Underfits function space → reduces variance
+- Similar to ridge regression shrinkage
+- Cross-validation to choose M
+
+Shrinkage Parameter ν ∈ (0,1]:
+F_m = F_{m-1} + ν·h_m
+
+Theorem (Friedman 2001):
+Smaller ν requires more iterations but often better test error
+
+Intuition:
+- ν = 1: Fast convergence, may overfit
+- ν ≪ 1: Slow convergence, better regularization
+- Typical: ν ∈ [0.01, 0.3]
+
+Trade-off: M and ν inversely related
+- Small ν → need large M
+- ν = 0.1, M = 1000 ≈ ν = 1, M = 100
+
+But smaller ν + larger M often generalizes better!
+```
+
+**Advanced Gradient Boosting Theory:**
+
+```
+XGBoost Objective (Chen & Guestrin, 2016):
+Adds second-order information and regularization!
+
+Obj(F_m) = Σᵢ L(yᵢ, F_{m-1}(xᵢ) + h_m(xᵢ)) + Ω(h_m)
+
+Second-order Taylor approximation:
+L(yᵢ, F_{m-1} + h_m) ≈ L(yᵢ, F_{m-1}) + gᵢ·h_m(xᵢ) + (hᵢ/2)·h_m²(xᵢ)
+
+where:
+- gᵢ = ∂L(yᵢ, F)/∂F|_{F=F_{m-1}} (first derivative)
+- hᵢ = ∂²L(yᵢ, F)/∂F²|_{F=F_{m-1}} (second derivative)
+
+Regularization:
+Ω(h) = γT + (λ/2)Σⱼ₌₁ᵀ wⱼ²
+
+where:
+- T: number of leaves in tree h
+- wⱼ: weight (prediction) at leaf j
+- γ: penalty for number of leaves
+- λ: L2 penalty on leaf weights
+
+Optimal leaf weights (closed-form!):
+wⱼ* = -Σᵢ∈Iⱼ gᵢ / (Σᵢ∈Iⱼ hᵢ + λ)
+
+where Iⱼ = {i : h(xᵢ) uses leaf j}
+
+Gain from split:
+Gain = ½[(Σᵢ∈Iₗ gᵢ)²/(Σᵢ∈Iₗ hᵢ + λ) +
+           (Σᵢ∈Iᵣ gᵢ)²/(Σᵢ∈Iᵣ hᵢ + λ) -
+           (Σᵢ∈I gᵢ)²/(Σᵢ∈I hᵢ + λ)] - γ
+
+Split if Gain > 0
+
+Advantages of second-order method:
+1. Newton-like updates (faster convergence)
+2. Better approximation than first-order
+3. Closed-form optimal leaf weights
+4. Natural regularization via hᵢ
+
+Complexity per iteration:
+- First-order GB: O(nd) [evaluate gradients]
+- Second-order XGB: O(nd) [evaluate gradients + hessians]
+- Same asymptotic complexity!
+
+But XGB needs fewer iterations → faster overall
+
+Histogram-Based Splitting (LightGBM/XGBoost):
+Instead of exact split finding:
+1. Bin continuous features into K bins
+2. Build histogram of gradients per bin
+3. Find best split using histograms
+
+Complexity:
+- Exact: O(nd·#features·#splits) ≈ O(nd²)
+- Histogram: O(nd + K·#features) ≈ O(nd)
+
+For large n, histogram much faster!
+
+Sample & Feature Subsampling:
+Randomly sample:
+- Rows: subsample ∈ (0,1] (typical: 0.5-0.9)
+- Columns: colsample_bytree ∈ (0,1] (typical: 0.5-0.9)
+
+Effects:
+1. Variance reduction (like Random Forest bagging)
+2. Computational speedup (fewer samples/features)
+3. Decorrelates trees → better ensemble
+
+Theory: Similar to Random Forest analysis
+Variance ∝ ρ + (1-ρ)/M
+Subsampling reduces ρ (correlation between trees)
+```
+
+**Gradient Boosting vs AdaBoost:**
+
+```
+Unified View (Friedman et al. 2000):
+Both are additive models: F(x) = Σₘ αₘhₘ(x)
+
+Difference is LOSS FUNCTION:
+
+AdaBoost:
+- Loss: L(y,F) = exp(-yF)
+- Minimizes exponential loss
+- Classification only
+- Reweights samples explicitly
+
+Gradient Boosting:
+- Loss: Any differentiable L(y,F)
+- Minimizes general loss via functional gradient
+- Regression or classification
+- Reweights via pseudo-residuals
+
+Connection:
+If GB uses exponential loss L(y,F) = exp(-yF):
+- Pseudo-residuals: r = y·exp(-yF)
+- This gives AdaBoost updates!
+
+AdaBoost = Special case of GB with exponential loss
+
+Why GB more general:
+- Can use any loss (squared, Huber, quantile, etc.)
+- Second-order approximations (XGBoost)
+- Explicit regularization (tree constraints, penalties)
+- Better for regression
+
+Why AdaBoost still useful:
+- Simpler algorithm
+- Strong theoretical guarantees (margin bounds)
+- Works well with simple weak learners (stumps)
+- Less prone to overfitting than GB (with many trees)
+
+Practical Guidance:
+- Classification with stumps: AdaBoost
+- Regression: Gradient Boosting
+- Tabular data competition: XGBoost/LightGBM/CatBoost
+- Need interpretability: AdaBoost (simpler)
+- Need speed on large data: LightGBM
 ```
 
 **Common Loss Functions and Gradients:**
