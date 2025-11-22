@@ -99,6 +99,149 @@ Std: 0.0141
 
 For this example: SE ≈ 0.0141/√5 × √1.6 ≈ 0.008, so 95% CI ≈ [0.834, 0.866].
 
+**Rigorous Statistical Theory of Cross-Validation:**
+
+```
+K-Fold CV Estimator:
+Let D = {(x₁,y₁), ..., (xₙ,yₙ)} be training data
+Partition into K folds: D = D₁ ∪ D₂ ∪ ... ∪ Dₖ
+
+For fold k:
+- Train set: D₋ₖ = D \ Dₖ (all data except fold k)
+- Test set: Dₖ
+- Algorithm produces: f̂₋ₖ trained on D₋ₖ
+- Error on fold k: Êₖ = (1/|Dₖ|) Σ_{(x,y)∈Dₖ} L(y, f̂₋ₖ(x))
+
+K-fold CV estimate:
+CV_K = (1/K) Σₖ₌₁ᴷ Êₖ
+
+Theoretical Question: What does CV_K estimate?
+
+Target 1: True Risk (Population Error)
+R(f̂) = E_{(x,y)~P}[L(y, f̂(x))]
+
+where f̂ is trained on all n samples
+
+Target 2: Expected Risk over Random Training Sets
+R̄ = E_D[R(f̂_D)]
+
+where expectation is over all possible training sets D of size n
+
+Theorem 1 (Bias of K-Fold CV - Stone 1974):
+E[CV_K] ≈ E[R(f̂_{n(K-1)/K})]
+
+K-fold CV is approximately unbiased for risk of model trained on n(K-1)/K samples
+
+Implication:
+- K=5: Estimates R(f̂_{0.8n}) (80% of data)
+- K=10: Estimates R(f̂_{0.9n}) (90% of data)
+- LOOCV (K=n): Estimates R(f̂_{n-1}) ≈ R(f̂_n) (most accurate)
+
+Bias of CV_K for estimating R(f̂_n):
+Bias(CV_K) = E[CV_K] - R(f̂_n)
+           ≈ R(f̂_{n(K-1)/K}) - R(f̂_n)
+
+If learning curve is concave (typical):
+R(f̂_m) decreases with m (more data → better model)
+⇒ R(f̂_{0.8n}) > R(f̂_n)
+⇒ CV_5 has pessimistic bias (overestimates error)
+
+Variance of CV_K:
+Var(CV_K) = Var[(1/K) Σₖ Êₖ]
+          = (1/K²) [Σₖ Var(Êₖ) + 2Σₖ<ⱼ Cov(Êₖ, Êⱼ)]
+
+Key observation: Folds are NOT independent!
+- Training sets overlap by (K-2)/(K-1) of data
+- For K=5: 75% overlap between any two training sets
+- This creates positive correlation: Cov(Êₖ, Êⱼ) > 0
+
+Theorem 2 (Nadeau & Bengio 2003):
+Under mild conditions:
+
+Var(CV_K) ≈ (σ²/n) · [1 + (n_test/n_train)]
+
+where:
+- σ²: Variance of single prediction error
+- n_test = n/K: Test fold size
+- n_train = n(K-1)/K: Training fold size
+
+For K=5: n_test/n_train = 1/4
+⇒ Var(CV_5) ≈ (σ²/n) · 1.25
+
+For K=10: n_test/n_train = 1/9
+⇒ Var(CV_10) ≈ (σ²/n) · 1.11
+
+For LOOCV (K=n): n_test/n_train = 1/(n-1) ≈ 0
+⇒ Var(LOOCV) ≈ σ²/n · 1 = σ²/n
+
+But LOOCV has high variance from correlation!
+
+Bengio-Nadeau Corrected Variance:
+Taking into account correlation between folds:
+
+Var(CV_K) = (1/K) · σ̂²_K · (1 + n_test/n_train)
+
+where σ̂²_K = (1/K)Σₖ(Êₖ - CV_K)²
+
+Standard Error:
+SE(CV_K) = √Var(CV_K) = √((1/K) · σ̂²_K · (1 + n_test/n_train))
+
+For K=5:
+SE(CV_5) ≈ (σ̂_5/√5) · √1.25 ≈ 0.5 · σ̂_5
+
+NOT σ̂_5/√5 as naive calculation suggests!
+
+Theorem 3 (Bias-Variance Tradeoff in K):
+As K increases:
+- Bias ↓: Trains on more data, closer to n
+- Variance ↑: More correlation between folds
+
+Optimal K balances bias and variance
+- Typically K=5 or K=10 in practice
+- K=10 preferred when n is large
+- K=5 preferred when n is small (less computation)
+
+Mean Squared Error (MSE) of CV_K:
+MSE(CV_K) = Bias²(CV_K) + Var(CV_K)
+
+For estimating R(f̂_n):
+- Small K (K=5): Higher bias, lower variance
+- Large K (K=n): Lower bias, higher variance
+- Optimal: Typically K=5 to K=10
+
+Theorem 4 (LOOCV Properties):
+Leave-One-Out CV (K=n):
+
+Advantages:
+- Approximately unbiased: E[CV_n] ≈ R(f̂_n)
+- Deterministic: No randomness in fold assignment
+
+Disadvantages:
+- High variance: Var(CV_n) can be larger than CV_K for K < n
+- Reason: Training sets are nearly identical
+  Correlation Corr(Êᵢ, Êⱼ) ≈ (n-2)/(n-1) ≈ 1 for large n
+- Computational cost: O(n) model fits
+
+For linear models (special case):
+LOOCV has closed form! No need to retrain n times:
+
+CV_n = (1/n) Σᵢ₌₁ⁿ [yᵢ - ŷᵢ / (1 - hᵢᵢ)]²
+
+where:
+- ŷᵢ: Prediction from model trained on all n samples
+- hᵢᵢ: i-th diagonal element of hat matrix H = X(X'X)⁻¹X'
+
+This is called PRESS (Predicted Residual Sum of Squares)
+Complexity: O(1) after initial model fit!
+
+Empirical Results (Kohavi 1995):
+Extensive experiments on multiple datasets:
+- K=10 gives best bias-variance tradeoff on average
+- K=5 nearly as good with half the computation
+- LOOCV often has higher variance despite lower bias
+- Recommendation: Use K=10 as default
+```
+
 **When to use:**
 - ✅ Regression problems
 - ✅ Balanced classification problems
@@ -619,6 +762,158 @@ Difference: 3.30 percentage points
 - Nested CV gives you an **unbiased performance estimate**
 - It does NOT give you the final model to deploy
 - After nested CV, retrain on all data with best hyperparameters for deployment
+
+**Rigorous Theory of Selection Bias in Model Selection:**
+
+```
+The Selection Bias Problem:
+Let A = {A₁, A₂, ..., A_M} be set of M candidate models/hyperparameters
+For each Aⱼ, estimate performance via K-fold CV: CV_K(Aⱼ)
+
+Model selection:
+Â = argmin_{Aⱼ ∈ A} CV_K(Aⱼ)
+
+Question: Is CV_K(Â) an unbiased estimate of R(Â)?
+
+Answer: NO! CV_K(Â) is biased (optimistic)
+
+Theorem 5 (Selection Bias - Varma & Simon 2006):
+E[CV_K(Â)] ≤ E[R(Â)]
+
+Selection introduces optimistic bias!
+
+Intuition:
+- We selected Â because it had minimum CV error
+- But CV estimates are noisy: CV_K(Aⱼ) = R(Aⱼ) + εⱼ
+- By selecting min, we pick model with negative εⱼ (lucky)
+- This underestimates true risk R(Â)
+
+Formal Proof:
+Let j* = argmin R(Aⱼ) be true best model
+Let ĵ = argmin CV_K(Aⱼ) be selected model
+
+CV_K(A_ĵ) = min_j CV_K(Aⱼ)
+          ≤ CV_K(A_{j*})  [by definition of min]
+
+Taking expectation over CV folds:
+E[CV_K(A_ĵ)] ≤ E[CV_K(A_{j*})]
+              ≈ R(A_{j*})  [CV is approximately unbiased]
+              ≤ R(A_ĵ)  [j* is true minimum]
+
+But we want: E[CV_K(A_ĵ)] ≈ R(A_ĵ)  ✗
+
+Conclusion: CV_K(Â) underestimates R(Â)
+
+Magnitude of Bias:
+Depends on:
+1. Number of models M (more models → more selection)
+2. Correlation between models (high correlation → less bias)
+3. Sample size n (small n → more noise → more bias)
+
+Empirical studies (Cawley & Talbot 2010):
+- M = 10 models: Bias ≈ 2-5% optimistic
+- M = 100 models: Bias ≈ 5-10% optimistic
+- M = 1000 models: Bias can be > 10% optimistic!
+
+Example:
+True error: 20%
+Non-nested CV reports: 15% (5% optimistic)
+Decision makers think model is better than it actually is!
+
+Solution: Nested Cross-Validation
+
+Nested CV Procedure:
+Outer loop (K_out folds): Estimate generalization error
+Inner loop (K_in folds): Hyperparameter selection
+
+Outer fold k:
+1. Split: D = D_k^train ∪ D_k^test
+2. Inner CV on D_k^train:
+   - For each hyperparameter λⱼ ∈ Λ:
+     * Estimate CV_{K_in}(λⱼ) using D_k^train
+   - Select: λ̂_k = argmin CV_{K_in}(λⱼ)
+3. Train model f̂_k with λ̂_k on all of D_k^train
+4. Evaluate: E_k = Error(f̂_k, D_k^test)
+
+Nested CV estimate:
+NCV = (1/K_out) Σ_k E_k
+
+Theorem 6 (Unbiasedness of Nested CV - Varma & Simon 2006):
+E[NCV] ≈ E[R(f̂_λ̂)]
+
+where:
+- λ̂ is selected via CV on training set of size n·(K_out-1)/K_out
+- f̂_λ̂ is trained with λ̂ on same amount of data
+
+Nested CV provides approximately unbiased estimate!
+
+Why does it work?
+- Selection (λ̂_k) and evaluation (E_k) use DISJOINT data
+- No information leakage from test set to selection process
+- Each outer fold simulates: select on train → evaluate on unseen test
+
+Cost Analysis:
+Non-nested CV: K_out × M evaluations
+Nested CV: K_out × (K_in × M + 1) evaluations
+
+Typical: K_out = 5, K_in = 3, M = 10
+- Non-nested: 5 × 10 = 50 model fits
+- Nested: 5 × (3 × 10 + 1) = 155 model fits
+
+3× more expensive, but gives unbiased estimate!
+
+Practical Recommendations:
+1. Use nested CV for reporting performance
+2. After nested CV, run regular CV on ALL data to select final λ
+3. Train final model on ALL data with selected λ
+4. Report nested CV score as expected performance
+
+Example workflow:
+# Step 1: Nested CV for unbiased estimate
+nested_scores = nested_cv(X, y, param_grid)
+print(f"Expected performance: {np.mean(nested_scores)}")
+
+# Step 2: Select best hyperparameters on all data
+grid_search = GridSearchCV(model, param_grid, cv=5)
+grid_search.fit(X, y)
+best_params = grid_search.best_params_
+
+# Step 3: Train final model
+final_model = Model(**best_params)
+final_model.fit(X, y)
+
+# Step 4: Deploy final_model
+# Expected performance: nested_scores (not grid_search.best_score_!)
+
+Common Mistakes:
+❌ Using grid_search.best_score_ as performance estimate
+✓ Using nested CV score as performance estimate
+
+❌ Deploying model from one outer fold of nested CV
+✓ Retraining on all data after nested CV
+
+❌ Selecting hyperparameters from nested CV results
+✓ Selecting via regular CV on all data (after nested CV)
+
+Varma-Simon Bias Correction (alternative to nested CV):
+For small datasets where nested CV is too expensive:
+
+Corrected estimate:
+R̂_corrected = CV_K(Â) + Bias_correction
+
+where Bias_correction ≈ (c/n) · log(M)
+
+c is problem-dependent constant (needs estimation)
+M is number of models considered
+
+Less reliable than nested CV, but cheaper!
+
+Theoretical Optimality (Arlot & Celisse 2010):
+Among all data-splitting procedures:
+- Nested CV with K_out = K_in = n (double LOOCV) is asymptotically optimal
+- But has highest variance
+- Practical optimum: K_out = 5-10, K_in = 3-5
+```
 
 ---
 
