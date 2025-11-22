@@ -9,6 +9,12 @@ Choosing the right evaluation metric is crucial. This guide helps you select and
 ## 📋 Table of Contents
 
 - [Why Metrics Matter](#why-metrics-matter)
+- [Statistical Foundations and Theory](#statistical-foundations-and-theory)
+  - [Metrics as Statistical Estimators](#metrics-as-statistical-estimators)
+  - [Confidence Intervals for Classification Metrics](#confidence-intervals-for-classification-metrics)
+  - [Hypothesis Testing for Comparing Models](#hypothesis-testing-for-comparing-models)
+  - [Decision-Theoretic Foundations](#decision-theoretic-foundations)
+  - [Theoretical Properties and Bounds](#theoretical-properties-and-bounds)
 - [Classification Metrics](#classification-metrics)
 - [Regression Metrics](#regression-metrics)
 - [Ranking Metrics](#ranking-metrics)
@@ -37,6 +43,663 @@ print(f"Recall: {recall:.0%}")      # 0% - Catches zero fraud!
 ```
 
 **Key lesson:** **Choose metrics that align with business goals.**
+
+---
+
+## Statistical Foundations and Theory
+
+### Metrics as Statistical Estimators
+
+**Every evaluation metric is an estimator of expected performance on the true data distribution.**
+
+**Formal Definition:**
+Let P(X, Y) be the true data distribution. The population risk is:
+```
+R(f) = E_(X,Y)~P [L(f(X), Y)]
+```
+where L is the loss function and f is our classifier/regressor.
+
+Given a test set D_test = {(x₁, y₁), ..., (xₙ, yₙ)} drawn i.i.d. from P, the empirical risk is:
+```
+R̂(f) = (1/n) Σᵢ L(f(xᵢ), yᵢ)
+```
+
+**Key Properties:**
+
+1. **Unbiasedness:** E[R̂(f)] = R(f)
+2. **Consistency:** R̂(f) →^p R(f) as n → ∞ (by Law of Large Numbers)
+3. **Variance:** Var(R̂(f)) = σ²/n where σ² = Var(L(f(X), Y))
+
+**Theorem 1 (Central Limit Theorem for Metrics):**
+For large n, the sampling distribution of any metric M̂ (with finite variance σ²) is approximately normal:
+```
+√n(M̂ - M) →^d N(0, σ²)
+
+M̂ ~ N(M, σ²/n) approximately
+```
+
+This enables confidence intervals and hypothesis tests.
+
+---
+
+### Confidence Intervals for Classification Metrics
+
+#### Binomial-Based Metrics (Accuracy, Precision, Recall)
+
+These metrics are proportions with **binomial variance**.
+
+**Theorem 2 (Exact Binomial CI):**
+For a metric M = k/n (k successes in n trials), the Clopper-Pearson exact CI is:
+```
+Lower bound: Beta⁻¹(α/2; k, n-k+1)
+Upper bound: Beta⁻¹(1-α/2; k+1, n-k)
+```
+where Beta⁻¹ is the inverse beta CDF.
+
+**Practical Approximation (Wald CI):**
+For large n, using normal approximation:
+```
+M̂ ± z_{α/2} · √(M̂(1-M̂)/n)
+```
+where z_{α/2} = 1.96 for 95% confidence.
+
+**Implementation:**
+```python
+import numpy as np
+from scipy import stats
+
+def binomial_confidence_interval(metric_value, n_samples, confidence=0.95):
+    """
+    Wilson score interval (more accurate than Wald for small n or extreme p)
+    """
+    z = stats.norm.ppf(1 - (1 - confidence) / 2)
+    denominator = 1 + z**2 / n_samples
+    center = (metric_value + z**2 / (2 * n_samples)) / denominator
+    margin = z * np.sqrt(metric_value * (1 - metric_value) / n_samples + z**2 / (4 * n_samples**2))
+    margin /= denominator
+
+    return (center - margin, center + margin)
+
+# Example: Accuracy = 0.85 on n=100 samples
+accuracy = 0.85
+n = 100
+ci_lower, ci_upper = binomial_confidence_interval(accuracy, n)
+print(f"95% CI for accuracy: [{ci_lower:.3f}, {ci_upper:.3f}]")
+# Output: [0.770, 0.910]
+```
+
+**Variance Formula:**
+```
+Var(Accuracy) = Accuracy · (1 - Accuracy) / n
+
+SE(Accuracy) = √(Accuracy · (1 - Accuracy) / n)
+```
+
+**For Precision and Recall:**
+```
+SE(Precision) = √(Precision · (1 - Precision) / n_predicted_positive)
+
+SE(Recall) = √(Recall · (1 - Recall) / n_actual_positive)
+```
+
+**Important:** The effective sample size differs:
+- Accuracy: n = total samples
+- Precision: n = TP + FP (predicted positives)
+- Recall: n = TP + FN (actual positives)
+
+#### ROC-AUC Confidence Intervals: DeLong's Method
+
+**Theorem 3 (AUC as Mann-Whitney U Statistic):**
+The ROC-AUC has an elegant interpretation:
+```
+AUC = P(score(X⁺) > score(X⁻))
+```
+where X⁺ ~ P(X | Y=1) and X⁻ ~ P(X | Y=0).
+
+**Equivalently:**
+```
+AUC = (1/(n₊·n₋)) Σᵢ∈pos Σⱼ∈neg 𝟙[score(xᵢ) > score(xⱼ)]
+```
+where n₊, n₋ are counts of positive and negative examples.
+
+**DeLong's Variance Formula (1988):**
+
+Let S₁₀ = average score assigned to negatives by the classifier ranking each positive higher, and S₀₁ similarly:
+```
+S₁₀ = (1/n₊) Σᵢ∈pos [number of negatives ranked below xᵢ] / n₋
+
+S₀₁ = (1/n₋) Σⱼ∈neg [number of positives ranked above xⱼ] / n₊
+```
+
+Then:
+```
+Var(AUC) = (1/n₊)·Var(S₁₀) + (1/n₋)·Var(S₀₁)
+```
+
+**Implementation:**
+```python
+from sklearn.metrics import roc_auc_score
+import numpy as np
+from scipy import stats
+
+def auc_confidence_interval_delong(y_true, y_scores, confidence=0.95):
+    """
+    Compute AUC confidence interval using DeLong's method
+
+    Reference: DeLong et al. (1988) "Comparing the areas under two or more
+    correlated receiver operating characteristic curves"
+    """
+    y_true = np.array(y_true)
+    y_scores = np.array(y_scores)
+
+    # Compute AUC
+    auc = roc_auc_score(y_true, y_scores)
+
+    # Get indices
+    pos_indices = np.where(y_true == 1)[0]
+    neg_indices = np.where(y_true == 0)[0]
+
+    n_pos = len(pos_indices)
+    n_neg = len(neg_indices)
+
+    # Compute structural components
+    pos_scores = y_scores[pos_indices]
+    neg_scores = y_scores[neg_indices]
+
+    # For each positive, count negatives ranked below it
+    V10 = np.zeros(n_pos)
+    for i, pos_score in enumerate(pos_scores):
+        V10[i] = np.mean(pos_score > neg_scores)
+
+    # For each negative, count positives ranked above it
+    V01 = np.zeros(n_neg)
+    for j, neg_score in enumerate(neg_scores):
+        V01[j] = np.mean(pos_scores > neg_score)
+
+    # Compute variance
+    var_auc = np.var(V10) / n_pos + np.var(V01) / n_neg
+    se_auc = np.sqrt(var_auc)
+
+    # Confidence interval
+    z = stats.norm.ppf(1 - (1 - confidence) / 2)
+    ci_lower = auc - z * se_auc
+    ci_upper = auc + z * se_auc
+
+    return auc, ci_lower, ci_upper, se_auc
+
+# Example
+y_true = np.array([0, 0, 1, 1, 0, 1, 0, 1])
+y_scores = np.array([0.1, 0.4, 0.35, 0.8, 0.2, 0.7, 0.3, 0.9])
+
+auc, ci_lower, ci_upper, se = auc_confidence_interval_delong(y_true, y_scores)
+print(f"AUC: {auc:.3f} ± {se:.3f}")
+print(f"95% CI: [{ci_lower:.3f}, {ci_upper:.3f}]")
+```
+
+**Hanley-McNeil Approximation (1982):**
+
+Simpler but less accurate alternative:
+```
+SE(AUC) ≈ √[(AUC·(1-AUC) + (n₊-1)(Q₁-AUC²) + (n₋-1)(Q₂-AUC²)) / (n₊·n₋)]
+```
+where:
+- Q₁ = AUC / (2 - AUC)
+- Q₂ = 2·AUC² / (1 + AUC)
+
+#### Bootstrap Confidence Intervals for Any Metric
+
+For complex metrics without analytical variance formulas:
+
+```python
+from sklearn.utils import resample
+
+def bootstrap_metric_ci(y_true, y_pred_or_scores, metric_func,
+                        n_bootstrap=1000, confidence=0.95):
+    """
+    Bootstrap confidence interval for any metric
+
+    Args:
+        y_true: True labels
+        y_pred_or_scores: Predictions or scores
+        metric_func: Function that computes the metric
+        n_bootstrap: Number of bootstrap samples
+        confidence: Confidence level
+
+    Returns:
+        metric_value, ci_lower, ci_upper
+    """
+    n = len(y_true)
+    bootstrap_metrics = []
+
+    for _ in range(n_bootstrap):
+        # Resample with replacement
+        indices = resample(range(n), n_samples=n, replace=True)
+        y_true_boot = [y_true[i] for i in indices]
+        y_pred_boot = [y_pred_or_scores[i] for i in indices]
+
+        # Compute metric on bootstrap sample
+        metric_boot = metric_func(y_true_boot, y_pred_boot)
+        bootstrap_metrics.append(metric_boot)
+
+    # Original metric
+    metric_value = metric_func(y_true, y_pred_or_scores)
+
+    # Percentile confidence interval
+    alpha = 1 - confidence
+    ci_lower = np.percentile(bootstrap_metrics, 100 * alpha / 2)
+    ci_upper = np.percentile(bootstrap_metrics, 100 * (1 - alpha / 2))
+
+    return metric_value, ci_lower, ci_upper
+
+# Example: Bootstrap CI for F1 score
+from sklearn.metrics import f1_score
+
+f1, ci_lower, ci_upper = bootstrap_metric_ci(
+    y_true, y_pred,
+    lambda y_t, y_p: f1_score(y_t, y_p),
+    n_bootstrap=2000
+)
+print(f"F1: {f1:.3f}, 95% CI: [{ci_lower:.3f}, {ci_upper:.3f}]")
+```
+
+---
+
+### Hypothesis Testing for Comparing Models
+
+#### McNemar's Test (Binary Classification)
+
+**Use case:** Compare two classifiers on the same test set.
+
+**Null Hypothesis:** Both classifiers have equal error rates.
+
+**Theorem 4 (McNemar's Test Statistic):**
+Construct a 2×2 contingency table of classifier agreements/disagreements:
+```
+                Classifier B Correct    Classifier B Wrong
+Classifier A
+Correct              a                      b
+Classifier A
+Wrong                c                      d
+```
+
+Under H₀, the test statistic follows a chi-squared distribution:
+```
+χ² = (b - c)² / (b + c) ~ χ²(1)
+```
+
+**More accurate (with continuity correction):**
+```
+χ² = (|b - c| - 1)² / (b + c)
+```
+
+**Implementation:**
+```python
+from statsmodels.stats.contingency_tables import mcnemar
+
+def compare_classifiers_mcnemar(y_true, y_pred_A, y_pred_B):
+    """
+    McNemar's test for paired binary classifiers
+
+    Returns: p-value (reject H₀ if p < 0.05)
+    """
+    # Create contingency table
+    correct_A = (y_true == y_pred_A)
+    correct_B = (y_true == y_pred_B)
+
+    # Count disagreements
+    a = np.sum(correct_A & correct_B)      # Both correct
+    b = np.sum(correct_A & ~correct_B)     # A correct, B wrong
+    c = np.sum(~correct_A & correct_B)     # A wrong, B correct
+    d = np.sum(~correct_A & ~correct_B)    # Both wrong
+
+    contingency_table = np.array([[a, b], [c, d]])
+
+    # Perform McNemar's test
+    result = mcnemar(contingency_table, exact=True)  # exact=True for small samples
+
+    print(f"McNemar's Test Results:")
+    print(f"Both correct: {a}, A only: {b}, B only: {c}, Both wrong: {d}")
+    print(f"Test statistic: {result.statistic:.3f}")
+    print(f"p-value: {result.pvalue:.4f}")
+
+    if result.pvalue < 0.05:
+        print("Conclusion: Classifiers have significantly different error rates")
+    else:
+        print("Conclusion: No significant difference between classifiers")
+
+    return result.pvalue
+
+# Example
+y_true = np.array([1, 0, 1, 1, 0, 1, 0, 0, 1, 1])
+y_pred_A = np.array([1, 0, 1, 0, 0, 1, 1, 0, 1, 1])
+y_pred_B = np.array([1, 0, 0, 1, 0, 1, 0, 0, 1, 0])
+
+p_value = compare_classifiers_mcnemar(y_true, y_pred_A, y_pred_B)
+```
+
+**When to use:**
+- ✅ Same test set for both classifiers
+- ✅ Binary classification
+- ✅ Paired comparison (same examples)
+
+**When NOT to use:**
+- ❌ Different test sets
+- ❌ Multi-class (use Cochran's Q test instead)
+
+#### Paired t-Test for Metrics (Regression or AUC)
+
+For continuous metrics (RMSE, AUC, etc.), use paired t-test on per-fold cross-validation results:
+
+```python
+from scipy.stats import ttest_rel
+
+def compare_models_cv(model_A, model_B, X, y, cv=5, metric_func=None):
+    """
+    Compare two models using cross-validated paired t-test
+
+    Args:
+        model_A, model_B: Sklearn-compatible models
+        X, y: Features and labels
+        cv: Number of folds
+        metric_func: Metric function (default: accuracy for classification)
+
+    Returns:
+        p_value, mean_diff, scores_A, scores_B
+    """
+    from sklearn.model_selection import cross_val_score
+
+    if metric_func is None:
+        # Default metric
+        metric_func = 'accuracy'
+
+    # Get cross-validated scores
+    scores_A = cross_val_score(model_A, X, y, cv=cv, scoring=metric_func)
+    scores_B = cross_val_score(model_B, X, y, cv=cv, scoring=metric_func)
+
+    # Paired t-test
+    t_stat, p_value = ttest_rel(scores_A, scores_B)
+    mean_diff = np.mean(scores_A - scores_B)
+
+    print(f"Model A: {np.mean(scores_A):.4f} ± {np.std(scores_A):.4f}")
+    print(f"Model B: {np.mean(scores_B):.4f} ± {np.std(scores_B):.4f}")
+    print(f"Mean difference: {mean_diff:.4f}")
+    print(f"t-statistic: {t_stat:.3f}")
+    print(f"p-value: {p_value:.4f}")
+
+    if p_value < 0.05:
+        better_model = "A" if mean_diff > 0 else "B"
+        print(f"Conclusion: Model {better_model} is significantly better (p < 0.05)")
+    else:
+        print("Conclusion: No significant difference between models")
+
+    return p_value, mean_diff, scores_A, scores_B
+```
+
+**Important Caveat (Nadeau & Bengio 2003):**
+Standard t-test **underestimates variance** due to fold overlap. Use corrected variance:
+```
+Var_corrected = Var_apparent · (1 + n_test / n_train)
+```
+See [Cross-Validation Guide](./CROSS_VALIDATION_GUIDE.md) for details.
+
+#### Permutation Test (Non-Parametric Alternative)
+
+When assumptions of parametric tests don't hold:
+
+```python
+def permutation_test(y_true, y_pred_A, y_pred_B, metric_func, n_permutations=10000):
+    """
+    Non-parametric permutation test for comparing classifiers
+
+    H₀: Both classifiers perform equally (metric difference = 0)
+    """
+    # Observed difference
+    metric_A = metric_func(y_true, y_pred_A)
+    metric_B = metric_func(y_true, y_pred_B)
+    observed_diff = metric_A - metric_B
+
+    # Permutation distribution under H₀
+    perm_diffs = []
+    for _ in range(n_permutations):
+        # Randomly swap predictions for each example
+        swap_mask = np.random.rand(len(y_true)) > 0.5
+        y_pred_A_perm = np.where(swap_mask, y_pred_B, y_pred_A)
+        y_pred_B_perm = np.where(swap_mask, y_pred_A, y_pred_B)
+
+        metric_A_perm = metric_func(y_true, y_pred_A_perm)
+        metric_B_perm = metric_func(y_true, y_pred_B_perm)
+        perm_diffs.append(metric_A_perm - metric_B_perm)
+
+    # Two-tailed p-value
+    p_value = np.mean(np.abs(perm_diffs) >= np.abs(observed_diff))
+
+    print(f"Observed difference: {observed_diff:.4f}")
+    print(f"p-value: {p_value:.4f}")
+
+    return p_value, observed_diff, perm_diffs
+
+# Example
+from sklearn.metrics import accuracy_score
+
+p_val, obs_diff, perm_dist = permutation_test(
+    y_true, y_pred_A, y_pred_B,
+    metric_func=accuracy_score,
+    n_permutations=10000
+)
+```
+
+---
+
+### Decision-Theoretic Foundations
+
+#### Bayes Optimal Classifier and Loss Functions
+
+**Theorem 5 (Bayes Optimal Decision Rule):**
+Given a loss function L(ŷ, y), the Bayes optimal predictor minimizes expected loss:
+```
+f*(x) = argmin_ŷ E_Y|X [L(ŷ, Y) | X = x]
+       = argmin_ŷ Σ_y L(ŷ, y) · P(Y = y | X = x)
+```
+
+**For binary classification (Y ∈ {0, 1}):**
+
+**0-1 Loss:** L(ŷ, y) = 𝟙[ŷ ≠ y]
+```
+f*(x) = argmin_ŷ [ŷ·P(Y=0|x) + (1-ŷ)·P(Y=1|x)]
+      = 𝟙[P(Y=1|x) > 0.5]
+```
+**Optimal decision:** Predict class with highest posterior probability.
+**Associated metric:** Accuracy (misclassification rate).
+
+**Log Loss:** L(p̂, y) = -[y log p̂ + (1-y) log(1-p̂)]
+```
+f*(x) = P(Y=1|x)  (the true posterior probability)
+```
+**Optimal decision:** Output calibrated probabilities.
+**Associated metric:** Cross-entropy / log loss.
+
+**Cost-Sensitive Loss:** L(ŷ, y) = C_FP·ŷ·(1-y) + C_FN·(1-ŷ)·y
+```
+f*(x) = 𝟙[P(Y=1|x) > C_FP / (C_FP + C_FN)]
+```
+**Optimal decision:** Threshold adjusted by cost ratio.
+**Associated metric:** Expected cost.
+
+**Example:**
+```python
+# Medical diagnosis: FN (miss disease) costs 100x more than FP (false alarm)
+C_FN = 100
+C_FP = 1
+optimal_threshold = C_FP / (C_FP + C_FN)  # = 0.0099
+
+# Predict positive if P(disease | symptoms) > 0.0099 (very conservative)
+y_pred_optimal = (y_proba > optimal_threshold).astype(int)
+```
+
+#### ROC Analysis and Operating Points
+
+**Theorem 6 (ROC Curve is Concave):**
+The ROC curve of a proper scoring classifier (one that outputs monotonic transformations of P(Y=1|X)) is concave.
+
+**Proof:**
+Any point on the ROC curve corresponds to a threshold t:
+```
+(FPR(t), TPR(t)) = (P(ŝ(X) > t | Y=0), P(ŝ(X) > t | Y=1))
+```
+
+For any two thresholds t₁ < t₂ and λ ∈ [0, 1], we can construct a randomized threshold that achieves:
+```
+(FPR(λ), TPR(λ)) = λ·(FPR(t₁), TPR(t₁)) + (1-λ)·(FPR(t₂), TPR(t₂))
+```
+by randomly choosing threshold t₁ with probability λ and t₂ otherwise.
+
+Since the deterministic curve lies on or above all such convex combinations, it is concave. ∎
+
+**Consequence:** Any classifier with a non-concave ROC curve can be improved by randomization.
+
+**Theorem 7 (AUC as Ranking Quality):**
+```
+AUC = ∫₀¹ TPR(FPR) d(FPR)
+    = P(score(X⁺) > score(X⁻))
+    = (1/(2·n₊·n₋)) · Σᵢ∈pos Σⱼ∈neg [𝟙(sᵢ > sⱼ) + 0.5·𝟙(sᵢ = sⱼ)]
+```
+
+**Interpretation:** AUC is the probability that a randomly chosen positive example is ranked higher than a randomly chosen negative example.
+
+**Perfect ranking:** AUC = 1.0 (all positives ranked above all negatives)
+**Random ranking:** AUC = 0.5 (expected value for random scores)
+**Inverted ranking:** AUC = 0.0 (flip predictions to get AUC = 1.0)
+
+#### Precision-Recall Analysis
+
+**Theorem 8 (Precision-Recall Relationship):**
+Unlike ROC space, Precision-Recall curves are **not** invariant to class imbalance.
+
+Given:
+- π = P(Y=1) (prevalence of positive class)
+- Precision = TP / (TP + FP)
+- Recall = TPR = TP / (TP + FN)
+- FPR = FP / (FP + TN)
+
+We can derive:
+```
+Precision = (Recall · π) / (Recall · π + FPR · (1 - π))
+```
+
+**Key insight:** As π → 0 (rare positive class), FPR dominates:
+```
+Precision ≈ (Recall · π) / (FPR · (1 - π)) → 0 as π → 0
+```
+
+Even with low FPR = 0.01, if π = 0.001 (0.1% positive):
+```
+Precision = (1.0 · 0.001) / (1.0 · 0.001 + 0.01 · 0.999) ≈ 0.09 (9%)
+```
+
+**This explains why ROC-AUC can be misleadingly high on imbalanced data while precision is low.**
+
+**Theorem 9 (Optimal F₁ Threshold):**
+For a probabilistic classifier with scores s(x), the threshold t* that maximizes F₁ score satisfies:
+```
+t* = argmax_t [2·Precision(t)·Recall(t) / (Precision(t) + Recall(t))]
+```
+
+In general, this must be found numerically. However, for perfectly calibrated classifiers:
+```
+t* ≈ (TP + FN) / n  (the true prevalence in the test set)
+```
+
+---
+
+### Theoretical Properties and Bounds
+
+#### Sample Complexity for Metric Estimation
+
+**Theorem 10 (Hoeffding's Bound for Empirical Error):**
+Let R̂(f) be the empirical error rate on n samples. Then with probability at least 1 - δ:
+```
+|R̂(f) - R(f)| ≤ √(ln(2/δ) / (2n))
+```
+
+**Practical implication:** To estimate error within ε with 95% confidence:
+```
+n ≥ ln(2/0.05) / (2ε²) ≈ 1.84 / ε²
+```
+
+**Examples:**
+- ε = 0.01 (1% accuracy): n ≥ 18,400 samples
+- ε = 0.05 (5% accuracy): n ≥ 736 samples
+
+**For AUC specifically (Cortes & Mohri 2004):**
+```
+|AUC - AUC_true| ≤ O(√(1/(n₊·n₋)))
+```
+
+**Implication:** Need many examples from **both** classes for accurate AUC estimation. If minority class has only 10 examples, standard error is ≈ 1/√(10·n₋) ≈ 0.1 even with large n₋.
+
+#### Metric Calibration and Proper Scoring Rules
+
+**Definition (Proper Scoring Rule):**
+A scoring rule S(p̂, y) is **proper** if:
+```
+E_Y [S(p, Y)] ≤ E_Y [S(p̂, Y)]  for all p̂, when p = P(Y=1)
+```
+
+I.e., reporting the true probability minimizes expected loss.
+
+**Theorem 11 (Log Loss is Strictly Proper):**
+Log loss is minimized when p̂ = P(Y=1|x):
+```
+L(p̂) = E_Y [-Y log p̂ - (1-Y) log(1-p̂)]
+     = -P(Y=1) log p̂ - P(Y=0) log(1-p̂)
+
+dL/dp̂ = -P(Y=1)/p̂ + P(Y=0)/(1-p̂) = 0
+⟹ p̂ = P(Y=1)  ✓
+```
+
+**Other proper scoring rules:**
+- **Brier score:** (y - p̂)²
+- **Spherical score:** y·p̂ / √(p̂² + (1-p̂)²)
+
+**Improper scoring rules:**
+- Accuracy (not continuous in probabilities)
+- AUC (only depends on ranking, not calibration)
+
+#### Regression Metrics: Optimality and Robustness
+
+**Theorem 12 (Loss Functions and Optimal Predictors):**
+
+| Loss Function | Optimal Predictor | Robustness to Outliers |
+|---------------|-------------------|------------------------|
+| L₂ (MSE)      | E[Y \| X]        | Low (quadratic penalty) |
+| L₁ (MAE)      | Median[Y \| X]   | High (linear penalty) |
+| Huber(δ)      | Hybrid           | Medium (adaptive) |
+| Quantile(τ)   | Q_τ[Y \| X]      | High |
+
+**Proof for L₂:**
+```
+argmin_c E[(Y - c)²] = argmin_c E[Y² - 2cY + c²]
+
+d/dc = -2E[Y] + 2c = 0  ⟹  c = E[Y]  ✓
+```
+
+**Proof for L₁:**
+The median minimizes MAE because it balances mass on both sides. Formally, for any c < median:
+```
+E[|Y - c|] = E[|Y - c| | Y < c]·P(Y < c) + E[|Y - c| | Y ≥ c]·P(Y ≥ c)
+```
+Increasing c toward the median decreases the larger (Y ≥ c) term more than it increases the smaller (Y < c) term, until c = median where P(Y < c) = P(Y ≥ c) = 0.5. ∎
+
+---
+
+**Key Takeaways from Statistical Foundations:**
+
+1. **Every metric is an estimator** with sampling variance ∝ 1/n
+2. **Always report confidence intervals**, especially with small test sets
+3. **Use appropriate statistical tests** for comparing models (McNemar's for classification, paired t-test for CV)
+4. **Align metrics with loss functions** that match your decision-theoretic goals
+5. **ROC-AUC measures ranking**, not calibration; use log loss for calibrated probabilities
+6. **Sample complexity matters**: Accurate metric estimation requires adequate test set size
 
 ---
 
