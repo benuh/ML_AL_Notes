@@ -8,6 +8,16 @@
 
 - [Understanding Hyperparameters](#understanding-hyperparameters)
 - [Tuning Strategies](#tuning-strategies)
+- [Mathematical Foundations of Hyperparameter Optimization](#mathematical-foundations-of-hyperparameter-optimization)
+  - [Black-Box Optimization Framework](#black-box-optimization-framework)
+  - [Grid Search: Exhaustive Enumeration](#grid-search-exhaustive-enumeration)
+  - [Random Search: Monte Carlo Sampling](#random-search-monte-carlo-sampling)
+  - [Bayesian Optimization: Principled Sequential Design](#bayesian-optimization-principled-sequential-design)
+    - [Gaussian Process Regression](#gaussian-process-regression)
+    - [Acquisition Functions (EI, UCB, PI)](#acquisition-functions)
+    - [Regret Bounds](#regret-bounds)
+  - [Multi-Armed Bandits and Successive Halving](#multi-armed-bandits-and-successive-halving)
+  - [Convergence Rates Comparison](#convergence-rates-comparison)
 - [Grid Search](#grid-search)
 - [Random Search](#random-search)
 - [Bayesian Optimization](#bayesian-optimization)
@@ -117,6 +127,616 @@ print(f"Baseline: {baseline_score:.3f}")
 # 3. Combine best values
 # 4. Fine-tune together
 ```
+
+---
+
+## Mathematical Foundations of Hyperparameter Optimization
+
+### Black-Box Optimization Framework
+
+**Problem Formulation:**
+
+We aim to solve:
+```
+θ* = argmax_{θ ∈ Θ} f(θ)
+```
+
+where:
+- θ = (θ₁, ..., θ_d) are hyperparameters
+- Θ ⊆ ℝᵈ is the search space
+- f: Θ → ℝ is the objective function (validation performance)
+
+**Key Challenges:**
+
+1. **No closed form:** f(θ) has no analytical expression
+2. **Expensive evaluation:** Each f(θ) requires training a model
+3. **Noisy observations:** f(θ) ≠ f_observed(θ) due to randomness in:
+   - Train/validation splits
+   - Stochastic optimization (SGD)
+   - Model initialization
+4. **No gradients:** Cannot use gradient-based optimization
+5. **Non-convex:** Multiple local optima
+
+**Sequential Decision Problem:**
+
+Given budget T (number of trials), select sequence θ₁, θ₂, ..., θ_T to maximize:
+```
+max_{i=1,...,T} f(θᵢ)
+```
+
+This is a **multi-armed bandit problem** with continuous arms.
+
+---
+
+### Grid Search: Exhaustive Enumeration
+
+**Mathematical Description:**
+
+Define grid G = G₁ × G₂ × ... × G_d where each Gᵢ is a discrete set of values for θᵢ.
+
+**Total evaluations:**
+```
+|G| = ∏ᵢ₌₁ᵈ |Gᵢ|
+```
+
+**Theorem 1 (Grid Search Completeness):**
+Grid search finds the global optimum θ* ∈ G with probability 1:
+```
+P[θ̂_grid = argmax_{θ∈G} f(θ)] = 1
+```
+
+**Curse of Dimensionality:**
+
+For d dimensions with k values per dimension:
+```
+Complexity: O(kᵈ)
+```
+
+**Example:**
+- 5 hyperparameters
+- 10 values each
+- Total evaluations: 10⁵ = 100,000
+
+**Convergence Rate:**
+
+If f is L-Lipschitz continuous and grid spacing is h:
+```
+|f(θ*) - f(θ̂_grid)| ≤ L · h · √d
+```
+
+**Implications:**
+- Need exponentially fine grid for high dimensions
+- Computational cost grows exponentially: O(h⁻ᵈ)
+
+---
+
+### Random Search: Monte Carlo Sampling
+
+**Theorem 2 (Random Search Efficiency - Bergstra & Bengio 2012):**
+
+For objective function f with **low effective dimensionality** (only k << d dimensions matter):
+
+Random search finds θ with f(θ) ≥ f(θ*) - ε with high probability using:
+```
+n = O((1/ε) · log(1/δ))  samples
+```
+
+independent of d!
+
+**Proof Sketch:**
+
+Assume f(θ) = g(θ₁, ..., θ_k) (depends on k dimensions only).
+
+By Hoeffding's inequality, probability that random sample θ satisfies f(θ) ≥ f(θ*) - ε is:
+```
+P[f(θ) ≥ f(θ*) - ε] ≥ p₀ > 0
+```
+
+After n independent samples, probability of failure:
+```
+P[all samples suboptimal] ≤ (1 - p₀)ⁿ ≤ exp(-p₀ · n)
+```
+
+Setting exp(-p₀ · n) = δ:
+```
+n = (1/p₀) · log(1/δ)
+```
+
+Since p₀ depends on k (not d), we get dimension-independence! ∎
+
+**Practical Implication:**
+
+Random search is more efficient than grid search when:
+- d > 3 (high dimensional)
+- Only few hyperparameters are critical
+
+**Convergence Rate:**
+
+For L-Lipschitz f on bounded domain [0,1]ᵈ:
+```
+E[f(θ*) - max_{i≤n} f(θᵢ)] = O(L · d^(1/2) · n^(-1/d))
+```
+
+Much slower than optimization with gradients O(1/√n), but doesn't require gradients.
+
+---
+
+### Bayesian Optimization: Principled Sequential Design
+
+#### Gaussian Process Regression
+
+**Definition:**
+
+A Gaussian Process is a collection of random variables, any finite subset of which follows a multivariate Gaussian distribution.
+
+**Specification:**
+```
+f ~ GP(m, k)
+
+m(θ) = E[f(θ)]  (mean function)
+k(θ, θ') = Cov[f(θ), f(θ')]  (kernel/covariance function)
+```
+
+**Common Kernels:**
+
+1. **Squared Exponential (RBF):**
+   ```
+   k(θ, θ') = σ² · exp(-||θ - θ'||² / (2ℓ²))
+   ```
+   - σ²: output variance
+   - ℓ: lengthscale (controls smoothness)
+
+2. **Matérn (ν = 5/2):**
+   ```
+   k(θ, θ') = σ² · (1 + √5r/ℓ + 5r²/(3ℓ²)) · exp(-√5r/ℓ)
+   ```
+   where r = ||θ - θ'||
+   - Less smooth than RBF, more realistic for hyperparameter surfaces
+
+**GP Posterior (Prediction):**
+
+Given observations D_n = {(θᵢ, yᵢ)}ᵢ₌₁ⁿ, the posterior at new point θ is:
+```
+f(θ) | D_n ~ N(μ_n(θ), σ²_n(θ))
+```
+
+**Posterior Mean:**
+```
+μ_n(θ) = k(θ)ᵀ (K + σ²_noise I)⁻¹ y
+```
+
+**Posterior Variance:**
+```
+σ²_n(θ) = k(θ, θ) - k(θ)ᵀ (K + σ²_noise I)⁻¹ k(θ)
+```
+
+where:
+- k(θ) = [k(θ, θ₁), ..., k(θ, θ_n)]ᵀ
+- K = [k(θᵢ, θⱼ)]ᵢ,ⱼ (Gram matrix)
+- y = [y₁, ..., y_n]ᵀ
+
+**Key Properties:**
+
+1. **Exact interpolation (if σ²_noise = 0):**
+   ```
+   μ_n(θᵢ) = yᵢ  for all observed points
+   σ²_n(θᵢ) = 0
+   ```
+
+2. **Uncertainty quantification:**
+   - High σ²_n(θ) in unexplored regions
+   - Low σ²_n(θ) near observations
+
+3. **Computational complexity:**
+   - Training (hyperparameter optimization): O(n³)
+   - Prediction: O(n²)
+   - Limits to n ≈ 10,000 observations
+
+**Implementation:**
+```python
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import Matern
+import numpy as np
+
+# Observed data
+theta_obs = np.array([[0.1], [0.5], [0.9]])  # Hyperparameter values
+y_obs = np.array([0.75, 0.92, 0.81])         # Validation scores
+
+# Define GP with Matérn kernel
+kernel = Matern(nu=2.5, length_scale=0.2)
+gp = GaussianProcessRegressor(kernel=kernel, alpha=1e-5, n_restarts_optimizer=10)
+
+# Fit GP
+gp.fit(theta_obs, y_obs)
+
+# Predict at new points
+theta_new = np.linspace(0, 1, 100).reshape(-1, 1)
+mu, sigma = gp.predict(theta_new, return_std=True)
+
+# 95% confidence interval
+ci_lower = mu - 1.96 * sigma
+ci_upper = mu + 1.96 * sigma
+
+print(f"At θ=0.3: μ={mu[30]:.3f} ± {1.96*sigma[30]:.3f}")
+```
+
+#### Acquisition Functions
+
+**Purpose:** Balance exploration (high uncertainty) vs exploitation (high mean).
+
+**1. Expected Improvement (EI)**
+
+**Definition:**
+```
+EI(θ) = E[max(f(θ) - f(θ*), 0) | D_n]
+```
+
+where θ* = argmax_{θᵢ} yᵢ is the current best.
+
+**Closed-Form (for Gaussian posterior):**
+```
+Let γ(θ) = (μ_n(θ) - f(θ*)) / σ_n(θ)
+
+EI(θ) = σ_n(θ) · [γ(θ)·Φ(γ(θ)) + φ(γ(θ))]
+```
+
+where:
+- Φ: standard normal CDF
+- φ: standard normal PDF
+
+**Properties:**
+- EI(θ) = 0 if σ_n(θ) = 0 (no uncertainty → no exploration)
+- Large EI if μ_n(θ) >> f(θ*) (exploitation)
+- Large EI if σ_n(θ) large (exploration)
+
+**Gradient (for gradient-based EI optimization):**
+```
+∇_θ EI(θ) = ∇_θ μ_n(θ) · Φ(γ(θ)) + ∇_θ σ_n(θ) · φ(γ(θ))
+```
+
+**2. Upper Confidence Bound (UCB)**
+
+**Definition (GP-UCB):**
+```
+UCB(θ) = μ_n(θ) + β_n^(1/2) · σ_n(θ)
+```
+
+where β_n > 0 controls exploration-exploitation trade-off.
+
+**Theoretical Guarantee (Srinivas et al. 2010):**
+
+Choose β_n = 2 log(n² · π²/(6δ)) for confidence 1-δ. Then:
+```
+P[f(θ) ≤ UCB_n(θ) for all θ, n] ≥ 1 - δ
+```
+
+I.e., UCB provides **high-probability upper bound** on f.
+
+**Adaptive β_n:**
+- Small β_n: More exploitation (trust mean)
+- Large β_n: More exploration (trust uncertainty)
+
+**Common choice:** β_n = 2 log(d · n² · π²/6)
+
+**3. Probability of Improvement (PI)**
+
+**Definition:**
+```
+PI(θ) = P[f(θ) ≥ f(θ*) + ξ | D_n]
+       = Φ((μ_n(θ) - f(θ*) - ξ) / σ_n(θ))
+```
+
+where ξ ≥ 0 is a trade-off parameter.
+
+**Properties:**
+- ξ = 0: Greedy (may get stuck)
+- ξ > 0: Encourages exploration
+
+**Comparison:**
+- PI: Simplest, but can be too conservative
+- EI: Most popular, good balance
+- UCB: Theoretical guarantees, but requires β_n tuning
+
+**Implementation:**
+```python
+from scipy.stats import norm
+
+def expected_improvement(theta, gp, y_best, xi=0.01):
+    """
+    Compute Expected Improvement acquisition function
+
+    Args:
+        theta: Points to evaluate (n_points, n_dims)
+        gp: Fitted GaussianProcessRegressor
+        y_best: Current best observation
+        xi: Exploration parameter
+
+    Returns:
+        EI values (n_points,)
+    """
+    mu, sigma = gp.predict(theta, return_std=True)
+    sigma = sigma.reshape(-1, 1)
+
+    # Numerical stability
+    with np.errstate(divide='warn'):
+        gamma = (mu - y_best - xi) / sigma
+        ei = sigma * (gamma * norm.cdf(gamma) + norm.pdf(gamma))
+        ei[sigma == 0.0] = 0.0
+
+    return ei
+
+def upper_confidence_bound(theta, gp, beta=2.0):
+    """
+    Compute UCB acquisition function
+
+    Args:
+        theta: Points to evaluate
+        gp: Fitted GaussianProcessRegressor
+        beta: Exploration parameter (typically 2-5)
+
+    Returns:
+        UCB values
+    """
+    mu, sigma = gp.predict(theta, return_std=True)
+    return mu + np.sqrt(beta) * sigma
+
+# Select next point
+theta_candidates = np.random.uniform(0, 1, (1000, d))  # Random candidates
+ei_values = expected_improvement(theta_candidates, gp, y_best=max(y_obs))
+theta_next = theta_candidates[np.argmax(ei_values)]
+```
+
+#### Regret Bounds
+
+**Definition (Cumulative Regret):**
+```
+R_T = Σₜ₌₁ᵀ [f(θ*) - f(θₜ)]
+```
+
+where θ* is the true optimum and θₜ is the point selected at round t.
+
+**Theorem 3 (GP-UCB Regret Bound - Srinivas et al. 2010):**
+
+For GP-UCB with appropriate β_t, the cumulative regret is bounded:
+```
+R_T = O(√(T · γ_T · log T))
+```
+
+where γ_T is the **maximum information gain**:
+```
+γ_T = max_{θ₁,...,θ_T} I(y₁,...,y_T; f)
+```
+
+**For common kernels:**
+- Squared Exponential: γ_T = O((log T)^(d+1))
+- Matérn (ν > 1): γ_T = O(T^(d(d+1)/(2ν+d(d+1))) · (log T)²)
+
+**Implication:**
+
+Bayesian Optimization achieves **sublinear regret**: R_T/T → 0 as T → ∞.
+
+Average per-iteration regret vanishes, meaning convergence to optimum.
+
+**Practical Interpretation:**
+
+For d = 5 dimensions with RBF kernel:
+```
+R_T = O(√(T · (log T)⁶))
+```
+
+After T = 100 trials:
+- Expected regret per trial: ≈ (log 100)³/√100 ≈ 1.5% suboptimality
+
+Much better than random search: O(1/T^(1/d)) = O(1/100^(1/5)) ≈ 40% suboptimality.
+
+---
+
+### Multi-Armed Bandits and Successive Halving
+
+#### Multi-Armed Bandit Framework
+
+**Setting:**
+
+- K arms (configurations) with unknown rewards μ₁, ..., μ_K
+- Budget T (total trials)
+- Goal: Minimize regret
+
+**Simple Regret (Best-Arm Identification):**
+```
+r_T = μ* - μ̂_T
+```
+where μ̂_T is the best arm identified after T trials.
+
+**Theorem 4 (Successive Halving Simple Regret - Karnin et al. 2013):**
+
+Successive Halving with K arms and budget T achieves:
+```
+E[r_T] ≤ O(K/T · log(1/δ))
+```
+
+with probability 1-δ.
+
+**Algorithm (Successive Halving):**
+
+```
+Input: K configurations, budget T, elimination rate η > 1
+
+1. Initialize: S₀ = {1, ..., K}, B₀ = T/(K·log_η(K))
+2. For round r = 0, 1, ..., log_η(K)-1:
+   a. Allocate Bᵣ trials to each config in Sᵣ
+   b. Eliminate bottom half: Sᵣ₊₁ = top_half(Sᵣ)
+   c. Double budget: Bᵣ₊₁ = η · Bᵣ
+3. Return: Best configuration in final set
+```
+
+**Resource Allocation:**
+
+Round r has:
+- |Sᵣ| = K/ηʳ configurations
+- Bᵣ = η^r · T/(K·log_η(K)) budget each
+
+Total: K/ηʳ · ηʳ · T/(K·log_η(K)) = T/log_η(K) per round ✓
+
+**Example:**
+```python
+K = 81 configurations
+T = 1000 total trials
+η = 3 (eliminate 2/3 each round)
+
+Round 0: 81 configs × 10 trials = 810
+Round 1: 27 configs × 30 trials = 810
+Round 2: 9 configs × 90 trials = 810 (hypothetically)
+Round 3: 3 configs × 270 trials
+Round 4: 1 config × 810 trials
+
+# In practice, adjust to use full budget T
+```
+
+#### Hyperband: Multi-Scale Successive Halving
+
+**Problem with Successive Halving:** Requires knowing optimal budget allocation.
+
+**Hyperband Solution:** Run Successive Halving at multiple scales simultaneously.
+
+**Algorithm:**
+
+```
+Input: Maximum budget R, elimination rate η
+
+1. For log_η(R) different brackets:
+   - Bracket i: Start with many configs, small budget
+   - Run successive halving
+2. Allocate total budget across brackets
+3. Return best configuration overall
+```
+
+**Theorem 5 (Hyperband Regret):**
+
+Hyperband achieves regret:
+```
+E[r_T] ≤ O((1/T) · (log R)² · log(K))
+```
+
+**Key Advantage:** Robust to unknown optimal budget without prior knowledge.
+
+**Practical Implementation:**
+```python
+from sklearn.model_selection import HalvingRandomSearchCV
+from scipy.stats import randint, uniform
+
+# Define parameter distributions
+param_dist = {
+    'learning_rate': uniform(0.001, 0.1),
+    'max_depth': randint(3, 15),
+    'n_estimators': randint(50, 500),
+    'subsample': uniform(0.5, 0.5)
+}
+
+# Hyperband via HalvingRandomSearchCV
+halving = HalvingRandomSearchCV(
+    XGBClassifier(),
+    param_dist,
+    factor=3,  # η = 3 (eliminate 2/3 each round)
+    resource='n_estimators',  # Budget = number of trees
+    max_resources=500,
+    min_resources=50,
+    aggressive_elimination=False,  # Use Hyperband's schedule
+    cv=5,
+    random_state=42
+)
+
+halving.fit(X_train, y_train)
+```
+
+#### Asynchronous Successive Halving (ASHA)
+
+**Extension for parallel computation:**
+
+**Key Ideas:**
+1. **Asynchronous promotion:** Don't wait for all configs in a rung to finish
+2. **Early stopping:** Promote top performers as soon as ready
+3. **Continuous resource allocation:** No discrete rounds
+
+**Theorem 6 (ASHA Performance - Li et al. 2020):**
+
+With P parallel workers, ASHA achieves:
+```
+Speedup ≈ min(P, K/log(K))
+```
+
+Near-linear speedup up to K/log(K) workers.
+
+**Implementation (via Ray Tune):**
+```python
+from ray import tune
+from ray.tune.schedulers import ASHAScheduler
+
+# Define search space
+config_space = {
+    'learning_rate': tune.loguniform(1e-4, 1e-1),
+    'batch_size': tune.choice([16, 32, 64, 128]),
+    'hidden_units': tune.randint(64, 512)
+}
+
+# ASHA scheduler
+scheduler = ASHAScheduler(
+    metric='accuracy',
+    mode='max',
+    max_t=100,  # Maximum epochs
+    grace_period=10,  # Minimum epochs before elimination
+    reduction_factor=3  # η = 3
+)
+
+# Run parallel optimization
+analysis = tune.run(
+    train_function,
+    config=config_space,
+    num_samples=100,  # Total configurations to try
+    scheduler=scheduler,
+    resources_per_trial={'cpu': 2, 'gpu': 0.25}
+)
+```
+
+---
+
+### Convergence Rates Comparison
+
+**Summary Table:**
+
+| Method | Convergence Rate | Dimension Dependence | Best Use Case |
+|--------|-----------------|---------------------|---------------|
+| Grid Search | O(h⁻ᵈ) | Exponential | d ≤ 3, small discrete space |
+| Random Search | O(n^(-1/d)) | Exponential | d > 3, low effective dim |
+| Bayesian Opt (RBF) | O(√((log T)^(d+1) · T)) | Polynomial | d ≤ 20, expensive evals |
+| Successive Halving | O(K/T) | None (finite K) | Large K, cheap evals |
+| Hyperband | O((log R)²·log(K)/T) | None | Unknown budget, cheap evals |
+
+**Theoretical Regret After T = 100 Trials:**
+
+Assuming d = 5, K = 81 configs, normalized regret:
+
+- Grid Search: Not feasible (10⁵ evaluations needed)
+- Random Search: ≈ 40% suboptimality
+- Bayesian Opt: ≈ 1.5% suboptimality
+- Hyperband: ≈ 0.5% suboptimality (if early performance correlates with final)
+
+---
+
+**Key Takeaways from Mathematical Theory:**
+
+1. **Grid search curse:** Exponential complexity O(kᵈ) makes it impractical for d > 3
+
+2. **Random search efficiency:** Dimension-independent convergence when few hyperparameters matter
+
+3. **Bayesian optimization guarantees:** Sublinear regret O(√(T·γ_T)) with Gaussian Processes
+
+4. **Acquisition functions:** EI balances exploration/exploitation optimally in expectation
+
+5. **Multi-armed bandits:** Successive Halving achieves O(K/T) regret for discrete configs
+
+6. **Hyperband robustness:** Works without knowing optimal budget allocation
+
+7. **Parallel scaling:** ASHA enables near-linear speedup with multiple workers
 
 ---
 
