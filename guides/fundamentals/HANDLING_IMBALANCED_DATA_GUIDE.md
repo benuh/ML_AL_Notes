@@ -4,6 +4,13 @@ A comprehensive practical guide to dealing with class imbalance in classificatio
 
 ## Table of Contents
 - [Understanding Class Imbalance](#understanding-class-imbalance)
+- [Statistical Theory of Imbalanced Learning](#statistical-theory-of-imbalanced-learning)
+  - [Bayes Optimal Classifier with Class Imbalance](#bayes-optimal-classifier-with-class-imbalance)
+  - [Impact of Imbalance on Standard Classifiers](#impact-of-imbalance-on-standard-classifiers)
+  - [Sample Complexity with Class Imbalance](#sample-complexity-with-class-imbalance)
+  - [Statistical Analysis of Resampling Methods](#statistical-analysis-of-resampling-methods)
+  - [Cost-Sensitive Learning Theory](#cost-sensitive-learning-theory)
+  - [Ensemble Methods and Imbalance](#ensemble-methods-and-imbalance)
 - [Why Imbalance is a Problem](#why-imbalance-is-a-problem)
 - [Evaluation Metrics for Imbalanced Data](#evaluation-metrics-for-imbalanced-data)
 - [Resampling Techniques](#resampling-techniques)
@@ -117,6 +124,526 @@ Minority class (1): 100 samples
 Imbalance ratio: 99.00:1
 Severity: Moderate Imbalance
 ```
+
+---
+
+## Statistical Theory of Imbalanced Learning
+
+### Bayes Optimal Classifier with Class Imbalance
+
+**Fundamental Question:** How does class imbalance affect the optimal decision boundary?
+
+**Theorem 1 (Bayes Optimal Classifier):**
+
+For binary classification with prior probabilities π₀ = P(Y=0) and π₁ = P(Y=1), the Bayes optimal classifier that minimizes **0-1 loss** is:
+```
+f*(x) = 𝟙[P(Y=1|x) > π₀/( π₀ + π₁)]
+      = 𝟙[P(Y=1|x) > 0.5]  (for balanced classes)
+```
+
+**With Cost-Sensitive Loss:**
+
+If misclassifying positive costs C₁₀ and misclassifying negative costs C₀₁, the optimal classifier is:
+```
+f*(x) = 𝟙[P(Y=1|x) > (π₀ · C₀₁)/(π₀ · C₀₁ + π₁ · C₁₀)]
+```
+
+**Example (Fraud Detection):**
+- π₀ = 0.99 (non-fraud), π₁ = 0.01 (fraud)
+- C₀₁ = $10 (false alarm cost), C₁₀ = $500 (missed fraud cost)
+
+Optimal threshold:
+```
+τ* = (0.99 · 10)/(0.99 · 10 + 0.01 · 500)
+   = 9.9/(9.9 + 5) ≈ 0.665
+```
+
+Predict fraud if P(fraud|x) > 0.665 (not 0.5!)
+
+**Key Insight:** With imbalanced classes and asymmetric costs, optimal threshold shifts dramatically.
+
+---
+
+### Impact of Imbalance on Standard Classifiers
+
+#### Empirical Risk Minimization Bias
+
+**Problem:** Most classifiers minimize empirical risk:
+```
+R̂(f) = (1/n) Σᵢ L(yᵢ, f(xᵢ))
+```
+
+With imbalanced data (n₀ = 9900, n₁ = 100):
+```
+R̂(f) = (9900/10000)·L₀(f) + (100/10000)·L₁(f)
+     ≈ 0.99·L₀(f) + 0.01·L₁(f)
+```
+
+**Consequence:** Classifier optimizes mostly for majority class!
+
+**Theorem 2 (Asymptotic Bias):**
+
+For large n with imbalance ratio r = n₀/n₁ → ∞, standard ERM converges to:
+```
+f̂ → argmin_{f} E[L(Y, f(X)) | Y=0]
+```
+
+I.e., ignores minority class entirely in the limit.
+
+**Proof Sketch:**
+
+By Law of Large Numbers:
+```
+R̂(f) = (n₀/n)·(1/n₀)·Σᵢ:yᵢ=0 L(0, f(xᵢ)) + (n₁/n)·(1/n₁)·Σᵢ:yᵢ=1 L(1, f(xᵢ))
+     → (n₀/n)·E[L(0, f(X))|Y=0] + (n₁/n)·E[L(1, f(X))|Y=1]
+```
+
+As n → ∞ with n₀/n → 1 and n₁/n → 0:
+```
+R̂(f) → E[L(0, f(X))|Y=0]
+```
+
+Thus f̂ minimizes loss only on majority class. ∎
+
+**Practical Example:**
+
+```python
+# Simulated classifier on 99:1 imbalanced data
+# Even with perfect minority class fit, impact on overall loss is tiny
+
+loss_majority = 0.05  # 5% error on majority
+loss_minority_good = 0.10  # 10% error on minority
+loss_minority_bad = 0.50   # 50% error on minority
+
+total_loss_good = 0.99 * 0.05 + 0.01 * 0.10  # = 0.0505
+total_loss_bad = 0.99 * 0.05 + 0.01 * 0.50   # = 0.0545
+
+improvement = total_loss_bad - total_loss_good  # = 0.004 (only 0.4%!)
+
+# Classifier has little incentive to improve minority class
+```
+
+---
+
+### Sample Complexity with Class Imbalance
+
+**Question:** How many samples are needed to learn each class?
+
+**Theorem 3 (PAC Sample Complexity per Class):**
+
+For a hypothesis class F with VC dimension d, to achieve error ε with confidence 1-δ for **each class separately**, we need:
+```
+n_minority ≥ O((d/ε²) · log(1/δ))
+```
+
+**Key Insight:** Sample complexity depends on **per-class** sample size, not total size!
+
+**Practical Implication:**
+
+With imbalance ratio r = 100:1 and total n = 10,000:
+- n_majority = 9,900 (plenty)
+- n_minority = 100 (may be insufficient!)
+
+**Example Calculation:**
+
+For VC dimension d = 10, ε = 0.05, δ = 0.05:
+```
+n_required ≈ (10/0.05²) · log(1/0.05) · log(1/0.05)
+           ≈ 4000 · 3 · 3 ≈ 36,000 samples per class
+```
+
+With 99:1 imbalance, need n_total ≈ 36,000 · 100 = 3.6 million samples!
+
+**Consequence:** Standard sample complexity analyses are overly optimistic for imbalanced data.
+
+---
+
+### Statistical Analysis of Resampling Methods
+
+#### Random Oversampling
+
+**Method:** Duplicate minority class samples with replacement until balanced.
+
+**Theoretical Effect:**
+
+Original dataset: D = {(x₁, y₁), ..., (x_n, y_n)} with n₀ majority, n₁ minority
+
+Oversampled: D' with n₀ majority, n₀ duplicated minority samples
+
+**Effective Sample Size:**
+
+While D' has size 2n₀, the **effective sample size** for minority class remains n₁!
+
+**Theorem 4 (Oversampling Variance):**
+
+For estimator θ̂ (e.g., mean), variance after random oversampling is:
+```
+Var(θ̂_oversample) = Var(θ̂_original)
+```
+
+**Proof:**
+
+Duplicating samples doesn't add information. If we oversample by factor k:
+```
+θ̂ = (1/(k·n₁)) Σⱼ₌₁ᵏ Σᵢ₌₁ⁿ¹ xᵢ
+  = (k/( k·n₁)) · Σᵢ₌₁ⁿ¹ xᵢ
+  = (1/n₁) · Σᵢ₌₁ⁿ¹ xᵢ  (same as original!)
+```
+
+Variance unchanged. ∎
+
+**Practical Consequence:**
+
+- **Benefit:** Balances class weights in loss function
+- **No benefit:** Doesn't reduce estimation variance
+- **Risk:** Overfitting to minority class (especially with complex models)
+
+**Overfitting Analysis:**
+
+With k-fold oversampling, minority samples appear k times in training. For nearest-neighbor classifier:
+```
+P(overfit) ≈ 1 - (1 - 1/n₁)^k → 1 - exp(-k/n₁)
+```
+
+For k = 10, n₁ = 100: P(overfit) ≈ 9.5%
+
+#### Random Undersampling
+
+**Method:** Randomly discard majority class samples until balanced.
+
+**Information Loss:**
+
+Original: n₀ majority samples
+Undersampled: n₁ majority samples (discard n₀ - n₁)
+
+**Information loss ratio:**
+```
+1 - n₁/n₀ = 1 - 1/r  (where r is imbalance ratio)
+```
+
+For r = 100: Discard 99% of majority class data!
+
+**Theorem 5 (Undersampling Sample Complexity):**
+
+After undersampling to n₁ majority samples, effective VC-based bound becomes:
+```
+Generalization error ≤ O(√(d/(2n₁)))
+```
+
+**Example:**
+
+Original: n₀ = 9,900, n₁ = 100, d = 10
+- Full data: ε ≤ √(10/19,800) ≈ 0.022 (2.2% error)
+- Undersampled: ε ≤ √(10/200) ≈ 0.224 (22.4% error)
+
+**10x worse generalization bound!**
+
+**When Undersampling Works:**
+
+If majority class has **redundancy** (many similar samples), information loss is minimal.
+
+**Theorem 6 (Redundancy Condition):**
+
+If majority class samples are ε-covering of feature space (every point within ε of a sample), then random sampling of size:
+```
+n_sample = O((1/ε)^d · log(1/δ))
+```
+
+preserves ε-approximation with probability 1-δ.
+
+**Practical takeaway:** Undersampling works when n₀ >> (1/ε)^d (massive overrepresentation).
+
+#### SMOTE (Synthetic Minority Over-sampling Technique)
+
+**Method:** Generate synthetic minority samples via interpolation.
+
+**Algorithm:**
+
+For each minority sample xᵢ:
+1. Find k nearest minority neighbors: NN_k(xᵢ)
+2. Randomly select x̂ ∈ NN_k(xᵢ)
+3. Generate: x_new = xᵢ + λ·(x̂ - xᵢ), λ ~ Uniform(0,1)
+
+**Statistical Properties:**
+
+**Theorem 7 (SMOTE Distribution):**
+
+If minority class is concentrated in region R with density p(x), SMOTE generates samples with density:
+```
+p_SMOTE(x) ≈ ∫_R p(x') · p_neighbor(x'|x) dx'
+```
+
+where p_neighbor is k-NN neighbor distribution.
+
+**Effect:** Smooths minority class distribution, fills gaps between samples.
+
+**Variance Reduction:**
+
+Unlike random oversampling, SMOTE **does** reduce variance:
+```
+Var(θ̂_SMOTE) ≤ Var(θ̂_original)
+```
+
+because synthetic samples add information about local structure.
+
+**Practical Bound:**
+
+For linear interpolation with k neighbors:
+```
+Var(θ̂_SMOTE) ≈ Var(θ̂_original) / (1 + α·√k)
+```
+
+where α depends on local smoothness.
+
+**Risk: Overgeneralization**
+
+SMOTE can create unrealistic samples in overlapping regions.
+
+**Theorem 8 (SMOTE Misclassification Risk):**
+
+In overlap region where P(Y=0|x) ≈ P(Y=1|x), SMOTE increases false positive rate:
+```
+FPR_SMOTE ≥ FPR_original · (1 + β·overlap_fraction)
+```
+
+**Mitigation:** Borderline-SMOTE (only synthesize near decision boundary).
+
+---
+
+### Cost-Sensitive Learning Theory
+
+#### Weighted Loss Functions
+
+**Standard Loss:**
+```
+L(y, ŷ) = 𝟙[y ≠ ŷ]
+```
+
+**Weighted Loss:**
+```
+L_weighted(y, ŷ) = w_y · 𝟙[y ≠ ŷ]
+```
+
+where w₀ (majority weight) and w₁ (minority weight).
+
+**Optimal Weights (Theoretical):**
+
+**Theorem 9 (Optimal Class Weights):**
+
+To recover Bayes optimal classifier with 0-1 loss under imbalance, set:
+```
+w₀ : w₁ = π₁ : π₀ = n₁ : n₀ = 1 : r
+```
+
+where r is imbalance ratio.
+
+**Proof:**
+
+Weighted empirical risk:
+```
+R̂_w(f) = (1/n) [w₀·Σᵢ:yᵢ=0 L(f(xᵢ)) + w₁·Σᵢ:yᵢ=1 L(f(xᵢ))]
+       = (w₀·n₀/n)·(1/n₀)·Σᵢ:yᵢ=0 L(f(xᵢ)) + (w₁·n₁/n)·(1/n₁)·Σᵢ:yᵢ=1 L(f(xᵢ))
+```
+
+For equal effective weighting, need:
+```
+w₀·n₀ = w₁·n₁  ⟹  w₀/w₁ = n₁/n₀
+```
+
+Setting w₀ = n₁, w₁ = n₀ gives equal influence. ∎
+
+**Practical Implementation:**
+
+```python
+from sklearn.linear_model import LogisticRegression
+
+# Automatic balancing
+model = LogisticRegression(class_weight='balanced')
+
+# Manual weights
+n_0, n_1 = np.bincount(y_train)
+weights = {0: n_1/n_0, 1: 1.0}  # Normalize minority to 1
+model = LogisticRegression(class_weight=weights)
+
+# Equivalent to inverse frequency
+weights = {0: len(y_train)/n_0, 1: len(y_train)/n_1}
+```
+
+**With Asymmetric Costs:**
+
+If cost of false negative is C_FN and false positive is C_FP:
+```
+w₁ : w₀ = C_FN : C_FP
+```
+
+**Example (Medical Diagnosis):**
+- C_FN = $10,000 (missed disease)
+- C_FP = $100 (unnecessary test)
+- Set w₁/w₀ = 100:1
+
+#### Threshold Adjustment
+
+**Alternative to reweighting:** Adjust decision threshold after training.
+
+**Optimal Threshold (Neyman-Pearson Lemma):**
+
+**Theorem 10 (Optimal Threshold for Imbalanced Data):**
+
+For classifier outputting scores s(x), the threshold minimizing expected cost is:
+```
+τ* = argmin_τ E[Cost(Y, 𝟙[s(X) > τ])]
+```
+
+**Closed-Form (for balanced costs):**
+```
+τ* = π₀/(π₀ + π₁)  (prior probability of minority class)
+```
+
+**Example:**
+
+With 99:1 imbalance (π₁ = 0.01):
+```
+τ* = 0.99/(0.99 + 0.01) = 0.99
+```
+
+Predict positive if P(Y=1|x) > 0.99 (very high bar!). This is wrong for balanced loss - we want τ* = 0.5!
+
+**Correcting for Imbalance:**
+
+If model trained on balanced data via resampling, but deployed on imbalanced data:
+```
+τ_deploy = τ_train · (π₁_train/π₀_train) / (π₁_deploy/π₀_deploy)
+```
+
+**Practical Threshold Selection:**
+
+Use grid search on validation set:
+```python
+from sklearn.metrics import f1_score
+
+def find_optimal_threshold(y_true, y_scores, metric='f1'):
+    thresholds = np.linspace(0, 1, 100)
+    scores = []
+
+    for thresh in thresholds:
+        y_pred = (y_scores >= thresh).astype(int)
+        if metric == 'f1':
+            score = f1_score(y_true, y_pred)
+        elif metric == 'cost':
+            # Custom cost function
+            fp = np.sum((y_pred == 1) & (y_true == 0))
+            fn = np.sum((y_pred == 0) & (y_true == 1))
+            score = -(fp * cost_fp + fn * cost_fn)  # Negative cost
+        scores.append(score)
+
+    optimal_idx = np.argmax(scores)
+    optimal_thresh = thresholds[optimal_idx]
+
+    return optimal_thresh, scores
+```
+
+---
+
+### Ensemble Methods and Imbalance
+
+#### Balanced Bagging
+
+**Method:** Train ensemble on balanced bootstrap samples.
+
+**Algorithm:**
+```
+For t = 1 to T:
+  1. Sample n₁ minority samples with replacement
+  2. Sample n₁ majority samples with replacement
+  3. Train classifier fₜ on balanced sample
+  4. Final: f(x) = (1/T) Σₜ fₜ(x)
+```
+
+**Theorem 11 (Balanced Bagging Variance Reduction):**
+
+With T independent balanced classifiers, variance of ensemble prediction is:
+```
+Var(f_ensemble) = Var(f_single) / T
+```
+
+**Bias-Variance Trade-off:**
+
+Each individual classifier has:
+- **Higher bias** (trained on subset of data)
+- **Lower variance** (balanced classes)
+
+Ensemble averaging:
+- **Reduces variance** by factor of T
+- **Keeps bias** roughly constant
+
+**Optimal T:**
+
+Diminishing returns after:
+```
+T* ≈ n₀/n₁  (imbalance ratio)
+```
+
+**Example:**
+
+With 100:1 imbalance:
+- T < 100: Significant variance reduction
+- T > 100: Minimal additional benefit
+
+#### EasyEnsemble and BalanceCascade
+
+**EasyEnsemble:** Balanced bagging with full minority class reuse.
+
+**Statistical Efficiency:**
+
+Uses all n₀ majority samples across T ensembles:
+```
+Coverage = T · n₁ / n₀
+```
+
+For full coverage, need:
+```
+T ≥ n₀/n₁ = r  (imbalance ratio)
+```
+
+**Theorem 12 (EasyEnsemble Information Utilization):**
+
+EasyEnsemble with T = r uses approximately:
+```
+Information_util ≈ 1 - exp(-T·n₁/n₀) ≈ 1 - exp(-1) ≈ 63%
+```
+
+of total majority class information.
+
+**BalanceCascade:** Sequential removal of correctly classified majority samples.
+
+**Convergence:**
+
+Under mild conditions, BalanceCascade achieves full information utilization in:
+```
+T ≈ log(n₀/n₁)  rounds
+```
+
+Much fewer than EasyEnsemble!
+
+---
+
+**Key Takeaways from Statistical Theory:**
+
+1. **Optimal thresholds shift** with class imbalance and costs: τ* ≠ 0.5
+
+2. **Standard ERM biased** toward majority class: weight O(n₀/n) vs O(n₁/n)
+
+3. **Sample complexity per class:** Need sufficient samples in **each** class independently
+
+4. **Random oversampling** doesn't reduce variance, but balances loss weighting
+
+5. **Random undersampling** loses information: O(√(d/n₁)) vs O(√(d/n)) generalization
+
+6. **SMOTE adds information** via interpolation, reduces variance, but risks overgeneralization
+
+7. **Optimal class weights:** w₀:w₁ = n₁:n₀ for balanced influence
+
+8. **Ensemble methods** effective: Variance reduction O(1/T) with balanced bootstrap
 
 ---
 
