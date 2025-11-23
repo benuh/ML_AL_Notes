@@ -9,6 +9,11 @@
 - [Why Preprocessing Matters](#why-preprocessing-matters)
 - [Data Loading and Inspection](#data-loading-and-inspection)
 - [Handling Missing Values](#handling-missing-values)
+  - [Statistical Theory of Missing Data](#statistical-theory-of-missing-data)
+    - [Formal Framework (Rubin 1976)](#formal-framework-rubin-1976)
+    - [Little's MCAR Test](#littles-mcar-test)
+    - [Bias-Variance Trade-off in Imputation](#bias-variance-trade-off-in-imputation)
+    - [Multiple Imputation Theory](#multiple-imputation-theory)
 - [Dealing with Duplicates](#dealing-with-duplicates)
 - [Outlier Detection and Treatment](#outlier-detection-and-treatment)
 - [Data Type Conversions](#data-type-conversions)
@@ -297,6 +302,382 @@ Is the column important?
    - Solution: Create missing indicator + imputation, or model missingness explicitly
 
 **Important:** MCAR is rare in practice. Most real-world missing data is MAR or MNAR. Using simple imputation (mean) on MAR/MNAR data can introduce bias.
+
+---
+
+### Statistical Theory of Missing Data
+
+#### Formal Framework (Rubin 1976)
+
+**Complete Data:** X = (X_obs, X_mis)
+- X_obs: Observed values
+- X_mis: Missing values
+
+**Missingness Indicator:** R = binary matrix where Rᵢⱼ = 1 if xᵢⱼ is missing
+
+**Missingness Mechanism:** Distribution P(R | X, ψ) where ψ are parameters
+
+**Three Mechanisms (Formal Definitions):**
+
+1. **MCAR (Missing Completely at Random):**
+   ```
+   P(R | X_obs, X_mis, ψ) = P(R | ψ)
+   ```
+   Missingness independent of both observed and missing values.
+
+2. **MAR (Missing at Random):**
+   ```
+   P(R | X_obs, X_mis, ψ) = P(R | X_obs, ψ)
+   ```
+   Missingness may depend on observed data, but not on missing values themselves.
+
+3. **MNAR (Missing Not at Random):**
+   ```
+   P(R | X_obs, X_mis, ψ) depends on X_mis
+   ```
+   Missingness depends on the missing values themselves.
+
+#### Little's MCAR Test
+
+**Null Hypothesis:** Data is MCAR
+
+**Test Statistic:**
+```
+d² = Σⱼ nⱼ(μ̂ⱼ - μ̂_total)ᵀ Σ̂⁻¹ (μ̂ⱼ - μ̂_total)
+```
+
+where:
+- j indexes different missing patterns
+- nⱼ = number of observations with pattern j
+- μ̂ⱼ = mean vector for pattern j
+- μ̂_total = overall mean vector
+- Σ̂ = pooled covariance matrix
+
+**Distribution under H₀:**
+```
+d² ~ χ²(df)
+```
+
+where df = (# patterns - 1) × (# variables)
+
+**Decision:** Reject MCAR if p-value < α (typically 0.05)
+
+**Implementation:**
+```python
+# Little's MCAR test (requires R package or custom implementation)
+from scipy.stats import chi2
+import numpy as np
+
+def littles_mcar_test(data):
+    """
+    Simplified Little's MCAR test
+
+    Returns: chi-square statistic, p-value
+    """
+    # Identify missing patterns
+    missing_patterns = data.isnull().astype(int)
+    unique_patterns = missing_patterns.drop_duplicates()
+
+    # For each pattern, compute mean of observed variables
+    chi_square = 0
+    df = 0
+
+    for _, pattern in unique_patterns.iterrows():
+        # Select rows with this pattern
+        mask = (missing_patterns == pattern).all(axis=1)
+        subset = data[mask]
+
+        # Observed variables in this pattern
+        observed_vars = pattern[pattern == 0].index
+
+        if len(observed_vars) > 0:
+            # Compute pattern-specific mean
+            pattern_mean = subset[observed_vars].mean()
+            overall_mean = data[observed_vars].mean()
+
+            # Contribution to chi-square
+            diff = pattern_mean - overall_mean
+            n = len(subset)
+            chi_square += n * np.sum(diff ** 2)  # Simplified
+            df += len(observed_vars)
+
+    # P-value
+    p_value = 1 - chi2.cdf(chi_square, df)
+
+    return chi_square, p_value, df
+
+# Usage
+chi2_stat, p_val, degrees_of_freedom = littles_mcar_test(df)
+print(f"Little's MCAR Test: χ² = {chi2_stat:.2f}, df = {degrees_of_freedom}, p = {p_val:.4f}")
+
+if p_val < 0.05:
+    print("Reject MCAR: Data is likely MAR or MNAR")
+else:
+    print("Cannot reject MCAR: Simple imputation may be appropriate")
+```
+
+#### Bias-Variance Trade-off in Imputation
+
+**Theorem 1 (Mean Imputation Bias):**
+
+Under MAR, mean imputation for predictor X given outcome Y:
+```
+E[X_imputed | X_obs, R, Y] ≠ E[X | X_obs, Y]
+```
+
+**Bias:**
+```
+Bias = E[X | Y] - E[X | X_obs]
+```
+
+**Consequences:**
+1. **Attenuates correlations:** cor(X_imputed, Y) < cor(X_true, Y)
+2. **Reduces variance:** Var(X_imputed) < Var(X_true)
+3. **Shrinks regression coefficients** toward zero
+
+**Quantitative Example:**
+```python
+# True model: Y = 2X + ε
+# With 50% MCAR data and mean imputation:
+
+# Simulated data
+n = 1000
+X_true = np.random.normal(0, 1, n)
+Y = 2 * X_true + np.random.normal(0, 0.5, n)
+
+# Introduce MCAR missingness (50%)
+missing_mask = np.random.rand(n) < 0.5
+X_observed = X_true.copy()
+X_observed[missing_mask] = np.nan
+
+# Mean imputation
+X_imputed = X_observed.copy()
+X_imputed[np.isnan(X_imputed)] = np.nanmean(X_observed)
+
+# Compare correlations
+cor_true = np.corrcoef(X_true, Y)[0, 1]
+cor_imputed = np.corrcoef(X_imputed, Y)[0, 1]
+
+print(f"True correlation: {cor_true:.3f}")
+print(f"After mean imputation: {cor_imputed:.3f}")
+print(f"Attenuation: {(cor_true - cor_imputed) / cor_true * 100:.1f}%")
+
+# Typical output:
+# True correlation: 0.971
+# After mean imputation: 0.686
+# Attenuation: 29.3%  (severe bias!)
+```
+
+**Theorem 2 (KNN Imputation Variance):**
+
+For KNN imputation with k neighbors, the variance of imputed value:
+```
+Var(X̂_imputed) ≈ Var(X_true) / k + σ²_noise
+```
+
+**Trade-off:**
+- Small k: Low bias (uses similar neighbors), high variance
+- Large k: High bias (averages dissimilar neighbors), low variance
+- Optimal k balances bias-variance
+
+**Cross-Validation for k Selection:**
+```python
+from sklearn.impute import KNNImputer
+from sklearn.model_selection import cross_val_score
+
+def select_optimal_k(X_with_missing, y, k_values=range(1, 21)):
+    """
+    Select optimal k for KNN imputation via CV
+    """
+    scores = []
+
+    for k in k_values:
+        imputer = KNNImputer(n_neighbors=k)
+        X_imputed = imputer.fit_transform(X_with_missing)
+
+        # Evaluate downstream task performance
+        model = LinearRegression()
+        score = cross_val_score(model, X_imputed, y, cv=5,
+                                scoring='r2').mean()
+        scores.append(score)
+
+    optimal_k = k_values[np.argmax(scores)]
+
+    plt.plot(k_values, scores)
+    plt.xlabel('Number of neighbors (k)')
+    plt.ylabel('Cross-validated R²')
+    plt.title('KNN Imputation: Optimal k Selection')
+    plt.axvline(optimal_k, color='r', linestyle='--',
+                label=f'Optimal k={optimal_k}')
+    plt.legend()
+    plt.show()
+
+    return optimal_k
+```
+
+#### Multiple Imputation Theory
+
+**Key Idea:** Impute m times to capture uncertainty, analyze each dataset separately, then pool results.
+
+**Rubin's Rules for Combining Estimates:**
+
+Given m imputed datasets, for parameter θ:
+
+**Within-imputation variance:**
+```
+W̄ = (1/m) Σⱼ Var(θ̂ⱼ)
+```
+
+**Between-imputation variance:**
+```
+B = (1/(m-1)) Σⱼ (θ̂ⱼ - θ̄)²
+```
+
+**Total variance:**
+```
+T = W̄ + (1 + 1/m) · B
+```
+
+**Pooled estimate:**
+```
+θ̂_pooled = (1/m) Σⱼ θ̂ⱼ
+```
+
+**Degrees of freedom:**
+```
+df = (m - 1) · [1 + (W̄ / ((1 + 1/m)·B))]²
+```
+
+**Confidence Interval:**
+```
+θ̂_pooled ± t_{df, α/2} · √T
+```
+
+**Fraction of Missing Information:**
+```
+λ = (B + B/m) / T
+```
+
+Interpretation: Proportion of total variance due to missing data
+
+**Efficiency:**
+```
+Relative Efficiency = (1 + λ/m)⁻¹
+```
+
+For m = 5 imputations and λ = 0.5 (50% missing information):
+```
+RE = (1 + 0.5/5)⁻¹ = 0.909 (91% efficient)
+```
+
+**Practical Guideline:** m = 5-20 imputations typically sufficient
+
+**Implementation:**
+```python
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
+import numpy as np
+
+def multiple_imputation(X_missing, y, n_imputations=5):
+    """
+    Multiple imputation with Rubin's rules
+    """
+    from sklearn.linear_model import LinearRegression
+
+    # Storage for imputed dataset results
+    theta_estimates = []
+    theta_variances = []
+
+    for m in range(n_imputations):
+        # Impute with different random seed
+        imputer = IterativeImputer(random_state=m)
+        X_imputed = imputer.fit_transform(X_missing)
+
+        # Fit model on imputed data
+        model = LinearRegression()
+        model.fit(X_imputed, y)
+
+        # Get coefficient estimates and their variances
+        theta_estimates.append(model.coef_)
+
+        # Estimate variance (via bootstrap or analytical formula)
+        # Simplified: use residual variance
+        y_pred = model.predict(X_imputed)
+        residuals = y - y_pred
+        var_estimate = np.var(residuals) * np.linalg.inv(X_imputed.T @ X_imputed).diagonal()
+        theta_variances.append(var_estimate)
+
+    # Apply Rubin's rules
+    theta_pooled = np.mean(theta_estimates, axis=0)
+    W_bar = np.mean(theta_variances, axis=0)
+    B = np.var(theta_estimates, axis=0, ddof=1)
+    T = W_bar + (1 + 1/n_imputations) * B
+
+    # Fraction of missing information
+    lambda_mi = (B + B/n_imputations) / T
+
+    # Confidence intervals
+    from scipy.stats import t as t_dist
+    df = (n_imputations - 1) * (1 + W_bar / ((1 + 1/n_imputations) * B))**2
+    t_crit = t_dist.ppf(0.975, df)
+    ci_lower = theta_pooled - t_crit * np.sqrt(T)
+    ci_upper = theta_pooled + t_crit * np.sqrt(T)
+
+    results = {
+        'theta_pooled': theta_pooled,
+        'total_variance': T,
+        'ci_lower': ci_lower,
+        'ci_upper': ci_upper,
+        'fraction_missing_info': lambda_mi
+    }
+
+    return results
+
+# Usage
+results = multiple_imputation(X_with_missing, y, n_imputations=10)
+print(f"Pooled estimates: {results['theta_pooled']}")
+print(f"95% CI: [{results['ci_lower']}, {results['ci_upper']}]")
+print(f"Fraction of missing info: {results['fraction_missing_info']}")
+```
+
+#### Practical Guidelines
+
+**Missing Data Decision Tree (Enhanced):**
+
+```
+1. Check missingness percentage:
+   ├─ < 5%: Deletion likely OK (if MCAR)
+   ├─ 5-40%: Imputation recommended
+   └─ > 40%: Collect more data or model missingness explicitly
+
+2. Test mechanism:
+   ├─ Run Little's MCAR test
+   ├─ If MCAR (p > 0.05): Simple imputation acceptable
+   │  └─ Mean/median for numerical, mode for categorical
+   └─ If MAR/MNAR (p < 0.05): Use model-based imputation
+      ├─ KNN: Good for local structure
+      ├─ MICE: Good for complex dependencies
+      └─ Multiple imputation: Best for inference (p-values, CIs)
+
+3. Downstream task:
+   ├─ Prediction only: Single imputation OK
+   └─ Inference (hypothesis tests): Multiple imputation required
+
+4. Validation:
+   ├─ Artificially introduce missingness in complete data
+   ├─ Compare imputation methods
+   └─ Select method with best downstream task performance
+```
+
+**Imputation Method Comparison:**
+
+| Method | Bias (MAR) | Variance | Preserves Correlations | Computational Cost |
+|--------|------------|----------|------------------------|-------------------|
+| Mean | High | Low (too low!) | No | O(n) |
+| Median | High | Low | No | O(n log n) |
+| KNN | Medium | Medium | Partially | O(n²) |
+| MICE | Low | Medium | Yes | O(n · iter) |
+| Multiple Imputation | Lowest | Correct | Yes | O(m · n · iter) |
 
 ---
 
