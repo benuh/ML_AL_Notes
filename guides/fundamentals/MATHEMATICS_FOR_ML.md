@@ -184,6 +184,138 @@ eigenvalues, eigenvectors = np.linalg.eig(A)
 #    - Eigenvectors of graph Laplacian
 ```
 
+### Spectral Theorem: Complete Theory
+
+**Theorem 1 (Spectral Theorem for Real Symmetric Matrices):**
+
+Let A ∈ ℝⁿˣⁿ be a symmetric matrix (A = Aᵀ). Then:
+
+1. **All eigenvalues are real:** λᵢ ∈ ℝ for all i
+2. **Eigenvectors can be chosen orthonormal:** There exists orthonormal basis {v₁, ..., vₙ}
+3. **Spectral decomposition exists:** A = QΛQᵀ where:
+   - Q = [v₁ | v₂ | ... | vₙ] is orthogonal (QᵀQ = QQᵀ = I)
+   - Λ = diag(λ₁, λ₂, ..., λₙ) contains eigenvalues
+
+**Proof Sketch:**
+
+**Part 1: Eigenvalues are real**
+
+Let λ be an eigenvalue with eigenvector v (possibly complex): Av = λv
+
+Take conjugate transpose: (Av)* = (λv)* → vᵀAᵀ = λ̄vᵀ
+
+Since A = Aᵀ (symmetric): vᵀA = λ̄vᵀ
+
+Multiply both sides by v:
+```
+vᵀAv = λ̄vᵀv
+Av = λv  (multiply original equation by vᵀ)
+vᵀAv = λvᵀv
+```
+
+Therefore: λ̄vᵀv = λvᵀv
+
+Since vᵀv = ||v||² > 0: λ̄ = λ → λ ∈ ℝ  ✓
+
+**Part 2: Eigenvectors for distinct eigenvalues are orthogonal**
+
+Let Av₁ = λ₁v₁ and Av₂ = λ₂v₂ with λ₁ ≠ λ₂
+
+Compute v₁ᵀAv₂ in two ways:
+```
+Method 1: v₁ᵀAv₂ = v₁ᵀ(λ₂v₂) = λ₂(v₁ᵀv₂)
+Method 2: v₁ᵀAv₂ = (Av₁)ᵀv₂ = (λ₁v₁)ᵀv₂ = λ₁(v₁ᵀv₂)
+```
+
+Therefore: λ₂(v₁ᵀv₂) = λ₁(v₁ᵀv₂)
+
+Since λ₁ ≠ λ₂: v₁ᵀv₂ = 0 (orthogonal)  ✓
+
+**Part 3: Complete orthonormal basis exists**
+
+By induction on dimension n:
+- Base case (n=1): Trivial
+- Inductive step: Let v₁ be unit eigenvector for λ₁
+  - Consider subspace V⊥ orthogonal to v₁
+  - A maps V⊥ to itself (since symmetric)
+  - Apply induction to A|_{V⊥} to get {v₂, ..., vₙ}
+
+Result: Complete orthonormal eigenbasis {v₁, ..., vₙ}  ✓
+
+**Corollary 1 (Diagonalization):**
+For symmetric A:
+```
+A = QΛQᵀ
+  = [v₁ | ... | vₙ] · diag(λ₁, ..., λₙ) · [v₁ | ... | vₙ]ᵀ
+  = Σᵢ λᵢ vᵢvᵢᵀ  (spectral decomposition)
+```
+
+**Corollary 2 (Positive Definiteness Characterization):**
+Symmetric A is positive definite ⟺ all eigenvalues λᵢ > 0
+
+**Proof:** For any x ≠ 0:
+```
+xᵀAx = xᵀQΛQᵀx = (Qᵀx)ᵀΛ(Qᵀx) = Σᵢ λᵢ(qᵢᵀx)²
+```
+where qᵢ are columns of Q.
+
+Since Q is orthogonal, Qᵀx ≠ 0. Thus xᵀAx > 0 ⟺ all λᵢ > 0  ✓
+
+**Corollary 3 (Matrix Functions):**
+For symmetric A = QΛQᵀ, we can define:
+```
+f(A) = Qf(Λ)Qᵀ = Q · diag(f(λ₁), ..., f(λₙ)) · Qᵀ
+```
+
+Examples:
+- **Matrix square root:** A^(1/2) = Q · diag(√λ₁, ..., √λₙ) · Qᵀ (requires λᵢ ≥ 0)
+- **Matrix exponential:** e^A = Q · diag(e^λ₁, ..., e^λₙ) · Qᵀ
+- **Matrix inverse:** A⁻¹ = Q · diag(1/λ₁, ..., 1/λₙ) · Qᵀ (requires λᵢ ≠ 0)
+
+**Application: PCA Theoretical Foundation**
+
+Given data matrix X ∈ ℝⁿˣᵈ (centered), covariance matrix:
+```
+C = (1/n)XᵀX ∈ ℝᵈˣᵈ
+```
+
+C is symmetric and positive semi-definite. By spectral theorem:
+```
+C = QΛQᵀ where λ₁ ≥ λ₂ ≥ ... ≥ λ_d ≥ 0
+```
+
+**Theorem 2 (PCA Optimality):**
+The first k principal components {v₁, ..., v_k} maximize the variance captured:
+```
+max_{V⊥, dim(V)=k} tr(VᵀCᵀV) = Σᵢ₌₁ᵏ λᵢ
+```
+
+**Proof:**
+Let V = [v₁ | ... | v_k] with VᵀV = I_k.
+
+Variance captured:
+```
+tr(VᵀCV) = tr(VᵀQΛQᵀV)
+         = tr((QᵀV)ᵀΛ(QᵀV))
+         = Σⱼ₌₁ᵈ λⱼ · ||QᵀVeⱼ||²
+```
+
+Since V has orthonormal columns: Σⱼ ||QᵀVeⱼ||² = k
+
+By rearrangement inequality, sum is maximized when largest λⱼ get weight 1:
+```
+tr(VᵀCV) ≤ λ₁ + λ₂ + ... + λ_k
+```
+
+Equality when V spans first k eigenvectors. ✓
+
+**Reconstruction Error:**
+```
+||X - X_k||²_F = Σᵢ₌ₖ₊₁ᵈ λᵢ
+```
+
+where X_k is projection onto first k principal components.
+
 **Singular Value Decomposition (SVD)**:
 ```python
 # Singular Value Decomposition (SVD)
@@ -220,6 +352,224 @@ A_reconstructed = U @ np.diag(S) @ VT
 
 # Best rank-k approximation (Eckart-Young theorem):
 # A_k = Σ_{i=1}^k σ_i u_i v_i^T minimizes ||A - A_k||₂ and ||A - A_k||_F
+```
+
+### SVD: Complete Theory and Proofs
+
+**Theorem 3 (Singular Value Decomposition - Existence and Uniqueness):**
+
+For any A ∈ ℝᵐˣⁿ with rank r, there exist:
+- Orthogonal U ∈ ℝᵐˣᵐ (UᵀU = I_m)
+- Orthogonal V ∈ ℝⁿˣⁿ (VᵀV = I_n)
+- Σ ∈ ℝᵐˣⁿ with diagonal entries σ₁ ≥ σ₂ ≥ ... ≥ σᵣ > 0
+
+Such that: A = UΣVᵀ
+
+**Uniqueness:** Singular values {σᵢ} are unique. If σᵢ are distinct, then uᵢ and vᵢ are unique up to sign.
+
+**Proof (Constructive):**
+
+**Step 1:** Compute eigendecomposition of AᵀA
+
+AᵀA ∈ ℝⁿˣⁿ is symmetric and positive semi-definite.
+
+By spectral theorem: AᵀA = VΛVᵀ where Λ = diag(λ₁, ..., λₙ) with λ₁ ≥ ... ≥ λₙ ≥ 0
+
+**Step 2:** Define singular values
+
+Define σᵢ = √λᵢ for i = 1, ..., r (where λᵣ > 0, λ_{r+1} = 0)
+
+**Step 3:** Construct left singular vectors
+
+For i = 1, ..., r:
+```
+uᵢ = (1/σᵢ) Avᵢ
+```
+
+**Verification that uᵢ are orthonormal:**
+```
+uᵢᵀuⱼ = (1/(σᵢσⱼ)) vᵢᵀAᵀAvⱼ
+      = (1/(σᵢσⱼ)) vᵢᵀ(λⱼvⱼ)
+      = (λⱼ/(σᵢσⱼ)) δᵢⱼ
+      = (σⱼ²/(σᵢσⱼ)) δᵢⱼ
+      = δᵢⱼ  ✓
+```
+
+**Step 4:** Extend to complete orthonormal basis
+
+Extend {u₁, ..., uᵣ} to orthonormal basis {u₁, ..., uₘ} of ℝᵐ
+
+Extend {v₁, ..., vᵣ} to orthonormal basis {v₁, ..., vₙ} of ℝⁿ (if needed)
+
+**Step 5:** Verify A = UΣVᵀ
+
+For any x = Σⱼ cⱼvⱼ:
+```
+Ax = A(Σⱼ cⱼvⱼ)
+   = Σⱼ₌₁ʳ cⱼAvⱼ
+   = Σⱼ₌₁ʳ cⱼσⱼuⱼ
+   = U(Σvⱼcⱼeⱼ)
+   = UΣVᵀx  ✓
+```
+
+**Theorem 4 (Eckart-Young-Mirsky Theorem):**
+
+Let A = UΣVᵀ be SVD with singular values σ₁ ≥ ... ≥ σᵣ > 0.
+
+Define rank-k approximation:
+```
+A_k = Σᵢ₌₁ᵏ σᵢuᵢvᵢᵀ = U_kΣ_kV_kᵀ
+```
+
+Then A_k is the **optimal rank-k approximation** in both spectral and Frobenius norms:
+```
+||A - A_k||₂ = min_{rank(B)≤k} ||A - B||₂ = σ_{k+1}
+||A - A_k||_F = min_{rank(B)≤k} ||A - B||_F = √(σ²_{k+1} + ... + σ²ᵣ)
+```
+
+**Proof (Frobenius norm case):**
+
+**Lower bound:** Any rank-k matrix B can be written as B = XYᵀ where X ∈ ℝᵐˣᵏ, Y ∈ ℝⁿˣᵏ.
+
+The null space of B has dimension at least n - k.
+
+Consider subspace S spanned by {v₁, ..., v_{k+1}} (dimension k+1).
+
+By dimension counting: S ∩ null(B) ≠ {0}
+
+Let z ∈ S ∩ null(B) with ||z|| = 1:
+```
+z = Σᵢ₌₁ᵏ⁺¹ cᵢvᵢ
+
+||A - B||²_F ≥ ||(A - B)z||²
+            = ||Az||²  (since Bz = 0)
+            = ||UΣVᵀz||²
+            = ||Σ(Vᵀz)||²
+            = Σᵢ₌₁ᵏ⁺¹ σᵢ²cᵢ²  (since Vᵀz = (c₁, ..., c_{k+1}, 0, ...))
+            ≥ σ²_{k+1} Σᵢ cᵢ²
+            = σ²_{k+1}  (since ||z|| = 1)
+```
+
+**Upper bound:** For A_k:
+```
+||A - A_k||²_F = ||Σᵢ₌ₖ₊₁ʳ σᵢuᵢvᵢᵀ||²_F
+                = Σᵢ₌ₖ₊₁ʳ σᵢ²  (orthonormality of uᵢ, vᵢ)
+```
+
+For k = r-1:
+```
+||A - A_{r-1}||²_F = σᵣ²
+```
+
+Therefore: min_{rank(B)≤k} ||A - B||_F = √(σ²_{k+1} + ... + σ²ᵣ)  ✓
+
+**Corollary (Optimal Approximation):**
+
+Fraction of Frobenius norm captured by rank-k approximation:
+```
+||A_k||²_F / ||A||²_F = (Σᵢ₌₁ᵏ σᵢ²) / (Σᵢ₌₁ʳ σᵢ²)
+```
+
+**Practical guideline:** Keep singular values until Σᵢ₌₁ᵏ σᵢ² ≥ 0.9 Σᵢ₌₁ʳ σᵢ² (90% variance explained)
+
+**Theorem 5 (SVD Properties and Applications):**
+
+1. **Rank:** rank(A) = number of non-zero singular values
+
+2. **Norms:**
+   - Spectral norm: ||A||₂ = σ₁ (largest singular value)
+   - Frobenius norm: ||A||_F = √(σ₁² + ... + σᵣ²)
+   - Nuclear norm: ||A||* = σ₁ + ... + σᵣ
+
+3. **Condition number:** κ(A) = σ₁/σᵣ (ratio of largest to smallest singular value)
+   - κ(A) = 1: perfectly conditioned (A is multiple of orthogonal matrix)
+   - κ(A) >> 1: ill-conditioned (small changes in input cause large output changes)
+
+4. **Moore-Penrose pseudoinverse:**
+   ```
+   A⁺ = VΣ⁺Uᵀ
+   ```
+   where Σ⁺ has diagonal entries 1/σᵢ for i = 1, ..., r and 0 otherwise.
+
+   **Properties:**
+   - AA⁺A = A
+   - A⁺AA⁺ = A⁺
+   - (AA⁺)ᵀ = AA⁺ (AA⁺ is symmetric)
+   - (A⁺A)ᵀ = A⁺A (A⁺A is symmetric)
+
+5. **Least squares solution:**
+   For Ax = b, the minimum-norm solution is:
+   ```
+   x* = A⁺b = VΣ⁺Uᵀb
+   ```
+
+   **Proof:**
+   ```
+   ||Ax - b||² is minimized when x minimizes ||Ax - b||²
+
+   Setting gradient to zero:
+   AᵀAx = Aᵀb
+
+   Solution:
+   x* = (AᵀA)⁺Aᵀb = A⁺b  ✓
+   ```
+
+**Application: Matrix Completion and Recommender Systems**
+
+Given partially observed matrix M ∈ ℝᵐˣⁿ (e.g., user-item ratings with missing entries):
+
+**Problem:** Find low-rank matrix X minimizing:
+```
+min_X Σ_{(i,j)∈Ω} (M_{ij} - X_{ij})² + λ||X||*
+```
+
+where Ω is set of observed entries and ||X||* is nuclear norm.
+
+**Rationale:**
+- Low-rank assumption: Users have few latent preferences
+- Nuclear norm regularization promotes low rank
+- SVD gives optimal low-rank approximation
+
+**Solution via SVD:**
+1. Initialize missing entries (e.g., column means)
+2. Compute SVD: X = UΣVᵀ
+3. Keep top k singular values: X_k
+4. Update missing entries from X_k
+5. Repeat until convergence
+
+```python
+def matrix_completion_svd(M_observed, mask, k, max_iter=100):
+    """
+    Matrix completion via SVD
+
+    Args:
+        M_observed: Partially observed matrix
+        mask: Boolean matrix (True = observed)
+        k: Target rank
+    """
+    M = M_observed.copy()
+
+    # Initialize missing with column means
+    col_means = np.nanmean(M_observed, axis=0)
+    for j in range(M.shape[1]):
+        M[~mask[:, j], j] = col_means[j]
+
+    for iteration in range(max_iter):
+        M_old = M.copy()
+
+        # SVD and truncate to rank k
+        U, S, VT = np.linalg.svd(M, full_matrices=False)
+        M_approx = U[:, :k] @ np.diag(S[:k]) @ VT[:k, :]
+
+        # Update only missing entries
+        M[~mask] = M_approx[~mask]
+
+        # Check convergence
+        change = np.linalg.norm(M - M_old) / np.linalg.norm(M_old)
+        if change < 1e-4:
+            break
+
+    return M, iteration
 
 # ML applications:
 
