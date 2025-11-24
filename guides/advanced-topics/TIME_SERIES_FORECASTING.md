@@ -14,6 +14,169 @@ Master time series analysis and forecasting from classical methods to deep learn
 
 ## Time Series Fundamentals
 
+### Mathematical Foundations of Time Series
+
+Before discussing decomposition, we establish the rigorous mathematical theory of time series.
+
+**Definition 1 (Stochastic Process):**
+A time series {Y_t : t ∈ T} is a collection of random variables indexed by time.
+- Discrete time: T = {..., -1, 0, 1, 2, ...} (most common in practice)
+- Continuous time: T = ℝ (used in mathematical finance, physics)
+
+**Definition 2 (Moments):**
+For time series {Y_t}:
+- Mean function: μ_t = E[Y_t]
+- Variance function: σ²_t = Var(Y_t) = E[(Y_t - μ_t)²]
+- Autocovariance function: γ(s, t) = Cov(Y_s, Y_t) = E[(Y_s - μ_s)(Y_t - μ_t)]
+- Autocorrelation function: ρ(s, t) = γ(s, t) / √(σ²_s σ²_t)
+
+**Definition 3 (Stationarity):**
+
+**Strict Stationarity:**
+{Y_t} is strictly stationary if for any k, t₁, ..., t_k, and h:
+
+P(Y_{t₁} ≤ y₁, ..., Y_{t_k} ≤ y_k) = P(Y_{t₁+h} ≤ y₁, ..., Y_{t_k+h} ≤ y_k)
+
+In words: joint distribution is shift-invariant.
+
+**Weak (Second-Order) Stationarity:**
+{Y_t} is weakly stationary if:
+1. E[Y_t] = μ for all t (constant mean)
+2. Var(Y_t) = σ² < ∞ for all t (constant variance)
+3. Cov(Y_t, Y_{t+h}) = γ(h) depends only on lag h (time-invariant covariance)
+
+**Theorem 1 (Properties of Stationary Series):**
+For weakly stationary {Y_t} with autocovariance γ(h):
+
+(a) γ(0) = Var(Y_t) = σ²
+(b) γ(h) = γ(-h) (symmetry)
+(c) |γ(h)| ≤ γ(0) (bound)
+(d) γ(h) is positive semidefinite:
+    Σᵢ Σⱼ aᵢ aⱼ γ(i - j) ≥ 0 for any coefficients aᵢ
+
+Proof of (c):
+By Cauchy-Schwarz inequality:
+|γ(h)| = |Cov(Y_t, Y_{t+h})|
+       ≤ √(Var(Y_t) Var(Y_{t+h}))
+       = √(γ(0) γ(0))
+       = γ(0) ∎
+
+**Definition 4 (Ergodicity):**
+A stationary process is ergodic if time averages converge to ensemble averages:
+
+(1/n)Σ_{t=1}^n Y_t → E[Y_t] as n → ∞  (almost surely)
+
+**Practical importance:** Ergodicity allows us to estimate μ = E[Y_t] from a single long realization.
+
+**Theorem 2 (Ergodic Theorem):**
+If {Y_t} is stationary and Σ_{h=-∞}^∞ |γ(h)| < ∞, then {Y_t} is ergodic for the mean:
+
+lim_{n→∞} (1/n)Σ_{t=1}^n Y_t = μ  (in L² and almost surely)
+
+**Definition 5 (White Noise):**
+{ε_t} is white noise if:
+1. E[ε_t] = 0
+2. Var(ε_t) = σ²
+3. Cov(ε_t, ε_s) = 0 for t ≠ s
+
+Notation: ε_t ~ WN(0, σ²)
+
+**Strong White Noise:** ε_t ~ iid(0, σ²) (independent, identically distributed)
+
+**Gaussian White Noise:** ε_t ~ iid N(0, σ²)
+
+**Theorem 3 (Spectral Representation):**
+Any stationary process with Σ_{h=-∞}^∞ |γ(h)| < ∞ can be represented as:
+
+Y_t = ∫_{-π}^π e^{iωt} dZ(ω)
+
+where Z(ω) is a process with orthogonal increments.
+
+**Spectral density:**
+f(ω) = (1/2π) Σ_{h=-∞}^∞ γ(h) e^{-iωh}
+
+and:
+γ(h) = ∫_{-π}^π e^{iωh} f(ω) dω
+
+This gives frequency domain representation of time series.
+
+**Interpretation:**
+- f(ω) measures contribution of frequency ω to total variance
+- High f(ω): frequency ω is important (e.g., seasonal periods)
+- Periodogram: I(ω_k) = (1/2πn)|Σ_t Y_t e^{-iω_k t}|² estimates f(ω)
+
+### Autocorrelation Structure
+
+**Sample Autocorrelation Function (ACF):**
+r(h) = Σ_{t=1}^{n-h} (Y_t - Ȳ)(Y_{t+h} - Ȳ) / Σ_{t=1}^n (Y_t - Ȳ)²
+
+**Theorem 4 (Distribution of Sample ACF):**
+Under white noise H₀: ρ(h) = 0 for h > 0:
+
+√n · r(h) ~ N(0, 1) asymptotically
+
+95% confidence bands: ±1.96/√n
+
+**Ljung-Box Test:**
+Test for autocorrelation up to lag H:
+
+Q = n(n+2) Σ_{h=1}^H r²(h)/(n-h) ~ χ²_H
+
+Reject white noise if Q > χ²_{H,0.05}.
+
+**Sample Partial Autocorrelation Function (PACF):**
+φ_{hh} = Corr(Y_t, Y_{t+h} | Y_{t+1}, ..., Y_{t+h-1})
+
+This measures correlation after removing linear dependence on intermediate lags.
+
+**Theorem 5 (ACF/PACF Patterns):**
+
+For AR(p): Autoregressive of order p
+- ACF: Decays exponentially or with damped oscillations
+- PACF: Cuts off after lag p (φ_{pp} ≠ 0, φ_{hh} = 0 for h > p)
+
+For MA(q): Moving average of order q
+- ACF: Cuts off after lag q (ρ(h) = 0 for h > q)
+- PACF: Decays exponentially or with damped oscillations
+
+For ARMA(p,q):
+- Both ACF and PACF decay exponentially
+
+These patterns are used for model identification.
+
+### Wold Decomposition
+
+**Theorem 6 (Wold Decomposition Theorem):**
+Any stationary process {Y_t} with zero mean can be uniquely decomposed as:
+
+Y_t = Σ_{j=0}^∞ ψ_j ε_{t-j} + V_t
+
+where:
+- {ε_t} ~ WN(0, σ²) (white noise)
+- ψ₀ = 1, Σ_{j=0}^∞ ψ²_j < ∞
+- V_t is deterministic (perfectly predictable from past)
+- ε_t ⊥ V_s for all t, s
+
+**Interpretation:**
+Every stationary series can be represented as:
+1. Infinite MA process (stochastic part)
+2. Deterministic part (e.g., sinusoids)
+
+In practice, V_t is often negligible → focus on MA(∞) representation.
+
+**Corollary 6.1 (Linear Process):**
+A linear process is:
+
+Y_t = μ + Σ_{j=0}^∞ ψ_j ε_{t-j}
+
+with ε_t ~ WN(0, σ²).
+
+**Autocovariance:**
+γ(h) = σ² Σ_{j=0}^∞ ψ_j ψ_{j+|h|}
+
+**Variance:**
+Var(Y_t) = σ² Σ_{j=0}^∞ ψ²_j
+
 ### Understanding Time Series Data
 
 **Components of Time Series (Decomposition):**
@@ -159,6 +322,186 @@ stationary_series = ts_analyzer.make_stationary()
 ---
 
 ## Classical Methods
+
+### ARIMA Theory: Mathematical Foundations
+
+Before discussing ARIMA models, we establish the rigorous mathematical theory.
+
+**Lag Operator Notation:**
+Define the lag (backshift) operator L:
+
+LY_t = Y_{t-1}
+L²Y_t = Y_{t-2}
+L^kY_t = Y_{t-k}
+
+**Difference operator:**
+∇ = 1 - L
+∇Y_t = Y_t - Y_{t-1}
+∇²Y_t = (1-L)²Y_t = Y_t - 2Y_{t-1} + Y_{t-2}
+
+#### AutoRegressive (AR) Models
+
+**Definition (AR(p) Model):**
+Y_t = φ₁Y_{t-1} + φ₂Y_{t-2} + ... + φ_pY_{t-p} + ε_t
+
+Or in lag operator notation:
+φ(L)Y_t = ε_t
+
+where φ(L) = 1 - φ₁L - φ₂L² - ... - φ_pL^p is the AR characteristic polynomial.
+
+**Theorem 7 (Stationarity Conditions for AR(p)):**
+An AR(p) process is stationary if and only if all roots of φ(z) = 0 lie outside the unit circle:
+
+|z_i| > 1 for all i
+
+Equivalently: all eigenvalues of companion matrix have modulus < 1.
+
+Proof: The process can be written as infinite MA:
+Y_t = φ(L)^{-1} ε_t = Σ_{j=0}^∞ ψ_j ε_{t-j}
+
+This converges (Σ ψ²_j < ∞) iff roots of φ(z) are outside unit circle. ∎
+
+**Example (AR(1)):**
+Y_t = φY_{t-1} + ε_t
+
+Characteristic equation: 1 - φz = 0 → z = 1/φ
+
+Stationary iff |1/φ| > 1 ⟺ |φ| < 1
+
+**Autocovariance for AR(1):**
+γ(h) = φ^|h| σ²/(1 - φ²)  for |φ| < 1
+
+**Theorem 8 (Yule-Walker Equations):**
+For AR(p), the autocovariances satisfy:
+
+γ(h) = φ₁γ(h-1) + φ₂γ(h-2) + ... + φ_pγ(h-p)  for h > 0
+
+Dividing by γ(0) gives equations for autocorrelations ρ(h).
+
+These provide method-of-moments estimators for φᵢ.
+
+#### Moving Average (MA) Models
+
+**Definition (MA(q) Model):**
+Y_t = ε_t + θ₁ε_{t-1} + θ₂ε_{t-2} + ... + θ_qε_{t-q}
+
+Or: Y_t = θ(L)ε_t
+
+where θ(L) = 1 + θ₁L + θ₂L² + ... + θ_qL^q is the MA characteristic polynomial.
+
+**Key property:** MA(q) is always stationary (finite sum of white noise).
+
+**Autocovariance for MA(q):**
+γ(0) = σ²(1 + θ₁² + θ₂² + ... + θ_q²)
+γ(h) = σ²(θ_h + θ₁θ_{h+1} + ... + θ_{q-h}θ_q)  for 0 < h ≤ q
+γ(h) = 0  for h > q
+
+**Invertibility:**
+
+**Definition (Invertibility):**
+An MA(q) process is invertible if it can be written as:
+
+ε_t = θ(L)^{-1}Y_t = Σ_{j=0}^∞ π_j Y_{t-j}
+
+with Σ |π_j| < ∞.
+
+**Theorem 9 (Invertibility Conditions for MA(q)):**
+An MA(q) process is invertible if and only if all roots of θ(z) = 0 lie outside the unit circle:
+
+|z_i| > 1 for all i
+
+**Why invertibility matters:**
+- Ensures unique representation (avoids parameter redundancy)
+- Required for maximum likelihood estimation
+- Allows expressing current observation in terms of past observations
+
+**Example (MA(1)):**
+Y_t = ε_t + θε_{t-1}
+
+Invertible iff |θ| < 1.
+
+If invertible:
+ε_t = Σ_{j=0}^∞ (-θ)^j Y_{t-j}  (geometric series)
+
+#### ARMA Models
+
+**Definition (ARMA(p,q) Model):**
+φ(L)Y_t = θ(L)ε_t
+
+Or equivalently:
+Y_t - φ₁Y_{t-1} - ... - φ_pY_{t-p} = ε_t + θ₁ε_{t-1} + ... + θ_qε_{t-q}
+
+**Theorem 10 (ARMA Properties):**
+An ARMA(p,q) process is:
+- Stationary iff AR part is stationary (roots of φ(z) outside unit circle)
+- Invertible iff MA part is invertible (roots of θ(z) outside unit circle)
+
+**Autocovariance function:**
+For h > q:
+γ(h) = φ₁γ(h-1) + φ₂γ(h-2) + ... + φ_pγ(h-p)
+
+(same recurrence as AR(p), but initial conditions depend on θᵢ)
+
+**Theorem 11 (Parameter Redundancy):**
+If φ(z) and θ(z) have common roots, the model is overparameterized:
+
+φ(L)Y_t = θ(L)ε_t
+
+If (1 - αL) divides both:
+φ*(L)Y_t = θ*(L)ε_t  (reduced form)
+
+where φ*(L) = φ(L)/(1-αL), θ*(L) = θ(L)/(1-αL).
+
+**Practical implication:** Always check for common roots after estimation.
+
+#### ARIMA Models
+
+**Definition (ARIMA(p,d,q)):**
+If Y_t requires d differences to become stationary, model the stationary series:
+
+W_t = ∇^d Y_t = (1-L)^d Y_t
+
+as ARMA(p,q):
+φ(L)W_t = θ(L)ε_t
+
+Equivalently:
+φ(L)(1-L)^d Y_t = θ(L)ε_t
+
+**Integrated processes:**
+
+**Definition (I(d) Process):**
+Y_t is integrated of order d, denoted I(d), if ∇^d Y_t is stationary but ∇^{d-1} Y_t is not.
+
+**Random walk:** I(1) process
+Y_t = Y_{t-1} + ε_t
+
+Has unit root: φ(z) = 1 - z has root z = 1 (on unit circle).
+
+**Theorem 12 (Forecasting for ARIMA):**
+
+**h-step ahead forecast:**
+Ŷ_{t+h|t} = E[Y_{t+h} | Y_t, Y_{t-1}, ...]
+
+For ARMA(p,q):
+Ŷ_{t+h|t} = φ₁Ŷ_{t+h-1|t} + ... + φ_pŶ_{t+h-p|t} + θ₁ε_{t+h-1} + ... + θ_qε_{t+h-q}
+
+where:
+- Ŷ_{t+k|t} = Y_{t+k} if k ≤ 0 (known values)
+- ε_{t+k} = 0 if k > 0 (future errors have expectation 0)
+
+**Forecast variance:**
+Var(Y_{t+h} - Ŷ_{t+h|t}) = σ²(1 + ψ₁² + ψ₂² + ... + ψ²_{h-1})
+
+where ψ_j are MA(∞) coefficients from Wold representation.
+
+**Theorem 13 (Forecast Optimality):**
+The ARIMA forecast Ŷ_{t+h|t} is the best linear unbiased predictor (BLUP):
+
+Ŷ_{t+h|t} = argmin_f E[(Y_{t+h} - f(Y_t, Y_{t-1}, ...))²]
+
+among all linear functions f.
+
+**Proof:** By projection theorem in Hilbert space. ∎
 
 ### ARIMA (AutoRegressive Integrated Moving Average)
 
