@@ -9,6 +9,15 @@ This guide shows you how to engineer features that significantly improve model p
 ## 📋 Table of Contents
 
 - [Why Feature Engineering Matters](#why-feature-engineering-matters)
+- [Statistical and Information-Theoretic Foundations](#statistical-and-information-theoretic-foundations)
+  - [Feature Relevance Theory](#feature-relevance-theory)
+  - [Conditional Mutual Information](#conditional-mutual-information)
+  - [mRMR (Minimum Redundancy Maximum Relevance)](#mrmr-minimum-redundancy-maximum-relevance)
+  - [Feature Transformations: Information-Theoretic View](#feature-transformations-information-theoretic-view)
+  - [Feature Construction: Theoretical Justification](#feature-construction-theoretical-justification)
+  - [Log Transformation: Statistical Foundation](#log-transformation-statistical-foundation)
+  - [Feature Selection Bounds](#feature-selection-bounds)
+  - [Curse of Dimensionality: Quantitative Analysis](#curse-of-dimensionality-quantitative-analysis)
 - [Numerical Features](#numerical-features)
 - [Categorical Features](#categorical-features)
 - [DateTime Features](#datetime-features)
@@ -62,6 +71,441 @@ model.fit(features, prices)
 - Deep learning on images/text/audio
 - Very large datasets (>10M rows)
 - Black-box model acceptable
+
+---
+
+## Statistical and Information-Theoretic Foundations
+
+### Feature Relevance Theory
+
+**Definition (Relevant Feature):**
+
+A feature X is relevant for predicting Y if:
+```
+P(Y | X, Z) ≠ P(Y | Z)
+```
+
+for some feature set Z. I.e., X provides information about Y beyond what Z provides.
+
+**Types of Relevance:**
+
+1. **Strongly Relevant:** Removal always degrades optimal Bayes error
+   ```
+   Formal: ∃ P(X, Y), ∀ Z ⊆ S\{X}: R(f_optimal with X) < R(f_optimal without X)
+   ```
+
+2. **Weakly Relevant:** Sometimes useful, but redundant given other features
+   ```
+   Not strongly relevant, but ∃ Z: P(Y | X, Z) ≠ P(Y | Z)
+   ```
+
+3. **Irrelevant:** Never provides information
+   ```
+   ∀ Z ⊆ S\{X}: P(Y | X, Z) = P(Y | Z)
+   ```
+
+**Theorem 1 (Mutual Information and Relevance):**
+
+Feature X is relevant for Y if and only if:
+```
+I(X; Y) > 0
+```
+
+where mutual information:
+```
+I(X; Y) = Σ_x Σ_y P(x, y) log[P(x, y) / (P(x)P(y))]
+         = H(Y) - H(Y | X)
+         = E_X[KL(P(Y|X) || P(Y))]
+```
+
+**Interpretation:** I(X; Y) measures reduction in uncertainty about Y when observing X.
+
+**Properties:**
+- I(X; Y) ≥ 0 with equality iff X ⊥ Y (independent)
+- I(X; Y) = I(Y; X) (symmetric)
+- I(X; Y) ≤ min(H(X), H(Y)) (bounded by marginal entropies)
+
+**Proof of Theorem 1:**
+
+(⟹) If X relevant: ∃ Z, x, z such that P(Y|X=x, Z=z) ≠ P(Y|Z=z)
+
+Then: KL(P(Y|X=x) || P(Y)) > 0 for some x
+
+Since I(X; Y) = E_X[KL(P(Y|X) || P(Y))], we have I(X; Y) > 0  ✓
+
+(⟸) If I(X; Y) > 0: H(Y) - H(Y|X) > 0 ⟹ H(Y|X) < H(Y)
+
+This means knowing X reduces uncertainty about Y ⟹ X relevant  ✓
+
+### Conditional Mutual Information
+
+**Definition:**
+```
+I(X; Y | Z) = H(Y | Z) - H(Y | X, Z)
+            = E_Z[I(X; Y | Z=z)]
+```
+
+**Conditional Independence:**
+```
+X ⊥ Y | Z  ⟺  I(X; Y | Z) = 0
+           ⟺  P(X, Y | Z) = P(X | Z)P(Y | Z)
+```
+
+**Feature Redundancy:** X is redundant given Z if I(X; Y | Z) = 0
+
+**Theorem 2 (Information Decomposition):**
+
+For features X₁, X₂ and target Y:
+```
+I(X₁, X₂; Y) = I(X₁; Y) + I(X₂; Y | X₁)
+             = I(X₂; Y) + I(X₁; Y | X₂)
+```
+
+**Chain Rule for Mutual Information:**
+```
+I(X₁, ..., X_n; Y) = Σᵢ I(Xᵢ; Y | X₁, ..., X_{i-1})
+```
+
+**Implications for Feature Selection:**
+
+1. **Greedy selection is suboptimal:** Selecting features with highest I(Xᵢ; Y) individually ignores redundancy
+
+2. **Conditional relevance matters:** Feature may be irrelevant alone but useful in combination
+
+**Example:**
+```python
+import numpy as np
+from sklearn.feature_selection import mutual_info_classif
+
+# Generate XOR problem
+n = 1000
+X1 = np.random.binomial(1, 0.5, n)
+X2 = np.random.binomial(1, 0.5, n)
+Y = (X1 + X2) % 2  # XOR
+
+# Individual mutual information
+I_X1_Y = mutual_info_classif(X1.reshape(-1, 1), Y)[0]
+I_X2_Y = mutual_info_classif(X2.reshape(-1, 1), Y)[0]
+
+print(f"I(X1; Y) ≈ {I_X1_Y:.4f}")  # ≈ 0 (X1 alone useless!)
+print(f"I(X2; Y) ≈ {I_X2_Y:.4f}")  # ≈ 0 (X2 alone useless!)
+
+# But together they perfectly determine Y
+# I(X1, X2; Y) = H(Y) = 1 bit (maximal information)
+```
+
+### mRMR (Minimum Redundancy Maximum Relevance)
+
+**Objective:** Select feature set S that maximizes:
+```
+Φ(S) = (1/|S|) Σ_{X∈S} I(X; Y) - (1/|S|²) Σ_{X,X'∈S, X≠X'} I(X; X')
+     = Relevance - Redundancy
+```
+
+**Greedy Algorithm:**
+
+1. Start with S = ∅
+2. While |S| < k:
+   ```
+   X* = argmax_{X∉S} [I(X; Y) - (1/|S|) Σ_{X'∈S} I(X; X')]
+   S ← S ∪ {X*}
+   ```
+
+**Theorem 3 (mRMR Upper Bound):**
+
+For optimal feature set S* of size k:
+```
+I(S*; Y) ≤ k·max_X I(X; Y) - (k-1)·min_{X≠X'} I(X; X')
+```
+
+**Interpretation:** Maximum information gain bounded by sum of individual relevances minus minimum redundancy.
+
+### Feature Transformations: Information-Theoretic View
+
+**Data Processing Inequality:**
+
+For Markov chain X → f(X) → Y:
+```
+I(f(X); Y) ≤ I(X; Y)
+```
+
+**Consequence:** Transformations cannot increase information about target!
+
+**Exception:** Non-invertible transformations can reduce noise:
+```
+I(f(X); Y) > I(X; Y) possible when f removes noise
+```
+
+**Theorem 4 (Sufficient Statistic):**
+
+Feature transformation f(X) is sufficient for Y if:
+```
+I(f(X); Y) = I(X; Y)
+```
+
+I.e., f preserves all information about Y.
+
+**Example: Binning**
+
+For continuous X and categorical Y:
+```
+Binning f: X → {bin_1, ..., bin_k}
+
+Information loss: I(X; Y) - I(f(X); Y)
+
+Optimal bins (for fixed k) minimize information loss
+```
+
+**Optimal Binning Algorithm (Maximum Information):**
+
+```python
+def optimal_bins_mutual_info(X, y, n_bins):
+    """
+    Find bins maximizing I(bins(X); Y)
+
+    Uses dynamic programming for optimal cut points
+    """
+    from sklearn.metrics import mutual_info_score
+
+    # Sort data
+    sorted_idx = np.argsort(X)
+    X_sorted = X[sorted_idx]
+    y_sorted = y[sorted_idx]
+
+    n = len(X)
+
+    # DP: dp[i][j] = max mutual info using j bins for first i points
+    dp = np.zeros((n + 1, n_bins + 1))
+    cuts = {}
+
+    for i in range(1, n + 1):
+        for j in range(1, min(i, n_bins) + 1):
+            if j == 1:
+                # Single bin
+                dp[i][j] = 0
+                cuts[(i, j)] = []
+            else:
+                # Try all possible last bin boundaries
+                best_mi = -np.inf
+                best_cut = 0
+
+                for k in range(j - 1, i):
+                    # Bins: [0, k) and [k, i)
+                    labels = np.zeros(i)
+                    labels[k:] = 1  # Last bin
+
+                    # Reconstruct previous bins
+                    # ...
+
+                    mi = mutual_info_score(labels, y_sorted[:i])
+
+                    if dp[k][j - 1] + mi > best_mi:
+                        best_mi = dp[k][j - 1] + mi
+                        best_cut = k
+
+                dp[i][j] = best_mi
+                cuts[(i, j)] = cuts.get((best_cut, j - 1), []) + [X_sorted[best_cut]]
+
+    return cuts[(n, n_bins)]
+```
+
+### Feature Construction: Theoretical Justification
+
+**Polynomial Features:**
+
+For linear model with features {X₁, X₂}:
+```
+ŷ = w₀ + w₁X₁ + w₂X₂
+```
+
+Adding interaction term X₁·X₂:
+```
+ŷ = w₀ + w₁X₁ + w₂X₂ + w₃X₁X₂
+```
+
+**Theorem 5 (Polynomial Kernel Equivalence):**
+
+Linear model with degree-d polynomial features equivalent to kernel SVM with polynomial kernel K(x, x') = (x^T x' + c)^d
+
+**Proof:** Feature map φ(x) = [1, x₁, x₂, x₁², x₁x₂, x₂², ...]
+
+Then: K(x, x') = φ(x)^T φ(x') = (x^T x' + c)^d  ✓
+
+**Universal Approximation:** Polynomial features of sufficient degree can approximate any continuous function (by Weierstrass theorem).
+
+**Trade-off:**
+- Degree d → O(n^d) features (curse of dimensionality)
+- Need regularization to prevent overfitting
+
+**Theorem 6 (VC Dimension of Polynomial Classifiers):**
+
+Linear classifier in ℝ^d with polynomial features up to degree k has:
+```
+VC dimension ≈ C(d + k, k) = O(d^k / k!)
+```
+
+where C(n, k) is binomial coefficient.
+
+**Sample complexity implication:**
+
+Need n ≥ O(d^k) samples to learn reliably.
+
+**Example:**
+- d = 10 features, k = 2 (quadratic): VC ≈ C(12, 2) = 66 → need ~660 samples
+- d = 10 features, k = 3 (cubic): VC ≈ C(13, 3) = 286 → need ~2,860 samples
+
+### Log Transformation: Statistical Foundation
+
+**Box-Cox Transformation:**
+```
+y^(λ) = { (y^λ - 1) / λ   if λ ≠ 0
+        { log(y)            if λ = 0
+```
+
+**Theorem 7 (Maximum Likelihood λ Selection):**
+
+For data y₁, ..., y_n, optimal λ maximizes log-likelihood:
+```
+λ* = argmax_λ L(λ)
+   = argmax_λ [-n/2 · log(σ²(λ)) + (λ-1) Σᵢ log(yᵢ)]
+```
+
+where σ²(λ) = (1/n) Σᵢ (y_i^(λ) - ȳ^(λ))²
+
+**Interpretation:**
+- λ = 1: No transformation
+- λ = 0: Log transformation
+- λ = -1: Reciprocal transformation
+- λ = 1/2: Square root transformation
+
+**Statistical Test:**
+
+Test H₀: λ = λ₀ using likelihood ratio:
+```
+LR = 2[L(λ̂) - L(λ₀)] ~ χ²(1)
+```
+
+**Python Implementation:**
+```python
+from scipy import stats
+
+def optimal_box_cox(y):
+    """
+    Find optimal Box-Cox transformation parameter
+
+    Returns: transformed data, optimal λ, confidence interval
+    """
+    # Box-Cox transformation
+    y_transformed, lambda_optimal = stats.boxcox(y)
+
+    # Confidence interval via profile likelihood
+    lambda_range = np.linspace(-2, 2, 100)
+    log_likelihoods = []
+
+    for lam in lambda_range:
+        if lam == 0:
+            y_t = np.log(y)
+        else:
+            y_t = (y**lam - 1) / lam
+
+        # Log-likelihood (assuming normality)
+        n = len(y)
+        sigma2 = np.var(y_t, ddof=1)
+        ll = -n/2 * np.log(2*np.pi*sigma2) - n/2 + (lam - 1) * np.sum(np.log(y))
+        log_likelihoods.append(ll)
+
+    # 95% CI: λ where log-likelihood within χ²(0.95, 1)/2 ≈ 1.92 of maximum
+    max_ll = max(log_likelihoods)
+    threshold = max_ll - 1.92
+    ci_mask = np.array(log_likelihoods) >= threshold
+    ci = (lambda_range[ci_mask].min(), lambda_range[ci_mask].max())
+
+    return y_transformed, lambda_optimal, ci
+
+# Example
+y = np.random.lognormal(0, 1, 1000)  # Skewed data
+y_trans, lam, ci = optimal_box_cox(y)
+
+print(f"Optimal λ: {lam:.3f} (95% CI: [{ci[0]:.3f}, {ci[1]:.3f}])")
+print(f"Original skewness: {stats.skew(y):.3f}")
+print(f"Transformed skewness: {stats.skew(y_trans):.3f}")
+```
+
+### Feature Selection Bounds
+
+**Theorem 8 (Minimax Lower Bound for Feature Selection):**
+
+For any feature selection algorithm A, there exists distribution P such that:
+```
+E[R(A(S)) - R(f_optimal)] ≥ c · √(k/n)
+```
+
+where:
+- R = risk (expected loss)
+- S = training set of size n
+- k = number of relevant features
+
+**Interpretation:** Cannot do better than O(√(k/n)) error rate in worst case.
+
+**Theorem 9 (Consistency of Forward Selection):**
+
+Under conditions:
+1. Features conditionally independent given Y
+2. Sufficient sample size: n > c·k·log(d)
+
+Forward selection with mutual information recovers true feature set with high probability.
+
+**Sample Complexity:**
+```
+n ≥ O(k·log(d)/ε²)
+```
+
+to identify k relevant features among d candidates with error ≤ ε.
+
+### Curse of Dimensionality: Quantitative Analysis
+
+**Theorem 10 (Volume of High-Dimensional Sphere):**
+
+For unit ball in ℝ^d, fraction of volume within shell [1-ε, 1]:
+```
+V_shell / V_ball = 1 - (1-ε)^d → 1 as d → ∞
+```
+
+**Example:** For d = 100, ε = 0.01:
+```
+Fraction = 1 - (0.99)^100 ≈ 0.634
+```
+
+63% of volume is in thin outer shell!
+
+**Implication:** In high dimensions, almost all points are far from origin and near boundary.
+
+**Nearest Neighbor Curse:**
+
+Expected distance to nearest neighbor in d dimensions:
+```
+E[d_min] ≈ (1/n)^(1/d)
+```
+
+**Example:**
+- d = 2, n = 100: E[d_min] ≈ 0.1 (10% of space)
+- d = 10, n = 100: E[d_min] ≈ 0.76 (76% of space!)
+
+**Sample Size Requirement:**
+
+To maintain ε-nearest neighbor density:
+```
+n ≥ (1/ε)^d
+```
+
+**Example:** For ε = 0.1, d = 10: need n ≥ 10^10 samples!
+
+**Mitigation Strategies:**
+
+1. **Dimensionality reduction:** PCA, t-SNE, UMAP
+2. **Feature selection:** Keep only relevant features
+3. **Regularization:** Shrink coefficients toward zero
+4. **Manifold assumption:** Data lies on low-dimensional manifold
 
 ---
 
