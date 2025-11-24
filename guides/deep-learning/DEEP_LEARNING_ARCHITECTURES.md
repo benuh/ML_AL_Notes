@@ -262,6 +262,266 @@ if __name__ == "__main__":
     print(f"\nTraining Accuracy: {accuracy:.2%}")
 ```
 
+### Theoretical Foundations of Neural Networks
+
+Before discussing activation functions, we establish the rigorous mathematical theory underlying neural networks.
+
+#### Weight Initialization Theory
+
+Proper initialization is critical for training deep networks. Random initialization that is too large or too small leads to gradient explosion or vanishing.
+
+**Problem Setup:**
+Consider a layer with n_in inputs and n_out outputs:
+z = Wx + b, where W ∈ ℝ^(n_out × n_in)
+
+Assume:
+- Inputs x_i are i.i.d. with E[x_i] = 0, Var[x_i] = σ²_x
+- Weights W_ij are i.i.d. with E[W_ij] = 0, Var[W_ij] = σ²_W
+- Inputs and weights are independent
+
+**Theorem 1 (Variance Propagation):**
+The variance of pre-activation z_i is:
+
+Var[z_i] = n_in · σ²_W · σ²_x
+
+Proof:
+z_i = Σ_{j=1}^{n_in} W_ij x_j
+
+Var[z_i] = Var[Σ_j W_ij x_j]
+         = Σ_j Var[W_ij x_j]    (independence)
+         = Σ_j E[W²_ij]E[x²_j]  (independence, zero mean)
+         = Σ_j σ²_W · σ²_x
+         = n_in · σ²_W · σ²_x ∎
+
+**Corollary 1.1 (Variance Preservation):**
+To maintain Var[z_i] = Var[x_j], we need:
+
+n_in · σ²_W = 1  ⟹  σ²_W = 1/n_in
+
+This is **Xavier/Glorot initialization** for linear activations.
+
+**Xavier/Glorot Initialization (2010):**
+
+For forward pass, want: Var[z^[l]] = Var[z^[l-1]]
+For backward pass, want: Var[∂L/∂z^[l]] = Var[∂L/∂z^[l+1]]
+
+Forward: requires σ²_W = 1/n_in
+Backward: requires σ²_W = 1/n_out
+
+**Compromise:** Use harmonic mean:
+
+σ²_W = 2/(n_in + n_out)
+
+Implementation:
+```python
+W ~ Uniform(-√(6/(n_in + n_out)), √(6/(n_in + n_out)))
+# Or equivalently:
+W ~ Normal(0, √(2/(n_in + n_out)))
+```
+
+**Theorem 2 (He Initialization for ReLU):**
+For ReLU activation σ(z) = max(0, z), approximately half of neurons are inactive (output 0).
+This halves the variance of activations.
+
+To compensate, use:
+σ²_W = 2/n_in
+
+This maintains variance through ReLU layers.
+
+Proof sketch:
+For ReLU(z) where z ~ N(0, σ²):
+- P(ReLU(z) = 0) = 0.5
+- E[ReLU(z)] = σ/√(2π)
+- Var[ReLU(z)] = σ²(1 - 1/π)/2 ≈ 0.5σ²
+
+To maintain Var[a^[l]] = Var[a^[l-1]], need:
+n_in · σ²_W · 0.5 = 1  ⟹  σ²_W = 2/n_in ∎
+
+**He Initialization (2015):**
+```python
+W ~ Normal(0, √(2/n_in))
+```
+
+**Theorem 3 (Orthogonal Initialization):**
+For recurrent networks, initializing weight matrices to be orthogonal preserves gradient norms during backpropagation.
+
+An orthogonal matrix Q satisfies Q^T Q = I, thus ||Qv|| = ||v|| (preserves norms).
+
+For RNN: h_t = tanh(W_h h_{t-1} + W_x x_t)
+
+If W_h is orthogonal and |tanh'(z)| ≤ 1:
+||∂L/∂h_{t-1}|| ≈ ||∂L/∂h_t||
+
+This mitigates vanishing/exploding gradients in RNNs.
+
+Implementation via QR decomposition:
+```python
+W = np.random.randn(n, n)
+Q, R = np.linalg.qr(W)
+W_init = Q  # Orthogonal matrix
+```
+
+**Summary of Initialization Methods:**
+```
+Method             | Variance      | Use Case
+-------------------|---------------|-------------------
+Xavier/Glorot      | 2/(n_in+n_out)| Linear, tanh, sigmoid
+He                 | 2/n_in        | ReLU, Leaky ReLU, ELU
+Orthogonal         | 1             | RNNs, LSTMs, GRUs
+LeCun              | 1/n_in        | SELU
+```
+
+#### Universal Approximation Theorem (Rigorous Treatment)
+
+**Theorem 4 (Universal Approximation - Cybenko 1989, Hornik 1991):**
+Let φ: ℝ → ℝ be a non-constant, bounded, continuous function (e.g., sigmoid).
+Let I_n = [0,1]^n be the n-dimensional unit hypercube.
+Let C(I_n) be the space of continuous functions on I_n.
+
+Then for any f ∈ C(I_n) and ε > 0, there exists a network with one hidden layer:
+
+F(x) = Σ_{i=1}^N α_i φ(w_i^T x + b_i)
+
+such that:
+||F - f||_∞ = sup_{x∈I_n} |F(x) - f(x)| < ε
+
+**Proof outline:**
+1. Show that functions of form φ(w^T x + b) are **discriminatory**:
+   If Σ_i α_i φ(w_i^T x + b_i) = 0 for all x, then all α_i = 0
+
+2. By Riesz representation theorem, discriminatory functions are dense in C(I_n)
+
+3. Therefore, finite linear combinations can approximate any continuous function
+
+Full proof uses measure theory and functional analysis. ∎
+
+**Corollary 4.1 (ReLU Networks):**
+The theorem extends to ReLU networks despite ReLU being unbounded.
+A 2-layer ReLU network can approximate any continuous function on compact domains.
+
+**Theorem 5 (Approximation Rate - Barron 1993):**
+For functions f: ℝ^d → ℝ with bounded Fourier magnitude C_f:
+
+min_{N neurons} ||F_N - f||²_L2 ≤ C_f² / N
+
+This shows approximation error decreases as O(1/N) with network width N,
+independent of input dimension d!
+
+**Key insight:** Neural networks overcome the curse of dimensionality for
+functions with certain smoothness properties (bounded Fourier spectrum).
+
+#### Expressivity: Depth vs Width
+
+**Theorem 6 (Expressive Power of Depth):**
+Some functions require exponentially many neurons in a shallow network
+but can be represented with polynomially many neurons in a deep network.
+
+**Example:** Parity function f(x₁,...,x_d) = x₁ ⊕ x₂ ⊕ ... ⊕ x_d
+- Shallow network: requires Ω(2^d) neurons
+- Deep network (d layers): requires O(d) neurons
+
+**Theorem 7 (Width vs Depth Trade-off - Telgarsky 2016):**
+For any depth k, there exists a function f_k that:
+- Can be computed by a network with depth k and width O(k³)
+- Requires width 2^Ω(k) if depth is k-1
+
+This establishes an exponential separation between depth k and k-1.
+
+**Practical implications:**
+- Depth provides exponentially more expressivity than width
+- Deep networks can represent hierarchical compositional structure efficiently
+- Shallow networks require exponentially more neurons for same expressivity
+
+#### Gradient Flow and Vanishing/Exploding Gradients
+
+**Gradient Propagation Analysis:**
+
+For a network with L layers, the gradient w.r.t. first layer weights is:
+
+∂L/∂W^[1] = ∂L/∂z^[L] · ∂z^[L]/∂z^[L-1] · ... · ∂z^[2]/∂z^[1] · ∂z^[1]/∂W^[1]
+
+Each term ∂z^[l]/∂z^[l-1] = W^[l] · diag(g'(z^[l-1])) where g is activation.
+
+**Theorem 8 (Gradient Norm Bound):**
+The gradient norm is bounded by:
+
+||∂L/∂W^[1]|| ≤ ||∂L/∂z^[L]|| · Π_{l=2}^L ||W^[l]|| · ||diag(g'(z^[l-1]))||
+
+For sigmoid activation: g'(z) = σ(z)(1-σ(z)) ≤ 0.25
+For tanh: g'(z) = 1 - tanh²(z) ≤ 1
+
+**Vanishing Gradient Criterion:**
+If ||W^[l]|| · ||g'(z^[l])|| < 1 for all layers, then:
+
+||∂L/∂W^[1]|| ≤ ||∂L/∂z^[L]|| · (λ)^{L-1}
+
+where λ < 1, causing exponential decay as L grows.
+
+**Example (sigmoid):**
+With ||W^[l]|| = 1 and ||g'(z)|| = 0.25:
+After 10 layers: gradient scaled by (0.25)^9 ≈ 4 × 10^{-6}
+After 20 layers: gradient scaled by (0.25)^{19} ≈ 10^{-12}
+
+**ReLU Solution:**
+For ReLU, g'(z) ∈ {0, 1}, so no gradient saturation (when z > 0).
+With proper initialization (He), ||W^[l]|| ≈ 1 and gradient flow is stable.
+
+**Theorem 9 (ResNet Gradient Flow):**
+For ResNet with skip connections h_{l+1} = h_l + F(h_l):
+
+∂L/∂h_l = ∂L/∂h_{l+1} · (I + ∂F/∂h_l)
+
+By chain rule:
+∂L/∂h_1 = ∂L/∂h_L · Π_{l=1}^{L-1} (I + ∂F/∂h_l)
+
+The identity term I ensures at least some gradient flows directly,
+preventing complete vanishing even if ∂F/∂h_l is small.
+
+**Mathematical insight:**
+Π(I + A_l) ≥ I  (gradient cannot vanish completely)
+
+vs. standard network: Π A_l can approach 0
+
+This explains why ResNets enable training 100+ layer networks.
+
+#### Neural Tangent Kernel (NTK) - Modern Theory
+
+For overparameterized networks (width → ∞), neural network training can be analyzed via kernel methods.
+
+**Definition (Neural Tangent Kernel):**
+For network f(x; θ) with parameters θ, the NTK is:
+
+K(x, x') = ⟨∇_θ f(x; θ), ∇_θ f(x'; θ)⟩
+
+**Theorem 10 (NTK for Infinite Width - Jacot et al. 2018):**
+As width m → ∞ with proper initialization, the NTK:
+1. Converges to a deterministic limit K*
+2. Remains constant during training (lazy training regime)
+3. Training dynamics become linear in function space
+
+**Gradient descent dynamics:**
+df/dt = -∇_θ f · ∂L/∂f
+      → -K · ∂L/∂f  (as width → ∞)
+
+This is equivalent to kernel ridge regression with kernel K!
+
+**Corollary 10.1 (Global Convergence):**
+In the NTK regime, gradient descent on overparameterized networks
+converges to global minimum at rate:
+
+||f_t - f*||² ≤ e^{-λ_min(K)·t} ||f_0 - f*||²
+
+where λ_min(K) is the minimum eigenvalue of the NTK.
+
+**Practical implications:**
+- Explains why overparameterized networks don't overfit
+- Provides theoretical justification for wide networks
+- Shows connection between neural networks and kernel methods
+- Lazy training regime: features barely change during training
+
+**Limitation:** Real networks (finite width) often operate in "feature learning regime"
+where features evolve significantly, going beyond NTK predictions.
+
 ### Activation Functions Deep Dive
 
 #### **1. ReLU (Rectified Linear Unit)**
