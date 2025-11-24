@@ -55,6 +55,204 @@ Convergence depends on:
 - Smoothness
 ```
 
+### Statistical Decision Theory
+
+**Bayes Risk and Optimal Decision Rules**
+
+The foundation of loss functions lies in statistical decision theory.
+
+**Definition 1 (Decision Function):**
+A decision function δ: X → A maps inputs to actions.
+- For regression: A = ℝ (predict real values)
+- For binary classification: A = {0, 1} or A = [0, 1] (probabilities)
+- For multi-class: A = Δ_K (probability simplex)
+
+**Definition 2 (Risk):**
+The risk of decision function δ under loss L:
+
+R(δ) = E_{(X,Y)~P}[L(Y, δ(X))]
+
+**Theorem 1 (Bayes Optimal Decision Rule):**
+The Bayes optimal decision rule minimizes expected loss:
+
+δ*(x) = argmin_{a∈A} E_{Y|X=x}[L(Y, a)]
+
+This is the best possible decision rule given the true distribution P(Y|X).
+
+**Proof:**
+By iterated expectation:
+
+R(δ) = E_X[E_{Y|X}[L(Y, δ(X))]]
+
+For each x, E_{Y|X=x}[L(Y, δ(x))] depends only on δ(x).
+Minimizing R(δ) requires minimizing the inner expectation for each x:
+
+δ*(x) = argmin_{a∈A} E_{Y|X=x}[L(Y, a)]
+
+Any other choice δ(x) ≠ δ*(x) increases R(δ). ∎
+
+**Corollary 1.1 (Bayes Risk):**
+The Bayes risk R* is the minimum achievable risk:
+
+R* = E_X[min_{a∈A} E_{Y|X}[L(Y, a)]]
+
+No decision rule can achieve R(δ) < R*.
+
+**Excess Risk Decomposition:**
+For any decision rule δ:
+
+R(δ) - R* = E_X[E_{Y|X}[L(Y, δ(X))] - min_a E_{Y|X}[L(Y, a)]]
+          ≥ 0
+
+The excess risk measures sub-optimality of δ.
+
+**Example 1 (Squared Loss):**
+For L(y, ŷ) = (y - ŷ)²:
+
+δ*(x) = argmin_a E_{Y|X=x}[(Y - a)²]
+      = argmin_a E[(Y - E[Y|X=x] + E[Y|X=x] - a)²]
+      = argmin_a {Var[Y|X=x] + (E[Y|X=x] - a)²}
+      = E[Y|X=x]
+
+Therefore: **MSE loss leads to predicting the conditional mean**.
+
+**Example 2 (Absolute Loss):**
+For L(y, ŷ) = |y - ŷ|:
+
+δ*(x) = argmin_a E_{Y|X=x}[|Y - a|]
+      = median(Y|X=x)
+
+Therefore: **MAE loss leads to predicting the conditional median**.
+
+**Example 3 (0-1 Loss for Classification):**
+For L(y, ŷ) = 𝟙[y ≠ ŷ]:
+
+δ*(x) = argmin_{c∈{1,...,K}} P(Y ≠ c | X=x)
+      = argmin_c (1 - P(Y = c | X=x))
+      = argmax_c P(Y = c | X=x)
+
+Therefore: **0-1 loss leads to predicting the most probable class**.
+
+### Convexity Theory for Loss Functions
+
+**Definition 3 (Convex Function):**
+A function f: ℝⁿ → ℝ is convex if for all x, y ∈ ℝⁿ and λ ∈ [0, 1]:
+
+f(λx + (1-λ)y) ≤ λf(x) + (1-λ)f(y)
+
+f is strictly convex if inequality is strict for λ ∈ (0, 1) and x ≠ y.
+
+**Definition 4 (Strong Convexity):**
+f is μ-strongly convex if for all x, y:
+
+f(y) ≥ f(x) + ∇f(x)ᵀ(y - x) + (μ/2)||y - x||²
+
+Strong convexity implies unique global minimum.
+
+**Theorem 2 (Convexity of Common Losses):**
+
+(a) **MSE is convex:**
+For L(w) = (1/n)Σᵢ(wᵀxᵢ - yᵢ)², L is convex in w.
+
+Proof: The Hessian is:
+∇²L(w) = (2/n)XᵀX
+
+This is positive semidefinite since for any v:
+vᵀ∇²L(w)v = (2/n)vᵀXᵀXv = (2/n)||Xv||² ≥ 0
+
+If X has full column rank: ∇²L = (2/n)XᵀX ≻ 0, so L is μ-strongly convex
+with μ = (2/n)λ_min(XᵀX). ∎
+
+(b) **Cross-entropy is convex:**
+For logistic regression with L(w) = -Σᵢ[yᵢlog σ(wᵀxᵢ) + (1-yᵢ)log(1-σ(wᵀxᵢ))],
+where σ(z) = 1/(1+e^(-z)):
+
+Proof: The Hessian is:
+∇²L(w) = Σᵢ σ(wᵀxᵢ)(1-σ(wᵀxᵢ)) xᵢxᵢᵀ
+
+Since σ(z)(1-σ(z)) > 0 for all z, this is a sum of positive semidefinite matrices,
+hence positive semidefinite. Therefore L is convex. ∎
+
+(c) **MAE is convex:**
+For L(w) = Σᵢ|wᵀxᵢ - yᵢ|, L is convex (as sum of convex functions |·|).
+
+(d) **Hinge loss is convex:**
+For L(w) = Σᵢmax(0, 1 - yᵢwᵀxᵢ), L is convex (max of affine functions).
+
+**Theorem 3 (Smoothness and Lipschitz Continuity):**
+
+(a) **L-smooth:** A differentiable function f is L-smooth if:
+||∇f(x) - ∇f(y)|| ≤ L||x - y|| for all x, y
+
+Equivalently: ∇²f(x) ⪯ LI (all eigenvalues ≤ L)
+
+(b) **For MSE:** If L(w) = (1/n)||Xw - y||², then:
+∇²L = (2/n)XᵀX
+
+L-smooth with L = (2/n)λ_max(XᵀX).
+
+(c) **For logistic regression:** L-smooth with L = (1/4n)||X||²_F
+because max_z σ(z)(1-σ(z)) = 1/4.
+
+**Theorem 4 (Convergence Rates):**
+
+For μ-strongly convex and L-smooth function, gradient descent with step size α = 1/L:
+
+||w_k - w*||² ≤ (1 - μ/L)^k ||w_0 - w*||²
+
+where κ = L/μ is the condition number.
+
+Proof: By L-smoothness and μ-strong convexity:
+
+f(w_k) - f(w*) ≤ (1 - 1/κ)(f(w_{k-1}) - f(w*))
+
+This is linear (exponential) convergence with rate depending on κ. ∎
+
+**Practical Implications:**
+- Well-conditioned problems (κ ≈ 1): fast convergence
+- Ill-conditioned problems (κ >> 1): slow convergence
+- For linear regression: κ = λ_max(XᵀX)/λ_min(XᵀX)
+- Regularization improves conditioning: κ decreases with λ in L + λ||w||²
+
+### Bregman Divergences
+
+Many loss functions are Bregman divergences, providing a unified framework.
+
+**Definition 5 (Bregman Divergence):**
+For strictly convex, differentiable function φ:
+
+D_φ(y || ŷ) = φ(y) - φ(ŷ) - ⟨∇φ(ŷ), y - ŷ⟩
+
+This measures the "error" of approximating φ(y) by its first-order Taylor expansion at ŷ.
+
+**Properties:**
+1. D_φ(y || ŷ) ≥ 0 with equality iff y = ŷ
+2. Generally not symmetric: D_φ(y || ŷ) ≠ D_φ(ŷ || y)
+3. Convex in second argument
+
+**Theorem 5 (Common Losses as Bregman Divergences):**
+
+(a) **Squared loss:** φ(y) = (1/2)y²
+D_φ(y || ŷ) = (1/2)y² - (1/2)ŷ² - ŷ(y - ŷ)
+            = (1/2)(y - ŷ)²
+
+(b) **Generalized KL divergence:** φ(y) = y log y - y
+D_φ(y || ŷ) = y log(y/ŷ) - (y - ŷ)  (for y, ŷ > 0)
+
+(c) **Itakura-Saito divergence:** φ(y) = -log y
+D_φ(y || ŷ) = y/ŷ - log(y/ŷ) - 1
+
+**Theorem 6 (Bregman Projection):**
+The Bregman projection onto convex set C:
+
+P_C(y) = argmin_{ŷ∈C} D_φ(y || ŷ)
+
+satisfies the generalized Pythagorean theorem:
+
+D_φ(y || z) = D_φ(y || P_C(y)) + D_φ(P_C(y) || z)  for all z ∈ C
+
+This generalizes ordinary Euclidean projection (when φ(y) = (1/2)||y||²).
+
 ---
 
 ## Regression Loss Functions
@@ -387,6 +585,190 @@ Automatic transition between quadratic and linear
 ---
 
 ## Classification Loss Functions
+
+### Proper Scoring Rules and Calibration
+
+Before discussing specific classification losses, we establish the theory of proper scoring rules.
+
+**Definition 6 (Scoring Rule):**
+A scoring rule S(P, y) measures the quality of probabilistic forecast P when outcome is y.
+- P: predicted probability distribution over outcomes
+- y: realized outcome
+- Lower score = better prediction
+
+**Definition 7 (Proper Scoring Rule):**
+A scoring rule S is **proper** if the expected score is minimized by predicting the true distribution:
+
+argmin_Q E_{Y~P}[S(Q, Y)] = P
+
+It is **strictly proper** if P is the unique minimizer.
+
+**Theorem 7 (Cross-Entropy is Proper):**
+The logarithmic scoring rule S(P, y) = -log P(y) is strictly proper.
+
+Proof:
+Let P be the true distribution. For any other distribution Q:
+
+E_{Y~P}[S(Q, Y)] = E_{Y~P}[-log Q(Y)]
+                  = -Σ_y P(y) log Q(y)
+                  = H(P, Q)  (cross-entropy)
+
+We want to show: H(P, Q) ≥ H(P, P) with equality iff Q = P.
+
+H(P, Q) - H(P, P) = -Σ_y P(y) log Q(y) + Σ_y P(y) log P(y)
+                  = Σ_y P(y) log(P(y)/Q(y))
+                  = KL(P || Q)
+                  ≥ 0
+
+with equality iff P = Q (by non-negativity of KL divergence). ∎
+
+**Corollary 7.1:**
+Minimizing cross-entropy loss encourages calibrated probability predictions.
+
+**Theorem 8 (Brier Score is Proper):**
+The Brier score S(p, y) = (p - y)² for binary outcomes y ∈ {0, 1} is strictly proper.
+
+Proof:
+For true probability P(Y=1) = π, and predicted probability p:
+
+E_Y[S(p, Y)] = π(p - 1)² + (1-π)(p - 0)²
+              = π(p² - 2p + 1) + (1-π)p²
+              = p²(π + 1 - π) - 2πp + π
+              = p² - 2πp + π
+
+Taking derivative w.r.t. p:
+∂/∂p E[S(p, Y)] = 2p - 2π
+
+Setting to zero: p = π (the true probability).
+
+Second derivative: ∂²/∂p² E[S(p, Y)] = 2 > 0, confirming minimum. ∎
+
+**Theorem 9 (Characterization of Proper Scoring Rules):**
+A scoring rule S(p, y) for binary outcomes is proper if and only if it can be written as:
+
+S(p, 1) = -G(p)
+S(p, 0) = -G(1-p) - p·G'(p)
+
+where G is a strictly convex function with G' being its derivative.
+
+This gives a general family of proper scoring rules based on choice of G.
+
+**Examples:**
+- Log score: G(p) = log p (strictly convex for p > 0)
+- Brier score: G(p) = 2p - p² (strictly convex)
+- Spherical score: G(p) = 1/√(p² + (1-p)²)
+
+### Calibration Theory
+
+**Definition 8 (Calibration):**
+A classifier with predicted probabilities p is **calibrated** if:
+
+P(Y = 1 | p(X) = q) = q  for all q ∈ [0, 1]
+
+In words: among all predictions with confidence q, exactly fraction q should be correct.
+
+**Example (Well-calibrated):**
+- 100 predictions with p = 0.7
+- Exactly 70 should have Y = 1
+- If 70/100 are correct → well calibrated
+- If 50/100 are correct → underconfident (miscalibrated)
+- If 90/100 are correct → overconfident (miscalibrated)
+
+**Theorem 10 (Expected Calibration Error):**
+The Expected Calibration Error (ECE) measures calibration:
+
+ECE = Σ_{m=1}^M (n_m/n)|acc(m) - conf(m)|
+
+where:
+- Predictions binned into M bins by confidence
+- n_m: number of predictions in bin m
+- acc(m): accuracy in bin m
+- conf(m): average confidence in bin m
+
+Perfect calibration: ECE = 0.
+
+**Theorem 11 (Temperature Scaling for Calibration):**
+Post-hoc calibration via temperature scaling:
+
+p_calibrated = softmax(z/T)
+
+where z are logits and T > 0 is temperature.
+
+Finding optimal T:
+T* = argmin_T NLL(softmax(z/T), y) on validation set
+
+This preserves model accuracy while improving calibration.
+
+**Proof of effectiveness:**
+Temperature scaling is a monotonic transformation of probabilities:
+- Preserves argmax → same predicted classes
+- T > 1: reduces confidence (spreads probability mass)
+- T < 1: increases confidence (concentrates probability mass)
+- Optimizing T via NLL finds best calibration on validation data. ∎
+
+### Surrogate Loss Bounds
+
+The 0-1 loss L_{0-1}(y, f(x)) = 𝟙[y ≠ sign(f(x))] is non-convex and discontinuous.
+Classification algorithms use **surrogate losses** that are convex and differentiable.
+
+**Definition 9 (φ-surrogate Loss):**
+A surrogate loss φ: ℝ → ℝ₊ replaces 0-1 loss:
+
+L_φ(y, f(x)) = φ(y·f(x))
+
+where y ∈ {-1, +1} and f(x) ∈ ℝ is the margin.
+
+**Common Surrogates:**
+- 0-1 loss: φ(z) = 𝟙[z ≤ 0]
+- Hinge: φ(z) = max(0, 1 - z)
+- Logistic: φ(z) = log(1 + e^(-z))
+- Exponential: φ(z) = e^(-z)
+- Squared: φ(z) = (1 - z)²
+
+**Theorem 12 (Classification Calibration):**
+A surrogate φ is **classification-calibrated** if minimizing φ-risk implies minimizing 0-1 risk:
+
+R_φ(f_n) → inf_f R_φ(f)  ⟹  R_{0-1}(f_n) → inf_f R_{0-1}(f)
+
+**Sufficient condition:** φ is differentiable, convex, and φ'(0) < 0.
+
+All common surrogates (hinge, logistic, exponential) satisfy this.
+
+**Theorem 13 (Bartlett-Jordan-McAuliffe Bound):**
+For margin-based surrogates with φ convex, decreasing, and φ(0) = 1:
+
+R_{0-1}(f) - R*_{0-1} ≤ ψ_φ^(-1)(R_φ(f) - R*_φ)
+
+where ψ_φ is the calibration function measuring how well φ bounds 0-1 loss.
+
+**Explicit bounds:**
+
+(a) **Hinge loss:** φ(z) = max(0, 1-z)
+R_{0-1}(f) - R* ≤ R_φ(f) - R*_φ
+
+(b) **Logistic loss:** φ(z) = log(1 + e^(-z))
+R_{0-1}(f) - R* ≤ √(2(R_φ(f) - R*_φ))
+
+(c) **Exponential loss:** φ(z) = e^(-z)
+R_{0-1}(f) - R* ≤ √(2(R_φ(f) - R*_φ))
+
+**Interpretation:**
+- Minimizing surrogate φ-risk yields low 0-1 risk
+- Logistic and exponential: square root relationship (faster than linear)
+- Hinge: linear relationship (tightest bound)
+
+**Theorem 14 (H-Consistency Bounds):**
+For hypothesis class H, a loss is **H-consistent** if minimizing empirical φ-risk over H
+yields optimal 0-1 risk over H.
+
+For finite VC dimension d and n samples:
+
+R_{0-1}(f̂) ≤ R*_{0-1} + O(√(d/n)) + ψ_φ^(-1)(R̂_φ(f̂) - R_φ(f*) + O(√(d/n)))
+
+This combines:
+- Approximation error: R_φ(f*) - R*_φ
+- Estimation error: R̂_φ(f̂) - R_φ(f̂)
+- Calibration gap: ψ_φ^(-1)
 
 ### Cross-Entropy Loss (Log Loss)
 
@@ -950,6 +1332,92 @@ Rule of thumb: Start with ε = 0.1, increase if overfitting, decrease if underfi
 ---
 
 ## Probabilistic Loss Functions
+
+### f-Divergences: A Unified Framework
+
+Many divergences between probability distributions belong to the family of f-divergences.
+
+**Definition 10 (f-Divergence):**
+For convex function f: ℝ₊ → ℝ with f(1) = 0:
+
+D_f(P || Q) = E_Q[f(dP/dQ)] = Σ_x Q(x)·f(P(x)/Q(x))
+
+where dP/dQ is the Radon-Nikodym derivative (density ratio).
+
+**Properties:**
+1. Non-negativity: D_f(P || Q) ≥ f(1) = 0 (by Jensen's inequality)
+2. Identity: D_f(P || Q) = 0 ⟺ P = Q
+3. Convexity: D_f(P || Q) is convex in the pair (P, Q)
+
+**Proof of non-negativity:**
+By Jensen's inequality (f is convex):
+
+D_f(P || Q) = E_Q[f(dP/dQ)]
+            ≥ f(E_Q[dP/dQ])
+            = f(Σ_x Q(x)·(P(x)/Q(x)))
+            = f(Σ_x P(x))
+            = f(1)
+            = 0 ∎
+
+**Theorem 15 (Common Divergences as f-Divergences):**
+
+(a) **KL Divergence:** f(t) = t log t
+D_f(P || Q) = KL(P || Q) = Σ_x P(x) log(P(x)/Q(x))
+
+(b) **Reverse KL:** f(t) = -log t
+D_f(P || Q) = KL(Q || P) = Σ_x Q(x) log(Q(x)/P(x))
+
+(c) **Total Variation:** f(t) = (1/2)|t - 1|
+D_f(P || Q) = (1/2)Σ_x |P(x) - Q(x)| = TV(P, Q)
+
+(d) **Squared Hellinger:** f(t) = (√t - 1)²
+D_f(P || Q) = Σ_x Q(x)(√(P(x)/Q(x)) - 1)²
+            = Σ_x (√P(x) - √Q(x))²
+
+(e) **Chi-squared:** f(t) = (t - 1)²
+D_f(P || Q) = Σ_x Q(x)((P(x)/Q(x)) - 1)²
+            = Σ_x (P(x) - Q(x))²/Q(x)
+            = χ²(P || Q)
+
+(f) **Jensen-Shannon:** Symmetrized KL
+JS(P || Q) = (1/2)KL(P || M) + (1/2)KL(Q || M)
+where M = (1/2)(P + Q)
+
+Properties:
+- Symmetric: JS(P || Q) = JS(Q || P)
+- Bounded: 0 ≤ JS(P || Q) ≤ log 2
+- Square root is a metric: √JS is a proper distance
+
+**Theorem 16 (Variational Representation of f-Divergences):**
+For any f-divergence:
+
+D_f(P || Q) = sup_{T: X→ℝ} {E_P[T(X)] - E_Q[f*(T(X))]}
+
+where f* is the convex conjugate of f:
+f*(y) = sup_t {ty - f(t)}
+
+This variational form is the basis for adversarial training (GANs).
+
+**Example (KL Divergence):**
+For f(t) = t log t:
+f*(y) = e^(y-1)
+
+Thus:
+KL(P || Q) = sup_T {E_P[T] - E_Q[e^(T-1)]}
+
+**Theorem 17 (Data Processing Inequality):**
+For any f-divergence and Markov chain X → Y → Z:
+
+D_f(P_X || Q_X) ≥ D_f(P_Y || Q_Y) ≥ D_f(P_Z || Q_Z)
+
+In words: processing data through any channel cannot increase divergence.
+
+Proof: Uses Jensen's inequality and the Markov property. ∎
+
+**Practical implication:**
+- Feature extraction reduces divergence between distributions
+- Information is lost, never gained, through transformations
+- Applies to all f-divergences simultaneously
 
 ### Kullback-Leibler (KL) Divergence
 
@@ -1672,6 +2140,490 @@ Multi-task learning                | Weighted sum + uncertainty weighting
 ```
 
 ---
+
+## Practical Implementations of Theory
+
+### Computing Proper Scoring Rules
+
+**Implementation of proper scoring rules and calibration metrics:**
+
+```python
+import numpy as np
+from scipy.stats import chi2
+from scipy.special import softmax
+
+def log_score(y_true, y_pred_proba):
+    """
+    Logarithmic scoring rule (negative log-likelihood).
+    Strictly proper scoring rule.
+
+    Args:
+        y_true: Binary labels (0 or 1), shape (n,)
+        y_pred_proba: Predicted probabilities for class 1, shape (n,)
+
+    Returns:
+        score: Average log score (lower is better)
+    """
+    epsilon = 1e-15  # Avoid log(0)
+    y_pred_proba = np.clip(y_pred_proba, epsilon, 1 - epsilon)
+
+    scores = -np.where(y_true == 1,
+                       np.log(y_pred_proba),
+                       np.log(1 - y_pred_proba))
+
+    return np.mean(scores)
+
+def brier_score(y_true, y_pred_proba):
+    """
+    Brier score (mean squared error of probabilities).
+    Strictly proper scoring rule.
+
+    Args:
+        y_true: Binary labels (0 or 1), shape (n,)
+        y_pred_proba: Predicted probabilities for class 1, shape (n,)
+
+    Returns:
+        score: Brier score (lower is better)
+    """
+    return np.mean((y_pred_proba - y_true) ** 2)
+
+def spherical_score(y_true, y_pred_proba):
+    """
+    Spherical scoring rule.
+    Proper scoring rule that normalizes predictions.
+
+    Args:
+        y_true: Binary labels (0 or 1), shape (n,)
+        y_pred_proba: Predicted probabilities for class 1, shape (n,)
+
+    Returns:
+        score: Negative spherical score (lower is better)
+    """
+    # For binary: p' = [1-p, p], y' = [1-y, y]
+    p0 = 1 - y_pred_proba
+    p1 = y_pred_proba
+    norm = np.sqrt(p0**2 + p1**2)
+
+    scores = np.where(y_true == 1, p1 / norm, p0 / norm)
+
+    return -np.mean(scores)  # Negative because higher is better
+
+def expected_calibration_error(y_true, y_pred_proba, n_bins=10):
+    """
+    Expected Calibration Error (ECE).
+    Measures calibration by binning predictions.
+
+    Args:
+        y_true: True labels, shape (n,)
+        y_pred_proba: Predicted probabilities, shape (n,)
+        n_bins: Number of bins for calibration
+
+    Returns:
+        ece: Expected calibration error
+        bin_stats: Dictionary with per-bin statistics
+    """
+    # Create bins
+    bins = np.linspace(0, 1, n_bins + 1)
+    bin_indices = np.digitize(y_pred_proba, bins) - 1
+    bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+
+    ece = 0.0
+    bin_stats = []
+
+    for i in range(n_bins):
+        mask = bin_indices == i
+
+        if np.sum(mask) == 0:
+            continue
+
+        bin_size = np.sum(mask)
+        bin_confidence = np.mean(y_pred_proba[mask])
+        bin_accuracy = np.mean(y_true[mask])
+
+        bin_error = np.abs(bin_confidence - bin_accuracy)
+        ece += (bin_size / len(y_true)) * bin_error
+
+        bin_stats.append({
+            'bin': i,
+            'count': bin_size,
+            'confidence': bin_confidence,
+            'accuracy': bin_accuracy,
+            'error': bin_error
+        })
+
+    return ece, bin_stats
+
+def maximum_calibration_error(y_true, y_pred_proba, n_bins=10):
+    """
+    Maximum Calibration Error (MCE).
+    Worst-case calibration across bins.
+
+    Args:
+        y_true: True labels, shape (n,)
+        y_pred_proba: Predicted probabilities, shape (n,)
+        n_bins: Number of bins
+
+    Returns:
+        mce: Maximum calibration error
+    """
+    _, bin_stats = expected_calibration_error(y_true, y_pred_proba, n_bins)
+
+    if len(bin_stats) == 0:
+        return 0.0
+
+    return max(stat['error'] for stat in bin_stats)
+
+def temperature_scaling(logits, y_true, T_init=1.0, lr=0.01, max_iter=100):
+    """
+    Temperature scaling for model calibration.
+    Optimizes temperature T to minimize NLL on validation set.
+
+    Args:
+        logits: Model logits before softmax, shape (n, n_classes)
+        y_true: True class labels, shape (n,)
+        T_init: Initial temperature
+        lr: Learning rate
+        max_iter: Maximum iterations
+
+    Returns:
+        T_optimal: Optimal temperature
+        nll_history: NLL at each iteration
+    """
+    T = T_init
+    nll_history = []
+
+    for iteration in range(max_iter):
+        # Compute probabilities with current temperature
+        scaled_logits = logits / T
+        probs = softmax(scaled_logits, axis=1)
+
+        # Compute negative log-likelihood
+        epsilon = 1e-15
+        probs = np.clip(probs, epsilon, 1 - epsilon)
+        nll = -np.mean(np.log(probs[np.arange(len(y_true)), y_true]))
+        nll_history.append(nll)
+
+        # Gradient of NLL w.r.t. T
+        # ∂NLL/∂T = (1/T²) Σ_i (z_i - z_{y_i})
+        one_hot = np.zeros_like(probs)
+        one_hot[np.arange(len(y_true)), y_true] = 1
+
+        grad_T = np.mean(np.sum((probs - one_hot) * logits, axis=1)) / (T ** 2)
+
+        # Update temperature
+        T -= lr * grad_T
+        T = max(T, 0.01)  # Ensure T > 0
+
+        # Check convergence
+        if iteration > 0 and abs(nll_history[-1] - nll_history[-2]) < 1e-6:
+            break
+
+    return T, nll_history
+
+# Example usage
+if __name__ == "__main__":
+    # Generate example data
+    np.random.seed(42)
+    n_samples = 1000
+
+    # Ground truth labels
+    y_true = np.random.binomial(1, 0.3, n_samples)
+
+    # Overconfident predictions (miscalibrated)
+    y_pred_overconfident = np.where(y_true == 1,
+                                     np.random.beta(8, 2, n_samples),
+                                     np.random.beta(2, 8, n_samples))
+
+    # Well-calibrated predictions
+    y_pred_calibrated = np.where(y_true == 1,
+                                  np.random.beta(3, 2, n_samples),
+                                  np.random.beta(2, 3, n_samples))
+
+    print("=== Proper Scoring Rules ===")
+    print(f"\nOverconfident model:")
+    print(f"  Log score: {log_score(y_true, y_pred_overconfident):.4f}")
+    print(f"  Brier score: {brier_score(y_true, y_pred_overconfident):.4f}")
+    print(f"  Spherical score: {spherical_score(y_true, y_pred_overconfident):.4f}")
+
+    print(f"\nCalibrated model:")
+    print(f"  Log score: {log_score(y_true, y_pred_calibrated):.4f}")
+    print(f"  Brier score: {brier_score(y_true, y_pred_calibrated):.4f}")
+    print(f"  Spherical score: {spherical_score(y_true, y_pred_calibrated):.4f}")
+
+    print("\n=== Calibration Metrics ===")
+    ece_over, _ = expected_calibration_error(y_true, y_pred_overconfident)
+    mce_over = maximum_calibration_error(y_true, y_pred_overconfident)
+
+    ece_cal, _ = expected_calibration_error(y_true, y_pred_calibrated)
+    mce_cal = maximum_calibration_error(y_true, y_pred_calibrated)
+
+    print(f"\nOverconfident model:")
+    print(f"  ECE: {ece_over:.4f}")
+    print(f"  MCE: {mce_over:.4f}")
+
+    print(f"\nCalibrated model:")
+    print(f"  ECE: {ece_cal:.4f}")
+    print(f"  MCE: {mce_cal:.4f}")
+```
+
+### Computing f-Divergences
+
+**Implementation of various f-divergences:**
+
+```python
+import numpy as np
+from scipy.special import kl_div, rel_entr
+
+def compute_kl_divergence(P, Q, epsilon=1e-10):
+    """
+    Kullback-Leibler divergence KL(P || Q).
+
+    Args:
+        P: True distribution, shape (n,)
+        Q: Approximate distribution, shape (n,)
+        epsilon: Small value to avoid log(0)
+
+    Returns:
+        kl: KL divergence (nats)
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    return np.sum(rel_entr(P, Q))
+
+def compute_reverse_kl(P, Q, epsilon=1e-10):
+    """
+    Reverse KL divergence KL(Q || P).
+
+    Args:
+        P: First distribution, shape (n,)
+        Q: Second distribution, shape (n,)
+        epsilon: Small value to avoid log(0)
+
+    Returns:
+        rkl: Reverse KL divergence (nats)
+    """
+    return compute_kl_divergence(Q, P, epsilon)
+
+def compute_js_divergence(P, Q, epsilon=1e-10):
+    """
+    Jensen-Shannon divergence JS(P || Q).
+    Symmetric and bounded version of KL divergence.
+
+    Args:
+        P: First distribution, shape (n,)
+        Q: Second distribution, shape (n,)
+        epsilon: Small value to avoid log(0)
+
+    Returns:
+        js: Jensen-Shannon divergence (nats)
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    # Mixture distribution
+    M = 0.5 * (P + Q)
+
+    return 0.5 * compute_kl_divergence(P, M, 0) + 0.5 * compute_kl_divergence(Q, M, 0)
+
+def compute_hellinger_distance(P, Q, epsilon=1e-10):
+    """
+    Hellinger distance H(P, Q).
+    Metric derived from squared Hellinger divergence.
+
+    Args:
+        P: First distribution, shape (n,)
+        Q: Second distribution, shape (n,)
+        epsilon: Small value for numerical stability
+
+    Returns:
+        hellinger: Hellinger distance [0, 1]
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    # Hellinger distance: (1/√2)||√P - √Q||
+    return np.sqrt(np.sum((np.sqrt(P) - np.sqrt(Q)) ** 2)) / np.sqrt(2)
+
+def compute_total_variation(P, Q, epsilon=1e-10):
+    """
+    Total Variation distance TV(P, Q).
+
+    Args:
+        P: First distribution, shape (n,)
+        Q: Second distribution, shape (n,)
+        epsilon: Small value for numerical stability
+
+    Returns:
+        tv: Total variation distance [0, 1]
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    return 0.5 * np.sum(np.abs(P - Q))
+
+def compute_chi_squared(P, Q, epsilon=1e-10):
+    """
+    Chi-squared divergence χ²(P || Q).
+
+    Args:
+        P: True distribution, shape (n,)
+        Q: Approximate distribution, shape (n,)
+        epsilon: Small value to avoid division by zero
+
+    Returns:
+        chi_sq: Chi-squared divergence
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    return np.sum((P - Q) ** 2 / Q)
+
+def compute_f_divergence(P, Q, f_func, epsilon=1e-10):
+    """
+    General f-divergence computation.
+
+    Args:
+        P: True distribution, shape (n,)
+        Q: Approximate distribution, shape (n,)
+        f_func: Convex function f(t) with f(1) = 0
+        epsilon: Small value for numerical stability
+
+    Returns:
+        div: f-divergence
+    """
+    P = np.asarray(P) + epsilon
+    Q = np.asarray(Q) + epsilon
+
+    # Normalize
+    P = P / np.sum(P)
+    Q = Q / np.sum(Q)
+
+    # Compute t = P(x)/Q(x) for each x
+    t = P / Q
+
+    # D_f(P || Q) = Σ Q(x) f(P(x)/Q(x))
+    return np.sum(Q * f_func(t))
+
+# Example usage
+if __name__ == "__main__":
+    # Example distributions
+    P = np.array([0.4, 0.3, 0.2, 0.1])
+    Q = np.array([0.3, 0.3, 0.25, 0.15])
+
+    print("=== f-Divergences between P and Q ===")
+    print(f"P = {P}")
+    print(f"Q = {Q}")
+    print()
+
+    print(f"KL(P || Q):         {compute_kl_divergence(P, Q):.6f} nats")
+    print(f"KL(Q || P):         {compute_reverse_kl(P, Q):.6f} nats")
+    print(f"JS(P || Q):         {compute_js_divergence(P, Q):.6f} nats")
+    print(f"Hellinger(P, Q):    {compute_hellinger_distance(P, Q):.6f}")
+    print(f"TV(P, Q):           {compute_total_variation(P, Q):.6f}")
+    print(f"χ²(P || Q):         {compute_chi_squared(P, Q):.6f}")
+
+    print("\n=== Custom f-divergences ===")
+
+    # KL: f(t) = t log t
+    kl_custom = compute_f_divergence(P, Q, lambda t: t * np.log(t))
+    print(f"KL (via f-div):     {kl_custom:.6f} nats")
+
+    # Reverse KL: f(t) = -log t
+    rkl_custom = compute_f_divergence(P, Q, lambda t: -np.log(t))
+    print(f"Reverse KL (via f): {rkl_custom:.6f} nats")
+
+    # Chi-squared: f(t) = (t - 1)²
+    chi_custom = compute_f_divergence(P, Q, lambda t: (t - 1) ** 2)
+    print(f"χ² (via f-div):     {chi_custom:.6f}")
+```
+
+### Visualizing Surrogate Losses
+
+**Compare surrogate losses and their relationship to 0-1 loss:**
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+def zero_one_loss(margin):
+    """0-1 loss: 𝟙[margin ≤ 0]"""
+    return (margin <= 0).astype(float)
+
+def hinge_loss(margin):
+    """Hinge loss: max(0, 1 - margin)"""
+    return np.maximum(0, 1 - margin)
+
+def logistic_loss(margin):
+    """Logistic loss: log(1 + exp(-margin))"""
+    return np.log(1 + np.exp(-margin))
+
+def exponential_loss(margin):
+    """Exponential loss: exp(-margin)"""
+    return np.exp(-margin)
+
+def squared_loss(margin):
+    """Squared loss: (1 - margin)²"""
+    return (1 - margin) ** 2
+
+# Plot comparison
+margin = np.linspace(-2, 3, 500)
+
+plt.figure(figsize=(12, 7))
+
+plt.plot(margin, zero_one_loss(margin), 'k-', linewidth=2, label='0-1 loss')
+plt.plot(margin, hinge_loss(margin), 'r-', linewidth=2, label='Hinge')
+plt.plot(margin, logistic_loss(margin), 'b-', linewidth=2, label='Logistic')
+plt.plot(margin, exponential_loss(margin), 'g-', linewidth=2, label='Exponential')
+plt.plot(margin, squared_loss(margin), 'm-', linewidth=2, label='Squared')
+
+plt.axvline(x=0, color='gray', linestyle='--', alpha=0.5)
+plt.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+plt.axvline(x=1, color='gray', linestyle=':', alpha=0.3, label='Margin = 1')
+
+plt.xlabel('Margin (y·f(x))', fontsize=12)
+plt.ylabel('Loss', fontsize=12)
+plt.title('Surrogate Losses for Binary Classification', fontsize=14)
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3)
+plt.ylim(-0.1, 3)
+plt.xlim(-2, 3)
+
+plt.tight_layout()
+plt.savefig('surrogate_losses.png', dpi=300, bbox_inches='tight')
+print("Saved surrogate_losses.png")
+
+print("\n=== Loss Values at Key Margins ===")
+margins_test = [-1, 0, 0.5, 1, 2]
+
+for m in margins_test:
+    print(f"\nMargin = {m}:")
+    print(f"  0-1:         {zero_one_loss(np.array([m]))[0]:.4f}")
+    print(f"  Hinge:       {hinge_loss(np.array([m]))[0]:.4f}")
+    print(f"  Logistic:    {logistic_loss(np.array([m]))[0]:.4f}")
+    print(f"  Exponential: {exponential_loss(np.array([m]))[0]:.4f}")
+    print(f"  Squared:     {squared_loss(np.array([m]))[0]:.4f}")
+```
 
 ## Custom Loss Functions
 
