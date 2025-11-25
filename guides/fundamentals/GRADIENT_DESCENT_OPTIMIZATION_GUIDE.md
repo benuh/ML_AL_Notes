@@ -23,6 +23,166 @@ A comprehensive practical guide to gradient descent variants and modern optimiza
 
 **Gradient Descent** is an optimization algorithm that iteratively adjusts parameters to minimize a loss function.
 
+### Mathematical Foundations of Optimization
+
+Before discussing gradient descent, we establish the rigorous mathematical theory of continuous optimization.
+
+**Optimization Problem:**
+```
+min_{x∈ℝⁿ} f(x)
+```
+
+**Definition 1 (Convexity):**
+A function f: ℝⁿ → ℝ is convex if for all x, y ∈ ℝⁿ and λ ∈ [0, 1]:
+
+f(λx + (1-λ)y) ≤ λf(x) + (1-λ)f(y)
+
+**First-order characterization:**
+f is convex ⟺ f(y) ≥ f(x) + ∇f(x)ᵀ(y - x) for all x, y
+
+**Interpretation:** Function lies above all its tangent hyperplanes.
+
+**Definition 2 (Strong Convexity):**
+f is μ-strongly convex (μ > 0) if for all x, y:
+
+f(y) ≥ f(x) + ∇f(x)ᵀ(y - x) + (μ/2)||y - x||²
+
+**Equivalently:** f(x) - (μ/2)||x||² is convex.
+
+**Key property:** Strongly convex functions have unique global minima.
+
+**Theorem 1 (Characterization via Hessian):**
+If f is twice differentiable:
+
+(a) f is convex ⟺ ∇²f(x) ⪰ 0 (positive semidefinite) for all x
+(b) f is μ-strongly convex ⟺ ∇²f(x) ⪰ μI for all x
+
+Proof of (b):
+∇²(f(x) - (μ/2)||x||²) = ∇²f(x) - μI ⪰ 0 ⟺ ∇²f(x) ⪰ μI ∎
+
+**Definition 3 (Smoothness / Lipschitz Gradient):**
+f has L-Lipschitz continuous gradient if for all x, y:
+
+||∇f(x) - ∇f(y)|| ≤ L||x - y||
+
+**First-order bound:**
+f(y) ≤ f(x) + ∇f(x)ᵀ(y - x) + (L/2)||y - x||²
+
+**Interpretation:** Function lies below quadratic upper bound (opposite of strong convexity).
+
+**Theorem 2 (Smoothness via Hessian):**
+If f is twice differentiable:
+
+f has L-Lipschitz gradient ⟺ ∇²f(x) ⪯ LI for all x
+
+**Condition number:**
+For μ-strongly convex and L-smooth function:
+
+κ = L/μ
+
+measures "hardness" of optimization problem.
+- κ = 1: perfectly conditioned (gradient descent converges in 1 step)
+- κ >> 1: ill-conditioned (slow convergence)
+
+### Convergence Theory of Gradient Descent
+
+**Algorithm (Gradient Descent):**
+```
+Initialize: x₀ ∈ ℝⁿ
+For t = 0, 1, 2, ...:
+    x_{t+1} = x_t - α∇f(x_t)
+```
+
+where α > 0 is the step size (learning rate).
+
+**Theorem 3 (Convergence for Convex + L-Smooth):**
+If f is convex and L-smooth, with step size α ≤ 1/L:
+
+f(x_t) - f(x*) ≤ (2L||x₀ - x*||²)/t
+
+where x* = argmin f(x).
+
+**Convergence rate:** O(1/t) - sublinear
+
+**Proof sketch:**
+By L-smoothness:
+f(x_{t+1}) ≤ f(x_t) + ∇f(x_t)ᵀ(x_{t+1} - x_t) + (L/2)||x_{t+1} - x_t||²
+
+Substituting x_{t+1} = x_t - α∇f(x_t):
+f(x_{t+1}) ≤ f(x_t) - α||∇f(x_t)||² + (αL/2)||∇f(x_t)||²
+           = f(x_t) - α(1 - αL/2)||∇f(x_t)||²
+
+With α = 1/L:
+f(x_{t+1}) ≤ f(x_t) - (1/2L)||∇f(x_t)||²
+
+By convexity: ||∇f(x_t)||² ≥ 2L(f(x_t) - f(x*))
+
+Combining and telescoping gives O(1/t) rate. ∎
+
+**Theorem 4 (Convergence for Strongly Convex + Smooth):**
+If f is μ-strongly convex and L-smooth, with step size α = 1/L:
+
+||x_t - x*||² ≤ (1 - μ/L)^t ||x₀ - x*||²
+
+and:
+f(x_t) - f(x*) ≤ (L/2)(1 - μ/L)^t ||x₀ - x*||²
+
+**Convergence rate:** O((1 - 1/κ)^t) - linear (exponential)
+
+**Proof:**
+By strong convexity and smoothness:
+
+||x_{t+1} - x*||² = ||x_t - α∇f(x_t) - x*||²
+                  = ||x_t - x*||² - 2α∇f(x_t)ᵀ(x_t - x*) + α²||∇f(x_t)||²
+
+Using strong convexity: ∇f(x_t)ᵀ(x_t - x*) ≥ (μ/2)||x_t - x*||² + (1/2μ)||∇f(x_t)||²
+
+And smoothness: ||∇f(x_t)||² ≤ 2L(f(x_t) - f(x*)) ≤ L²||x_t - x*||²
+
+Combining with α = 1/L gives:
+||x_{t+1} - x*||² ≤ (1 - μ/L)||x_t - x*||² ∎
+
+**Comparison of Rates:**
+```
+Setting             | Rate       | # Iterations to ε-accuracy
+--------------------|------------|---------------------------
+Convex + Smooth     | O(1/t)     | O(L||x₀-x*||²/ε)
+μ-Strongly Convex   | O(e^{-t/κ})| O(κ log(1/ε))
++ L-Smooth          |            |
+```
+
+**Practical implications:**
+- Strong convexity crucial for fast convergence
+- Condition number κ determines convergence speed
+- Well-conditioned problems (κ ≈ 1): fast convergence
+- Ill-conditioned problems (κ >> 1): very slow convergence
+
+**Theorem 5 (Optimal Step Size):**
+For μ-strongly convex and L-smooth functions:
+
+Constant step size: α* = 2/(μ + L)
+
+gives convergence rate:
+||x_t - x*||² ≤ ((κ - 1)/(κ + 1))^t ||x₀ - x*||²
+
+This is faster than α = 1/L when κ > 3.
+
+**Line Search:**
+Instead of fixed α, choose α_t to minimize f(x_t - α∇f(x_t)):
+
+α_t = argmin_α f(x_t - α∇f(x_t))
+
+This is **exact line search** - often impractical but theoretically optimal.
+
+**Backtracking line search (Armijo rule):**
+Start with α = 1, repeatedly set α ← βα (β < 1) until:
+
+f(x_t - α∇f(x_t)) ≤ f(x_t) - c·α||∇f(x_t)||²
+
+where c ∈ (0, 1) (typically c = 10^{-4}).
+
+This ensures sufficient decrease while being computationally cheap.
+
 ### The Core Idea
 
 ```
@@ -485,6 +645,138 @@ for batch_size, label in zip(batch_sizes, batch_labels):
 ## Momentum
 
 **Adds fraction of previous update to current update** (like a ball rolling downhill).
+
+### Mathematical Theory of Momentum
+
+Before discussing the algorithm, we establish the rigorous theory.
+
+**Physical Motivation:**
+Consider a ball rolling down a surface with friction:
+
+m d²x/dt² = -∇f(x) - γ dx/dt
+
+where:
+- m: mass
+- γ: friction coefficient
+- -∇f(x): gravitational force
+
+Discretizing with appropriate choices of m, γ gives momentum method.
+
+**Heavy Ball Method (Polyak, 1964):**
+
+**Algorithm:**
+```
+v₀ = 0
+v_{t+1} = βv_t - α∇f(x_t)
+x_{t+1} = x_t + v_{t+1}
+```
+
+where β ∈ [0, 1) is momentum parameter, α > 0 is step size.
+
+**Theorem 6 (Convergence of Heavy Ball):**
+For μ-strongly convex and L-smooth function, with:
+
+α = 4 / (√μ + √L)²
+β = (√κ - 1)² / (√κ + 1)²  where κ = L/μ
+
+Heavy Ball achieves:
+
+||x_t - x*||² ≤ ((√κ - 1)/(√κ + 1))^t ||x₀ - x*||²
+
+**Convergence rate:** O((1 - 1/√κ)^t)
+
+**Comparison with GD:** O((1 - 1/κ)^t)
+
+**Acceleration:**
+- GD: O(κ) iterations
+- Heavy Ball: O(√κ) iterations
+
+For large κ >> 1, this is dramatic improvement: √10000 = 100 vs 10000.
+
+**Proof sketch:**
+The key insight is that momentum couples consecutive iterates, forming a second-order difference equation. Analyzing its characteristic polynomial shows the improved convergence rate. ∎
+
+**Nesterov's Accelerated Gradient (NAG, 1983):**
+
+NAG achieves the same O(1/√κ) rate but with different update:
+
+**Algorithm:**
+```
+v₀ = 0
+x̃_{t+1} = x_t + βv_t          (look-ahead step)
+v_{t+1} = βv_t - α∇f(x̃_{t+1}) (gradient at look-ahead)
+x_{t+1} = x_t + v_{t+1}
+```
+
+**Key difference:** Gradient evaluated at "lookahead" point x̃_{t+1}.
+
+**Theorem 7 (Optimal Convergence for First-Order Methods):**
+For convex and L-smooth functions, NAG achieves:
+
+f(x_t) - f(x*) ≤ 2L||x₀ - x*||² / (t + 1)²
+
+**This is optimal** among all first-order methods (Nemirovski & Yudin, 1983).
+
+**Lower bound:** No first-order method can guarantee better than O(1/t²) for this class.
+
+**Comparison:**
+```
+Method              | Strongly Convex    | Convex Only
+--------------------|--------------------|-----------------
+GD                  | O(e^{-t/κ})        | O(1/t)
+Heavy Ball / NAG    | O(e^{-t/√κ})       | O(1/t²)
+Lower Bound         | Ω(e^{-t/√κ})       | Ω(1/t²)
+```
+
+NAG is optimal!
+
+**Why Momentum Works:**
+
+**1. Exponential Moving Average:**
+Expanding v_t recursively:
+
+v_t = -α Σ_{i=0}^{t-1} β^i ∇f(x_{t-i-1})
+
+This is exponentially weighted average of past gradients.
+
+**Effective weight** on gradient from i steps ago: β^i
+
+With β = 0.9:
+- 1 step ago: weight 0.9
+- 10 steps ago: weight 0.9^{10} ≈ 0.35
+- 100 steps ago: weight 0.9^{100} ≈ 0.00003
+
+**2. Acceleration in Ravines:**
+Consider quadratic f(x) = (1/2)x^T Qx where Q has eigenvalues [λ₁, ..., λ_n].
+
+Without momentum: convergence rate determined by max eigenvalue ratio λ_max/λ_min = κ.
+
+With momentum: effective convergence rate √κ.
+
+**Intuition:** Momentum reduces oscillations in directions with high curvature while accelerating in directions with low curvature.
+
+**3. Noise Reduction:**
+In stochastic setting, momentum averages noisy gradients:
+
+E[v_t] = -α/(1-β) E[∇f(x_t)]  (at equilibrium)
+
+Variance reduces by factor related to β.
+
+**Theorem 8 (Momentum for Stochastic Case):**
+For SGD with momentum on μ-strongly convex function:
+
+E[||x_t - x*||²] ≤ C₁ e^{-μt/(1-β)} + C₂σ²/(μ(1-β))
+
+where σ² is gradient noise variance.
+
+**Two phases:**
+1. **Optimization phase:** Exponential decay dominates (t small)
+2. **Fluctuation phase:** Steady-state noise dominates (t large)
+
+**Trade-off:**
+- High β (e.g., 0.99): Slow optimization but low fluctuation
+- Low β (e.g., 0.5): Fast optimization but high fluctuation
+- Common choice: β = 0.9 balances both
 
 ### Formula
 
