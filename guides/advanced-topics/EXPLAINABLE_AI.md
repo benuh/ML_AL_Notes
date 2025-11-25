@@ -30,6 +30,147 @@ Make AI transparent, interpretable, and trustworthy.
 - **Model-specific** - For particular architectures (e.g., decision trees)
 - **Model-agnostic** - Works for any model
 
+### Mathematical Foundations of Explainability
+
+Before discussing specific methods, we establish the rigorous mathematical framework.
+
+**Definition 1 (Explanation Function):**
+An explanation function φ: F × X → ℝ^d maps a model f ∈ F and input x ∈ X to an importance vector φ(f, x) ∈ ℝ^d, where φ_i(f, x) represents the importance of feature i for prediction f(x).
+
+**Desirable Properties (Lundberg & Lee, 2017):**
+
+**Property 1 (Local Accuracy):**
+The explanation should approximate the model locally:
+
+f(x) ≈ φ_0 + Σ_{i=1}^d φ_i(f, x) · x_i
+
+where φ_0 is a baseline value.
+
+**Property 2 (Missingness):**
+If feature i is missing (x_i = 0 after appropriate encoding):
+
+φ_i(f, x) = 0
+
+**Property 3 (Consistency/Monotonicity):**
+If model f' relies more on feature i than f (holding all else fixed), then:
+
+φ_i(f', x) ≥ φ_i(f, x)
+
+**Theorem 1 (Uniqueness of Shapley Values):**
+The Shapley value is the only explanation method satisfying:
+1. Local accuracy
+2. Missingness
+3. Consistency
+
+**Definition 2 (Shapley Values - Game Theory):**
+For a coalition game with value function v: 2^D → ℝ (where D is set of features), the Shapley value for feature i is:
+
+φ_i = Σ_{S⊆D\{i}} |S|!(|D|-|S|-1)! / |D|! · [v(S∪{i}) - v(S)]
+
+**Interpretation:**
+- Average marginal contribution of feature i across all possible subsets S
+- Weights: |S|!(|D|-|S|-1)!/|D|! are binomial coefficients
+
+**Computation complexity:** O(2^d) subsets to evaluate
+
+**Theorem 2 (Shapley Value Properties):**
+
+(a) **Efficiency:** Σ_{i=1}^d φ_i = v(D) - v(∅)
+
+All contributions sum to total value.
+
+(b) **Symmetry:** If v(S∪{i}) = v(S∪{j}) for all S not containing i, j, then φ_i = φ_j
+
+Interchangeable features have equal values.
+
+(c) **Dummy:** If v(S∪{i}) = v(S) for all S, then φ_i = 0
+
+Features contributing nothing get zero value.
+
+(d) **Additivity:** For games v₁, v₂: φ_i(v₁ + v₂) = φ_i(v₁) + φ_i(v₂)
+
+Proof of efficiency:
+By induction on |D|. Base: |D|=1 trivial.
+Inductive step uses recursive Shapley formula:
+
+φ_i = (1/|D|)[v({i}) + Σ_{j≠i} (φ_i^{D\{j}} + v(D) - v(D\{i}))]
+
+where φ_i^{D\{j}} is Shapley value in reduced game. ∎
+
+**Definition 3 (SHAP - SHapley Additive exPlanations):**
+For machine learning model f and input x, define conditional expectation:
+
+v(S) = E[f(x) | x_S]
+
+where x_S denotes features in subset S are observed, others marginalized.
+
+SHAP value: φ_i(f, x) = Shapley value using v(S) above.
+
+**Theorem 3 (Kernel SHAP):**
+SHAP can be computed as weighted linear regression:
+
+min_{φ} Σ_{z∈Z} [f(h_x(z)) - g(z)]² · π(z)
+
+where:
+- z ∈ {0,1}^d: binary vector indicating feature presence
+- h_x(z): maps z to actual feature values (observed or marginalized)
+- g(z) = φ_0 + Σ_i z_i φ_i: linear explanation model
+- π(z): SHAP kernel weight
+
+**SHAP kernel:**
+π(z) = (d-1) / [binom(d, |z|) · |z| · (d - |z|)]
+
+This kernel ensures the solution minimizing weighted MSE equals Shapley values.
+
+### Fidelity and Faithfulness
+
+**Definition 4 (Fidelity):**
+Fidelity measures how well explanation approximates model:
+
+Fidelity(φ, f, x) = |f(x) - (φ_0 + Σ_i φ_i(f, x) · x_i)|
+
+Lower fidelity = better explanation.
+
+**Definition 5 (Faithfulness):**
+An explanation is faithful if:
+
+argmax_i φ_i(f, x) = argmax_i ∂f/∂x_i
+
+Most important feature according to explanation matches gradient.
+
+**Theorem 4 (Gradient-Based Explanations):**
+For differentiable f, the gradient ∇_x f(x) provides local linear approximation:
+
+f(x + δ) ≈ f(x) + ∇f(x)^T δ
+
+Thus |∂f/∂x_i| measures local sensitivity to feature i.
+
+**Limitations:**
+- Only local (infinitesimal perturbations)
+- Assumes smoothness
+- Can have zero gradient even if feature is important (saturation)
+
+**Integrated Gradients:**
+To address limitations, integrate gradients along path:
+
+IG_i(x) = (x_i - x'_i) · ∫_{α=0}^1 ∂f(x' + α(x - x'))/∂x_i dα
+
+where x' is baseline (e.g., all zeros).
+
+**Theorem 5 (Integrated Gradients Properties):**
+
+(a) **Completeness:** Σ_i IG_i(x) = f(x) - f(x')
+
+(b) **Implementation invariance:** If f₁(x) = f₂(x) for all x, then IG are identical
+
+Proof of completeness:
+By fundamental theorem of calculus:
+
+f(x) - f(x') = ∫₀¹ d/dα f(x' + α(x-x')) dα
+             = ∫₀¹ Σ_i ∂f/∂x_i(x' + α(x-x')) · (x_i - x'_i) dα
+             = Σ_i (x_i - x'_i) ∫₀¹ ∂f/∂x_i(x' + α(x-x')) dα
+             = Σ_i IG_i(x) ∎
+
 ---
 
 ## Model-Agnostic Methods
@@ -37,6 +178,57 @@ Make AI transparent, interpretable, and trustworthy.
 ### LIME (Local Interpretable Model-agnostic Explanations)
 
 **Key Idea:** Approximate complex model locally with interpretable model.
+
+**Mathematical Formulation:**
+
+LIME seeks an interpretable model g ∈ G that locally approximates f near x:
+
+ξ(x) = argmin_{g∈G} L(f, g, π_x) + Ω(g)
+
+where:
+- L(f, g, π_x): loss measuring how well g approximates f (weighted by π_x)
+- π_x(z): proximity measure to x (e.g., exponential kernel)
+- Ω(g): complexity penalty (e.g., number of non-zero coefficients)
+- G: class of interpretable models (e.g., linear models, decision trees)
+
+**For linear explanations:**
+g(z) = φ_0 + Σ_i φ_i z_i
+
+**Loss function:**
+L(f, g, π_x) = Σ_{z∈Z} π_x(z) · [f(z) - g(z)]²
+
+**Proximity kernel (Gaussian):**
+π_x(z) = exp(-||z - x||² / σ²)
+
+**Theorem 6 (LIME Convergence):**
+As σ → 0 (locality increases), LIME explanation converges to gradient:
+
+lim_{σ→0} φ_i / σ = ∂f/∂x_i(x)
+
+**Proof sketch:**
+Taylor expansion: f(x + δ) ≈ f(x) + ∇f(x)^T δ
+
+With very local samples, linear regression recovers gradient. ∎
+
+**Sampling Strategy:**
+
+**Tabular data:**
+1. Sample z' ~ N(0, 1)^d in interpretable space (binary or simplified features)
+2. Map to actual features: z = h_x(z')
+3. Weight by π_x(z) ∝ exp(-||z - x||²/σ²)
+
+**Text data:**
+1. Sample z' ∈ {0,1}^d by randomly removing words
+2. Map: z = words selected by z'
+3. Compute π_x(z) based on number of words removed
+
+**Theorem 7 (LIME Computational Complexity):**
+For n samples, d features, and k non-zero coefficients:
+
+Time: O(nd + nkd) for sampling and regression
+Space: O(nd)
+
+Using Lasso (L1 regularization) ensures sparsity (small k).
 
 ```python
 from lime import lime_tabular
