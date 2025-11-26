@@ -334,11 +334,95 @@ Q-Learning converges to Q* with probability 1 if:
    - Σ α_t² < ∞ (learning rate decreases sufficiently)
    - Example: α_t = 1/t satisfies these conditions
 
+**Theorem (Q-Learning Convergence - Watkins & Dayan, 1992):**
+
+For tabular Q-learning with learning rate α_t(s,a), if:
+1. Every state-action pair is visited infinitely often
+2. Σ_t α_t(s,a) = ∞ and Σ_t α²_t(s,a) < ∞ for all (s,a)
+3. Rewards are bounded: |r| ≤ R_max < ∞
+4. 0 ≤ γ < 1
+
+Then: Q_t(s,a) → Q*(s,a) with probability 1 for all (s,a)
+
+**Proof Sketch:**
+
+Q-learning is a stochastic approximation algorithm for finding the fixed point of T*:
+
+Q_{t+1}(s,a) = (1-α_t)Q_t(s,a) + α_t[r + γ max_a' Q_t(s',a')]
+             = Q_t(s,a) + α_t[T*(Q_t)(s,a) - Q_t(s,a) + ε_t]
+
+where ε_t is noise from sampling.
+
+Key steps:
+1. T* is a contraction with fixed point Q*
+2. Robbins-Monro conditions ensure convergence despite noise
+3. Infinite visitation ensures all Q-values updated infinitely often
+4. By stochastic approximation theory (Borkar & Meyn, 2000), Q_t → Q* w.p. 1 ∎
+
+**Convergence Rate:**
+
+For constant learning rate α:
+- If α too large: oscillation, no convergence
+- If α = 1/t: convergence at O(1/t) rate but very slow
+- Optimal schedule: α_t = c/(c_0 + visits(s,a)) for constants c, c_0
+
+Expected error bound:
+
+E[||Q_t - Q*||_∞] ≤ (1-α·μ)^t ||Q_0 - Q*||_∞ + O(α)
+
+where μ > 0 depends on mixing time of state visitation.
+
+**Tradeoff:**
+- Large α: fast initial learning, high asymptotic error
+- Small α: slow learning, low asymptotic error
+- Optimal: α_t → 0 but slowly enough to satisfy Robbins-Monro
+
+**Sample Complexity:**
+
+To achieve ε-optimal policy with probability ≥ 1-δ:
+
+T = O((|S|·|A|)/(ε²(1-γ)⁴) · log(|S|·|A|/δ))
+
+samples required (Li et al., 2020).
+
+**Off-Policy Learning Theory:**
+
+Q-learning uses behavior policy μ(a|s) for exploration but learns about target policy π*(s) = argmax_a Q*(s,a).
+
+Define importance sampling ratio:
+ρ_t = π(a_t|s_t) / μ(a_t|s_t)
+
+For Q-learning, we don't need importance sampling because:
+
+E_μ[max_a' Q(s',a')] = max_a' Q(s',a')
+
+(Expectation of deterministic function of s' is independent of action distribution)
+
 **Key Properties:**
 - Off-policy: Learns Q* regardless of behavior policy
 - Model-free: No need for transition model P(s'|s,a)
 - Bootstrapping: Uses estimate to update estimate
 - Sample-based: Updates from single sample, not full expectation
+
+**SARSA vs Q-Learning:**
+
+SARSA (on-policy TD control):
+Q(s,a) ← Q(s,a) + α[r + γQ(s',a') - Q(s,a)]
+
+where a' ~ π(·|s') is actually taken.
+
+**Comparison:**
+- Q-learning: max_a' Q(s',a') → learns optimal Q*, can be risky during learning
+- SARSA: Q(s',a') with a' from policy → learns Q^π, safer during learning
+
+**Theorem (SARSA Convergence):**
+
+Under same conditions as Q-learning theorem but with decaying exploration (ε-greedy with ε_t → 0):
+
+SARSA converges to Q* with probability 1.
+
+**Proof Idea:**
+As ε_t → 0, SARSA policy → greedy policy, and updates approach Q-learning updates. ∎
 
 ```python
 class QLearning:
@@ -638,6 +722,160 @@ class DoubleDQNAgent(DQNAgent):
 
 **Core Idea:** Directly optimize the policy using gradient ascent.
 
+#### Policy Gradient Theory
+
+**Objective Function:**
+
+J(θ) = E_{s~d^π, a~π} [Σ_{t=0}^∞ γ^t r_t]
+     = E_π[G_0]
+     = Σ_s d^π(s) V^π(s)
+     = Σ_s d^π(s) Σ_a π(a|s,θ) Q^π(s,a)
+
+where:
+- d^π(s): stationary distribution of states under policy π
+- V^π(s): value function
+- Q^π(s,a): action-value function
+
+**Policy Gradient Theorem (Sutton et al., 2000):**
+
+**Theorem:** The gradient of the performance objective with respect to policy parameters is:
+
+∇_θ J(θ) = E_{s~d^π, a~π_θ} [∇_θ log π_θ(a|s) Q^π_θ(s,a)]
+
+**Proof:**
+
+Start with value function gradient:
+
+∇_θ V^π(s) = ∇_θ [Σ_a π(a|s,θ) Q^π(s,a)]
+
+Expanding using product rule:
+
+= Σ_a [∇_θ π(a|s,θ) Q^π(s,a) + π(a|s,θ) ∇_θ Q^π(s,a)]
+
+For the Q-function gradient, expand via Bellman:
+
+Q^π(s,a) = E[r + γ V^π(s')]
+
+∇_θ Q^π(s,a) = ∇_θ E[γ V^π(s')] = γ E[∇_θ V^π(s')]
+
+Substituting back:
+
+∇_θ V^π(s) = Σ_a [∇_θ π(a|s,θ) Q^π(s,a) + π(a|s,θ) γ E_{s'}[∇_θ V^π(s')]]
+
+Unrolling recursively and using d^π(s):
+
+∇_θ J(θ) = Σ_s d^π(s) ∇_θ V^π(s)
+         = Σ_s d^π(s) Σ_a ∇_θ π(a|s,θ) Q^π(s,a)
+
+Using score function trick: ∇_θ π = π ∇_θ log π:
+
+= Σ_s d^π(s) Σ_a π(a|s,θ) ∇_θ log π(a|s,θ) Q^π(s,a)
+= E_{s~d^π, a~π} [∇_θ log π(a|s,θ) Q^π(s,a)]  ∎
+
+**REINFORCE Estimator:**
+
+Practical gradient estimate using sampled trajectory τ = (s_0, a_0, r_0, s_1, a_1, r_1, ...):
+
+∇_θ J(θ) ≈ Σ_t ∇_θ log π_θ(a_t|s_t) G_t
+
+where G_t = Σ_{k=t}^T γ^{k-t} r_k is return from time t.
+
+**Why this works:**
+
+E[G_t | s_t, a_t] = Q^π(s_t, a_t)
+
+So G_t is an unbiased estimate of Q^π.
+
+**Variance Analysis:**
+
+Var[∇̂_θ J] = E[(Σ_t ∇log π · G_t)²] - [E[Σ_t ∇log π · G_t]]²
+
+High variance because:
+1. G_t has high variance (depends on entire future trajectory)
+2. Multiplying by ∇log π amplifies variance
+
+**Variance Reduction via Baseline:**
+
+**Theorem (Baseline Invariance):**
+
+For any baseline function b(s) that doesn't depend on action:
+
+E[∇_θ log π_θ(a|s) b(s)] = 0
+
+**Proof:**
+
+E_a[∇_θ log π_θ(a|s)] = Σ_a π(a|s) ∇_θ log π(a|s)
+                       = Σ_a π(a|s) · (∇_θ π(a|s))/π(a|s)
+                       = Σ_a ∇_θ π(a|s)
+                       = ∇_θ Σ_a π(a|s)
+                       = ∇_θ 1 = 0  ∎
+
+**Optimal Baseline:**
+
+Minimize Var[∇̂_θ J]. Optimal baseline:
+
+b*(s) = E_a[(∇_θ log π(a|s))² Q(s,a)] / E_a[(∇_θ log π(a|s))²]
+
+In practice, use V^π(s) as baseline:
+
+∇̂_θ J ≈ Σ_t ∇_θ log π_θ(a_t|s_t) [G_t - V^π(s_t)]
+      = Σ_t ∇_θ log π_θ(a_t|s_t) A^π(s_t, a_t)
+
+where A^π(s,a) = Q^π(s,a) - V^π(s) is the advantage function.
+
+**Convergence of Policy Gradient:**
+
+**Theorem (Convergence to Local Optimum):**
+
+For policy gradient ascent with step size α_t satisfying:
+1. Σ_t α_t = ∞
+2. Σ_t α²_t < ∞
+
+And bounded gradients ||∇_θ J|| ≤ G, the iterates converge to a stationary point:
+
+lim inf_{t→∞} ||∇_θ J(θ_t)||² = 0
+
+with probability 1.
+
+**Convergence Rate:**
+
+For smooth objective (L-Lipschitz gradients) and constant step size α:
+
+E[||∇_θ J(θ_T)||²] ≤ O(1/√T) + O(α·σ²)
+
+where σ² is gradient variance.
+
+**Sample Complexity:**
+
+To find ε-stationary point (||∇J||² ≤ ε) with high probability:
+
+T = O(1/(ε²(1-γ)⁴))
+
+gradient samples required (Agarwal et al., 2021).
+
+**Natural Policy Gradient:**
+
+Vanilla gradient: θ ← θ + α ∇_θ J(θ)
+
+Problem: Gradient direction depends on parameterization.
+
+**Natural gradient:** Use Fisher information metric:
+
+F(θ) = E_π [∇_θ log π(a|s,θ) ∇_θ log π(a|s,θ)^T]
+
+Natural gradient direction:
+
+∇̃_θ J(θ) = F(θ)^{-1} ∇_θ J(θ)
+
+Update: θ ← θ + α F(θ)^{-1} ∇_θ J(θ)
+
+**Advantage:**
+- Invariant to parameterization
+- Better convergence in practice
+- Theoretically motivated by information geometry
+
+**Computational cost:** O(d²) for d parameters (computing F^{-1}).
+
 **Policy Gradient Theorem:**
 ```
 ∇J(θ) = E[∇log π(a|s,θ) * Q(s,a)]
@@ -867,6 +1105,145 @@ class A2C:
 ### Proximal Policy Optimization (PPO)
 
 **Key Innovation:** Trust region optimization for stable policy updates.
+
+#### Trust Region Methods Theory
+
+**Problem with Vanilla Policy Gradient:**
+
+Large policy updates can cause catastrophic performance collapse. Need to constrain update size.
+
+**Trust Region Policy Optimization (TRPO - Schulman et al., 2015):**
+
+**Objective:** Maximize improvement subject to KL constraint:
+
+max_θ E_π_{θ_old} [(π_θ(a|s)/π_{θ_old}(a|s)) A^π_{θ_old}(s,a)]
+
+subject to: E_s[KL(π_{θ_old}(·|s) || π_θ(·|s))] ≤ δ
+
+where:
+- π_θ/π_{θ_old}: importance sampling ratio
+- A^π: advantage function
+- KL: Kullback-Leibler divergence
+- δ: trust region size (e.g., 0.01)
+
+**Theoretical Motivation:**
+
+**Lemma (Policy Improvement Bound - Kakade & Langford, 2002):**
+
+J(π') - J(π) ≥ E_{s~d^π', a~π'} [A^π(s,a)] - (2ε γ)/(1-γ)² ||d^π' - d^π||_1
+
+where ε = max_s |E_a[A^π(s,a)]|
+
+**Interpretation:**
+- First term: expected advantage under new policy
+- Second term: penalty for distribution mismatch
+- Bound ensures monotonic improvement if mismatch is small
+
+**Conservative Policy Iteration (CPI):**
+
+Use mixture policy: π'(a|s) = (1-α)π(a|s) + απ_new(a|s)
+
+**Theorem (CPI Lower Bound):**
+
+J(π') - J(π) ≥ α E_s[E_a~π_new [A^π(s,a)]] - (4αγ)/(1-γ)² · max_s KL(π_new(·|s) || π(·|s))
+
+**TRPO approximates CPI** by constraining average KL divergence.
+
+**Natural Gradient Connection:**
+
+TRPO update approximates natural gradient descent:
+
+θ_{k+1} = θ_k + √(2δ/g^T F^{-1} g) F^{-1} g
+
+where:
+- F: Fisher information matrix
+- g: policy gradient
+- δ: KL constraint
+
+**Computational Challenge:**
+
+TRPO requires:
+1. Computing F^{-1} g: O(d³) or conjugate gradient O(d² · iters)
+2. Line search to satisfy KL constraint
+3. Exact constraint satisfaction
+
+Expensive for large networks!
+
+**PPO: Simplified Trust Region (Schulman et al., 2017):**
+
+**Key Idea:** Use clipped surrogate objective instead of hard KL constraint.
+
+**Clipped Objective:**
+
+L^{CLIP}(θ) = E[min(r_t(θ)Â_t, clip(r_t(θ), 1-ε, 1+ε)Â_t)]
+
+where:
+- r_t(θ) = π_θ(a_t|s_t)/π_{θ_old}(a_t|s_t): importance ratio
+- Â_t: advantage estimate
+- ε: clipping parameter (typically 0.2)
+
+**How clipping works:**
+
+If A > 0 (good action):
+  - r < 1-ε: encourage more (limited by 1-ε)
+  - r > 1+ε: clip to 1+ε (prevent too large increase)
+
+If A < 0 (bad action):
+  - r > 1+ε: encourage less (limited by 1+ε)
+  - r < 1-ε: clip to 1-ε (prevent too large decrease)
+
+**Effect:** Limits how much policy can change in single update.
+
+**Full PPO Objective:**
+
+L(θ) = E[L^{CLIP}(θ) - c_1 L^{VF}(θ) + c_2 H(π_θ)]
+
+where:
+- L^{VF}(θ): value function loss (MSE)
+- H(π_θ): entropy bonus for exploration
+- c_1, c_2: coefficients (typically c_1=0.5, c_2=0.01)
+
+**Theorem (PPO Lower Bound):**
+
+Under clipped objective with ε, the policy improvement satisfies:
+
+J(π_{new}) - J(π_{old}) ≥ -C · ε
+
+for constant C depending on advantage range and state distribution.
+
+**Interpretation:** Pessimistic bound - worst-case degradation is O(ε).
+
+**Generalized Advantage Estimation (GAE - Schulman et al., 2016):**
+
+Bias-variance tradeoff in advantage estimation:
+
+A_t^{GAE(γ,λ)} = Σ_{l=0}^∞ (γλ)^l δ_{t+l}
+
+where δ_t = r_t + γV(s_{t+1}) - V(s_t) is TD error.
+
+**Special cases:**
+- λ = 0: A_t = δ_t (high bias, low variance) - TD(0)
+- λ = 1: A_t = Σ_{l=0}^∞ γ^l r_{t+l} - V(s_t) (low bias, high variance) - Monte Carlo
+
+**Typical choice:** λ = 0.95 balances bias-variance.
+
+**Convergence Guarantees:**
+
+**Theorem (PPO Convergence - Approximate):**
+
+For sufficiently small ε and appropriate learning rate, PPO converges to a stationary point:
+
+lim inf_{k→∞} ||∇_θ J(θ_k)||² = 0
+
+**Sample Complexity:**
+
+To achieve ε-optimal policy:
+
+T = Õ(1/(ε³(1-γ)⁵))
+
+samples required (Wang et al., 2020).
+
+Note: Worse than Q-learning but more stable in practice with function approximation.
 
 ```python
 class PPO:
@@ -1137,6 +1514,176 @@ J(π) = Σ_t E[(r_t + α·H(π(·|s_t)))]
 where H(π(·|s)) = -Σ_a π(a|s) log π(a|s) is policy entropy
 α: temperature parameter (controls exploration vs exploitation)
 ```
+
+#### Maximum Entropy Reinforcement Learning Theory
+
+**Standard RL Objective:**
+
+J(π) = E_π [Σ_{t=0}^∞ γ^t r_t]
+
+**Maximum Entropy Objective (Ziebart et al., 2008):**
+
+J_{MaxEnt}(π) = E_π [Σ_{t=0}^∞ γ^t (r_t + α H(π(·|s_t)))]
+               = E_π [Σ_{t=0}^∞ γ^t (r_t - α log π(a_t|s_t))]
+
+where α > 0 is temperature parameter.
+
+**Motivation:**
+
+1. **Exploration:** Entropy bonus encourages stochasticity
+2. **Robustness:** Multiple near-optimal behaviors learned
+3. **Stability:** Smoother policy updates
+4. **Transfer:** More generalizable policies
+
+**Soft Value Functions:**
+
+Redefine value functions with entropy augmentation:
+
+**Soft Q-function:**
+
+Q_{soft}(s,a) = E_π [Σ_{t=0}^∞ γ^t (r_t + α H(π(·|s_t))) | s_0=s, a_0=a]
+
+**Soft V-function:**
+
+V_{soft}(s) = E_a~π [Q_{soft}(s,a) + α H(π(·|s))]
+            = E_a~π [Q_{soft}(s,a) - α log π(a|s)]
+
+**Soft Bellman Equations:**
+
+**Theorem (Soft Bellman Consistency):**
+
+The soft Q-function satisfies:
+
+Q_{soft}(s,a) = E[r + γ V_{soft}(s')]
+
+V_{soft}(s) = E_a~π [Q_{soft}(s,a) - α log π(a|s)]
+
+**Proof:**
+
+Q_{soft}(s,a) = E[r + Σ_{t=1}^∞ γ^t (r_t + α H(π(·|s_t)))]
+              = E[r + γ E[Σ_{t=0}^∞ γ^t (r_t + α H(π(·|s_t))) | s_1=s']]
+              = E[r + γ V_{soft}(s')]  ∎
+
+**Soft Bellman Backup Operator:**
+
+T_{soft} Q(s,a) = E[r + γ E_a'~π [Q(s',a') - α log π(a'|s')]]
+
+**Theorem (Soft Bellman Operator is Contraction):**
+
+T_{soft} is a γ-contraction in supremum norm:
+
+||T_{soft} Q_1 - T_{soft} Q_2||_∞ ≤ γ ||Q_1 - Q_2||_∞
+
+**Proof:** Similar to standard Bellman operator. The entropy term doesn't affect contraction property since it doesn't depend on Q. ∎
+
+**Consequence:** Unique soft optimal Q* exists.
+
+**Optimal Policy for Maximum Entropy RL:**
+
+**Theorem (Soft Optimal Policy - Boltzmann Distribution):**
+
+The optimal policy for maximum entropy objective is:
+
+π*(a|s) ∝ exp(Q*(s,a)/α)
+
+More precisely:
+
+π*(a|s) = exp((Q*(s,a) - V*(s))/α)
+
+**Proof:**
+
+Maximize: E_a~π [Q(s,a) - α log π(a|s)]
+
+Using Lagrange multiplier for Σ_a π(a|s) = 1:
+
+L = Σ_a π(a|s)[Q(s,a) - α log π(a|s)] + λ(1 - Σ_a π(a|s))
+
+Take derivative w.r.t. π(a|s):
+
+∂L/∂π(a|s) = Q(s,a) - α(log π(a|s) + 1) - λ = 0
+
+Solving:
+
+log π(a|s) = (Q(s,a) - λ - α)/α
+
+π(a|s) = exp((Q(s,a) - λ - α)/α)
+
+Normalization gives λ + α = V(s):
+
+π*(a|s) = exp((Q(s,a) - V(s))/α)  ∎
+
+**Temperature Parameter α:**
+
+**Effect:**
+- α → 0: π* → deterministic (standard RL)
+- α → ∞: π* → uniform (maximum exploration)
+- α = 1: natural scale for rewards
+
+**Automatic Temperature Tuning:**
+
+Treat α as learnable parameter. Objective:
+
+min_α E_a~π [-α log π(a|s) - α H_0]
+
+where H_0 is target entropy (e.g., -dim(A) for continuous actions).
+
+**Soft Actor-Critic Algorithm:**
+
+**Three components:**
+
+1. **Soft Q-function:** Twin Q-networks Q_φ1, Q_φ2
+2. **Policy:** Gaussian policy π_θ (reparameterization trick)
+3. **Temperature:** α (fixed or learned)
+
+**Updates:**
+
+**Critic update:** Minimize soft Bellman error:
+
+L(φ) = E[(Q_φ(s,a) - (r + γ(min_i Q_{φ'_i}(s',a') - α log π_θ(a'|s'))))²]
+
+where a' ~ π_θ(·|s').
+
+**Actor update:** Maximize soft Q-value:
+
+max_θ E_s [E_a~π_θ [Q_φ(s,a) - α log π_θ(a|s)]]
+
+**Reparameterization trick:**
+
+Sample a = μ_θ(s) + σ_θ(s) · ε, where ε ~ N(0,I)
+
+Then:
+
+∇_θ E_a~π_θ [Q(s,a)] = E_ε [∇_θ Q(s, a(θ,ε))]
+
+Low-variance gradient estimator!
+
+**Twin Q-Networks:**
+
+Use min_i Q_φi to address overestimation bias (Fujimoto et al., 2018):
+
+Q_target = r + γ(min_i Q_{φ'_i}(s',a') - α log π_θ(a'|s'))
+
+**Convergence Guarantees:**
+
+**Theorem (SAC Convergence):**
+
+Under tabular setting and appropriate learning rates, SAC converges to soft optimal Q* and π*.
+
+**Sample Complexity:**
+
+For continuous control with function approximation:
+
+T = Õ(poly(d, 1/ε, 1/(1-γ)))
+
+where d is dimensionality. Exact bound remains open research question.
+
+**Practical Advantages:**
+
+1. **Sample efficiency:** Off-policy with replay buffer
+2. **Stability:** Entropy prevents premature convergence
+3. **No hyperparameter tuning:** Automatic temperature adaptation
+4. **Continuous actions:** Natural for Gaussian policies
+5. **Robust:** Works across many environments with same hyperparameters
 
 ```python
 class SACCritic(nn.Module):
