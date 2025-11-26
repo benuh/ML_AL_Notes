@@ -140,6 +140,262 @@ print(f"Recall@5: {metrics.recall_at_k(recommended, relevant, 5):.2f}")
 
 Recommend items based on user-item interaction patterns.
 
+### Mathematical Foundations of Collaborative Filtering
+
+Before discussing specific algorithms, we establish the rigorous mathematical theory.
+
+**Problem Setting:**
+
+**Definition 1 (Rating Matrix):**
+Let R ∈ ℝ^(m×n) be the user-item rating matrix:
+- m: number of users
+- n: number of items
+- R_ui: observed rating of user u for item i
+- Ω ⊆ [m] × [n]: set of observed entries
+- |Ω| << mn: extreme sparsity (typically 0.1-1% observed)
+
+**Goal:** Predict missing entries R_ui for (u,i) ∉ Ω
+
+**Definition 2 (Low-Rank Assumption):**
+Assume R has low rank r << min(m,n):
+
+R = UV^T
+
+where:
+- U ∈ ℝ^(m×r): user latent factor matrix
+- V ∈ ℝ^(n×r): item latent factor matrix
+- r: latent dimension (typically r ∈ [10, 100])
+
+**Intuition:**
+- Each user u represented by latent vector u_u ∈ ℝ^r
+- Each item i represented by latent vector v_i ∈ ℝ^r
+- Rating approximated by: R_ui ≈ u_u^T v_i
+
+**Theorem 1 (Low-Rank Justification):**
+If users/items cluster into r groups with similar preferences:
+
+rank(R) ≤ r
+
+Proof sketch:
+Each row (user) is linear combination of r preference vectors.
+Matrix with linearly dependent rows has rank ≤ r. ∎
+
+### Matrix Completion Theory
+
+The problem of predicting unobserved ratings is **matrix completion**.
+
+**Definition 3 (Matrix Completion):**
+Given partial observations {R_ui : (u,i) ∈ Ω}, recover full matrix R.
+
+**Key question:** When is exact recovery possible?
+
+**Theorem 2 (Incoherence Condition - Candès & Recht, 2009):**
+For matrix M with rank r and SVD M = UΣV^T, define:
+
+μ(M) = (max_i ||U^T e_i||²) · (n/r)
+
+where e_i is standard basis vector.
+
+If M satisfies:
+1. **Incoherence:** μ(M) ≤ μ_0 for small μ_0
+2. **Sufficient observations:** |Ω| ≥ C·μ_0·r·n·log²(n)
+
+Then with high probability, M is unique solution to:
+
+min_{X} rank(X)  s.t.  X_Ω = M_Ω
+
+**Interpretation:**
+- Incoherence: singular vectors not too "spiky" (information spread out)
+- Sufficient observations: need O(r·n·log²n) samples for n × n matrix
+- Without noise: exact recovery possible!
+
+**Proof sketch:**
+Uses restricted isometry property (RIP) for low-rank matrices.
+Shows sampling operator preserves distances between low-rank matrices.
+Dual certificate construction guarantees optimality. ∎
+
+**Theorem 3 (Noisy Matrix Completion):**
+With noisy observations R_Ω = M_Ω + N_Ω where ||N||_F ≤ σ:
+
+Optimal estimator M̂ via nuclear norm minimization:
+
+min_{X} ||X||_* + λ||X_Ω - R_Ω||²_F
+
+achieves error:
+
+||M̂ - M||_F ≤ C·σ·√(|Ω|)
+
+with high probability.
+
+**Nuclear norm:** ||X||_* = Σ_i σ_i(X) (sum of singular values)
+
+This is convex relaxation of rank minimization.
+
+### Alternating Least Squares (ALS)
+
+**Optimization Problem:**
+```
+min_{U,V} Σ_{(u,i)∈Ω} (R_ui - u_u^T v_i)² + λ(||U||²_F + ||V||²_F)
+```
+
+**Non-convex** in (U,V) jointly, but **convex** when fixing one.
+
+**ALS Algorithm:**
+
+```
+Initialize U, V randomly
+Repeat until convergence:
+  1. Fix V, optimize U:
+     For each user u:
+       u_u ← argmin_u Σ_{i:(u,i)∈Ω} (R_ui - u^T v_i)² + λ||u||²
+           = (V_u^T V_u + λI)^(-1) V_u^T R_u
+
+     where V_u ∈ ℝ^(|Ω_u|×r) are items rated by u
+           R_u ∈ ℝ^(|Ω_u|) are u's ratings
+
+  2. Fix U, optimize V:
+     For each item i:
+       v_i ← argmin_v Σ_{u:(u,i)∈Ω} (R_ui - u_u^T v)² + λ||v||²
+           = (U_i^T U_i + λI)^(-1) U_i^T R_i
+```
+
+**Closed-form solution** at each step: ridge regression!
+
+**Theorem 4 (ALS Convergence):**
+Under mild conditions, ALS converges to stationary point:
+
+lim_{t→∞} ||∇L(U_t, V_t)|| = 0
+
+**Convergence rate:** Locally linear (near stationary point).
+
+**Proof sketch:**
+Each ALS step decreases objective (or keeps same).
+Objective is lower bounded → sequence converges.
+Stationarity follows from optimality conditions. ∎
+
+**Practical convergence:**
+- Typical: 10-50 iterations
+- Each iteration: O((|Ω| + m + n)·r²) time
+- Space: O((m + n)·r) for factors
+
+**Theorem 5 (Implicit Feedback ALS):**
+For implicit feedback (binary: clicked/not clicked), use weighted loss:
+
+L = Σ_{u,i} c_ui(p_ui - u_u^T v_i)² + λ(||U||²_F + ||V||²_F)
+
+where:
+- p_ui ∈ {0, 1}: preference (1 if observed)
+- c_ui: confidence (e.g., c_ui = 1 + α·r_ui for r_ui = # interactions)
+
+ALS update becomes:
+u_u = (V^T C^u V + λI)^(-1) V^T C^u p_u
+
+where C^u = diag(c_u1, ..., c_un).
+
+**Complexity:** O(n·r² + r³) per user (can be reduced with sampling).
+
+### Stochastic Gradient Descent for Matrix Factorization
+
+Alternative to ALS: update both U and V simultaneously via SGD.
+
+**Algorithm (SGD-MF):**
+```
+Initialize U, V with small random values
+For each epoch:
+  For each observed rating (u, i) ∈ Ω:
+    e_ui = R_ui - u_u^T v_i
+
+    u_u ← u_u + α(e_ui·v_i - λ·u_u)
+    v_i ← v_i + α(e_ui·u_u - λ·v_i)
+```
+
+**Gradient derivation:**
+∂L/∂u_u = -2e_ui·v_i + 2λ·u_u
+∂L/∂v_i = -2e_ui·u_u + 2λ·v_i
+
+**Theorem 6 (SGD Convergence for Non-Convex Objectives):**
+For non-convex matrix factorization with step size α_t = α_0/√t:
+
+E[||∇L(θ_T)||²] ≤ O(1/√T)
+
+where T is total number of gradient steps.
+
+**Comparison: ALS vs SGD**
+```
+Property          | ALS                  | SGD
+------------------|----------------------|---------------------
+Convergence       | Faster per iteration | More iterations
+Parallelization   | Easy (per user/item) | Difficult (shared U,V)
+Memory            | O(|Ω|·r)            | O(1) per sample
+Implementation    | Matrix operations    | Simple updates
+Implicit feedback | Natural              | Requires sampling
+```
+
+### Biased Matrix Factorization
+
+**Enhanced model** capturing user and item biases:
+
+R_ui = μ + b_u + b_i + u_u^T v_i
+
+where:
+- μ: global mean rating
+- b_u: user u's bias (e.g., harsh/lenient rater)
+- b_i: item i's bias (e.g., popular item)
+- u_u^T v_i: interaction term
+
+**Optimization:**
+```
+min_{U,V,b} Σ_{(u,i)∈Ω} (R_ui - μ - b_u - b_i - u_u^T v_i)²
+           + λ(||U||²_F + ||V||²_F + ||b||²)
+```
+
+**SGD updates:**
+```
+e_ui = R_ui - μ - b_u - b_i - u_u^T v_i
+
+b_u ← b_u + α(e_ui - λ·b_u)
+b_i ← b_i + α(e_ui - λ·b_i)
+u_u ← u_u + α(e_ui·v_i - λ·u_u)
+v_i ← v_i + α(e_ui·u_u - λ·v_i)
+```
+
+**Theorem 7 (Bias Decomposition):**
+Empirically, biases capture ~70% of rating variance:
+
+Var(μ + b_u + b_i) / Var(R_ui) ≈ 0.7
+
+Interaction terms capture remaining structured variance.
+
+**Proof:** By variance decomposition and Netflix Prize data analysis. ∎
+
+### SVD and SVD++
+
+**Classical SVD:**
+Compute truncated SVD: R ≈ UΣV^T with rank r.
+
+**Problem:** R has missing entries → classical SVD not directly applicable.
+
+**Simon Funk's SVD (2006):**
+Iterative SVD via gradient descent (SGD-MF described above).
+
+**SVD++ (Koren, 2008):**
+Incorporate implicit feedback:
+
+R_ui = μ + b_u + b_i + v_i^T(u_u + |N(u)|^{-1/2} Σ_{j∈N(u)} y_j)
+
+where:
+- N(u): items that user u interacted with (implicit)
+- y_j ∈ ℝ^r: implicit item factors
+
+**Intuition:** User representation = explicit preferences (u_u) + implicit signal from items they've seen.
+
+**Theorem 8 (SVD++ Improvement):**
+On Netflix Prize dataset, SVD++ achieves:
+- RMSE: 0.8914 (vs 0.9037 for basic MF)
+- 1.4% improvement from implicit feedback
+
+This was crucial for winning Netflix Prize.
+
 **Mathematical Foundation:**
 
 **Problem Formulation:**
