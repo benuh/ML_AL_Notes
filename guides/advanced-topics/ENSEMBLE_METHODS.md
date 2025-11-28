@@ -158,6 +158,221 @@ print(f"Theoretical bound: {ensemble_bound(0.85, 5):.3f}")
 - Models are not perfectly correlated
 - Sufficient training data for multiple models
 
+### PAC Learning Bounds for Ensembles
+
+**Theorem (Generalization Bound for Majority Vote - Freund & Schapire, 1997):**
+
+Let H = {h_1, ..., h_M} be ensemble of classifiers. Define weighted majority vote:
+
+F(x) = sign(Σ_{m=1}^M α_m h_m(x))
+
+With probability ≥ 1 - δ over training sample S of size n:
+
+P[F(x) ≠ y] ≤ P̂_S[margin_F(x,y) ≤ θ] + O(√((Σ_m d_m) log²(Mn) / (nθ²)) + √(log(1/δ) / n))
+
+where:
+- P̂_S: empirical probability on S
+- margin_F(x,y) = y·Σ_m α_m h_m(x) / Σ_m α_m
+- d_m: VC dimension of h_m
+- θ: margin threshold
+
+**Key Insights:**
+
+1. **Margin maximization crucial:** Bound inversely proportional to θ²
+2. **Ensemble complexity:** Depends on sum Σ_m d_m, not M
+3. **Trade-off:** Large margin vs empirical margin violations
+
+**Proof Sketch:**
+
+Uses VC theory with covering number arguments:
+1. Ensemble hypothesis class complexity via fat-shattering dimension
+2. Margin-based uniform convergence
+3. Chernoff-Hoeffding concentration inequalities
+
+The O(1/θ²) dependency explains why margin-maximizing ensembles (AdaBoost, SVM) generalize well!
+
+**Corollary (Exponential Convergence of Ensemble Error):**
+
+If each h_m has error rate ε_m ≤ 1/2 - γ (γ > 0) and errors are independent:
+
+P[majority vote error] ≤ exp(-2Mγ²)
+
+For M = 100, γ = 0.1:
+P[error] ≤ exp(-2) ≈ 0.135 (13.5%)
+
+**Diversity Measures:**
+
+**1. Disagreement Measure:**
+
+D_{ij} = P_{x~D}[h_i(x) ≠ h_j(x)]
+
+Average pairwise disagreement:
+
+D̄ = (2/(M(M-1))) Σ_{i<j} D_{ij}
+
+**2. Q-Statistic (Yule, 1900):**
+
+Q_{ij} = (N^{11}N^{00} - N^{01}N^{10}) / (N^{11}N^{00} + N^{01}N^{10})
+
+where N^{ab} = #{x : h_i(x)=a, h_j(x)=b}
+
+Q ∈ [-1, 1]:
+- Q = 1: perfect agreement
+- Q = 0: independence
+- Q = -1: perfect disagreement
+
+**3. Correlation Coefficient:**
+
+ρ_{ij} = (E[h_i h_j] - E[h_i]E[h_j]) / √(Var[h_i]Var[h_j])
+
+For binary classifiers h ∈ {-1, +1}:
+
+ρ_{ij} = (N^{11}N^{00} - N^{01}N^{10}) / √((N^{11}+N^{01})(N^{00}+N^{10})(N^{11}+N^{10})(N^{00}+N^{01}))
+
+**4. Entropy Measure (Kuncheva & Whitaker, 2003):**
+
+E = (1/M) Σ_i min(l_i(x), M - l_i(x))
+
+where l_i(x) = #{h : h(x) = i} for class i
+
+Maximum diversity: E = M/2 (half predict each class)
+Minimum diversity: E = 0 (all agree)
+
+**Theorem (Diversity-Accuracy Decomposition - Breiman, 2001):**
+
+For ensemble of M classifiers with simple averaging:
+
+E_ensemble = Ē - D̄
+
+where:
+- E_ensemble: ensemble MSE
+- Ē: average individual MSE
+- D̄: average ambiguity (diversity)
+
+**Ambiguity:**
+
+A_m(x) = (f_m(x) - f̄(x))²
+
+D̄ = E_x[(1/M) Σ_m (f_m(x) - f̄(x))²]
+
+**Implication:**
+
+Ensemble error = Average error - Diversity
+
+More diversity → lower ensemble error (assuming reasonable individual performance)
+
+**Optimal Diversity-Accuracy Trade-off:**
+
+Cannot maximize diversity and accuracy independently!
+
+**Trade-off curve:**
+
+As we increase diversity (e.g., via feature subsampling):
+- Individual error Ē increases (weaker models)
+- Diversity D̄ increases
+- Net effect on E_ensemble = Ē - D̄ depends on balance
+
+Optimal point: marginal benefit of diversity = marginal cost of accuracy
+
+**Theorem (NCL - No Free Lunch for Ensembles):**
+
+For any ensemble method, there exists a distribution where:
+
+E_ensemble > E_single
+
+**Interpretation:**
+Ensembles are not universally better! Need:
+1. Diverse errors
+2. Non-adversarial distribution
+3. Sufficient complexity in hypothesis space
+
+**Practical Diversity Strategies:**
+
+1. **Bagging:** Bootstrap sampling → different training sets
+2. **Random subspace:** Random feature selection
+3. **Random forests:** Bootstrap + random features + random splits
+4. **Boosting:** Sequential reweighting → different focus
+5. **Different algorithms:** Tree + linear + SVM
+6. **Different hyperparameters:** Depth, regularization
+7. **Different architectures:** Shallow vs deep networks
+
+**Measuring Ensemble Quality:**
+
+**Strength (Breiman, 2001):**
+
+s = E_x,y[P_θ[f(x,θ) = y] - max_{j≠y} P_θ[f(x,θ) = j]]
+
+Average margin of correct class over runner-up
+
+**Mean Correlation:**
+
+ρ̄ = (1/(M(M-1))) Σ_{i≠j} ρ(h_i, h_j)
+
+**Theorem (Random Forest Error Bound - Breiman, 2001):**
+
+For Random Forest with classifiers of strength s and mean correlation ρ̄:
+
+Generalization error ≤ ρ̄(1-s²) / s²
+
+**Interpretation:**
+- Lower correlation ρ̄ → better generalization
+- Higher strength s → better generalization
+- Trade-off managed by max_features parameter
+
+**Empirical Validation:**
+
+```python
+import numpy as np
+
+def compute_diversity_metrics(predictions, y_true):
+    """
+    Compute ensemble diversity metrics.
+
+    predictions: (n_samples, n_classifiers) binary predictions
+    y_true: (n_samples,) true labels
+    """
+    M = predictions.shape[1]
+    n = predictions.shape[0]
+
+    # Disagreement measure
+    disagreement = 0
+    for i in range(M):
+        for j in range(i+1, M):
+            disagreement += np.mean(predictions[:, i] != predictions[:, j])
+    disagreement = 2 * disagreement / (M * (M-1))
+
+    # Q-statistic (average over pairs)
+    Q_vals = []
+    for i in range(M):
+        for j in range(i+1, M):
+            N11 = np.sum((predictions[:, i] == 1) & (predictions[:, j] == 1))
+            N00 = np.sum((predictions[:, i] == 0) & (predictions[:, j] == 0))
+            N01 = np.sum((predictions[:, i] == 0) & (predictions[:, j] == 1))
+            N10 = np.sum((predictions[:, i] == 1) & (predictions[:, j] == 0))
+
+            Q = (N11*N00 - N01*N10) / (N11*N00 + N01*N10 + 1e-10)
+            Q_vals.append(Q)
+
+    Q_avg = np.mean(Q_vals)
+
+    # Ensemble vs individual accuracy
+    ensemble_pred = (predictions.sum(axis=1) > M/2).astype(int)
+    ensemble_acc = np.mean(ensemble_pred == y_true)
+    individual_acc = np.mean([np.mean(predictions[:, m] == y_true) for m in range(M)])
+
+    return {
+        'disagreement': disagreement,
+        'Q_statistic': Q_avg,
+        'ensemble_accuracy': ensemble_acc,
+        'individual_accuracy': individual_acc,
+        'improvement': ensemble_acc - individual_acc
+    }
+
+# Example usage
+# predictions = np.array of shape (n_samples, n_classifiers)
+# metrics = compute_diversity_metrics(predictions, y_true)
+```
+
 ---
 
 ## Bagging Methods
@@ -1225,6 +1440,224 @@ cat_model.fit(train_pool, eval_set=test_pool)
 ### Stacking (Stacked Generalization)
 
 **Strategy:** Use predictions from multiple models as features for a meta-learner.
+
+#### Mathematical Theory of Stacking
+
+**Stacked Generalization (Wolpert, 1992):**
+
+**Problem Setup:**
+
+Given:
+- Training data: D = {(x_i, y_i)}_{i=1}^n
+- Base learners: L_1, ..., L_M producing models f_1, ..., f_M
+- Meta-learner: L_0 producing model g
+
+**Goal:** Learn meta-function g that combines base predictions:
+
+ŷ = g(f_1(x), f_2(x), ..., f_M(x))
+
+**Naive approach (incorrect):**
+1. Train f_m on full D
+2. Generate predictions p_m(x_i) = f_m(x_i) for all x_i ∈ D
+3. Train g on {(p_1(x_i), ..., p_M(x_i)), y_i}
+
+**Problem:** Base predictions perfectly seen during training → meta-learner overfits → poor generalization!
+
+**Correct approach (Cross-Validation Stacking):**
+
+**Algorithm:**
+
+1. **Split data:** Divide D into K folds D_1, ..., D_K
+
+2. **Generate out-of-fold predictions:**
+   For each fold k and each base learner L_m:
+   - Train f_m^{(-k)} on D \ D_k (all data except fold k)
+   - Predict on D_k: p_m^k(x_i) = f_m^{(-k)}(x_i) for x_i ∈ D_k
+
+3. **Construct meta-training set:**
+   Z = {([p_1^k(x_i), ..., p_M^k(x_i)], y_i) : x_i ∈ D_k, k=1,...,K}
+
+4. **Train meta-learner:**
+   g = L_0(Z)
+
+5. **Train final base learners:**
+   For each m: f_m = L_m(D) (on full training data)
+
+6. **Final predictor:**
+   ŷ(x) = g(f_1(x), f_2(x), ..., f_M(x))
+
+**Theorem 1 (Stacking Generalization Bound - van der Laan et al., 2007):**
+
+For K-fold stacking with base learners having VC dimension d_m and meta-learner with VC dimension d_0:
+
+With probability ≥ 1 - δ:
+
+R(g ∘ f) - R̂_K(g ∘ f) ≤ O(√((Σ_m d_m + d_0) log(n/δ) / n))
+
+where:
+- R: true risk (generalization error)
+- R̂_K: K-fold cross-validated risk
+- g ∘ f: composed predictor g(f_1, ..., f_M)
+
+**Interpretation:**
+- Stacking complexity: sum of base learner and meta-learner complexities
+- K-fold CV provides unbiased estimates for meta-training
+- Bound depends on √(total VC dimension / n)
+
+**Bias-Variance Decomposition for Stacking:**
+
+**Theorem 2 (Stacking Reduces Variance):**
+
+Let f_1, ..., f_M be base learners with:
+- Individual bias: b_m = E[f_m(x)] - f(x)
+- Individual variance: v_m = Var[f_m(x)]
+- Pairwise correlation: ρ_{ij} = Corr(f_i(x), f_j(x))
+
+For linear stacking with weights w = [w_1, ..., w_M]:
+
+g(x) = Σ_m w_m f_m(x)
+
+Bias[g(x)] = Σ_m w_m b_m (weighted average of biases)
+
+Var[g(x)] = Σ_m w²_m v_m + Σ_{i≠j} w_i w_j √(v_i v_j) ρ_{ij}
+
+**Optimal weights (minimum variance):**
+
+w* = Σ^{-1} 1 / (1^T Σ^{-1} 1)
+
+where Σ_{ij} = Cov(f_i(x), f_j(x))
+
+**Special case (equal variance v, equal correlation ρ):**
+
+If w_m = 1/M (uniform weighting):
+
+Var[g] = v/M + v·ρ·(M-1)/M = v[ρ + (1-ρ)/M]
+
+**Variance reduction factor:**
+
+VRF = Var[single] / Var[ensemble] = 1 / [ρ + (1-ρ)/M]
+
+As M → ∞: VRF → 1/ρ
+
+**Implication:**
+- Low correlation (ρ → 0) → large variance reduction (VRF → M)
+- High correlation (ρ → 1) → no variance reduction (VRF → 1)
+- Diversity crucial!
+
+**Regularized Stacking:**
+
+**Problem:** Meta-learner can overfit, especially with many base learners.
+
+**Solution:** Use regularized meta-learner.
+
+**Ridge Stacking:**
+
+min_w Σ_i (y_i - Σ_m w_m f_m^{-k}(x_i))² + λ||w||²
+
+Closed form:
+
+w* = (F^T F + λI)^{-1} F^T y
+
+where F_{im} = f_m^{-k}(x_i)
+
+**Lasso Stacking (Feature Selection):**
+
+min_w Σ_i (y_i - Σ_m w_m f_m^{-k}(x_i))² + λ||w||_1
+
+Effect:
+- Automatically selects subset of base learners
+- Sets weights of weak/redundant learners to 0
+- Implicit model selection!
+
+**Non-negative Least Squares Stacking:**
+
+min_w Σ_i (y_i - Σ_m w_m f_m^{-k}(x_i))²
+
+subject to: w_m ≥ 0 for all m
+
+Rationale:
+- Prevents cancellation (more interpretable)
+- Often better generalization
+- Closer to averaging/voting
+
+**Theorem 3 (CV Bias in Stacking - Tibshirani & Tibshirani, 2009):**
+
+K-fold CV estimate of stacking performance has bias:
+
+Bias(R̂_K) = E[R̂_K] - R(g ∘ f) ≈ (K-1)/K · Cov(y, ŷ) / Var(y)
+
+**Interpretation:**
+- K-fold CV slightly pessimistic (trains on (K-1)/K of data)
+- Bias → 0 as K → n (leave-one-out)
+- But LOO has high variance!
+- Typical: K = 5 or 10 balances bias-variance
+
+**Super Learner (van der Laan et al., 2007):**
+
+Theoretical optimal stacking via cross-validation:
+
+**Theorem 4 (Oracle Inequality for Super Learner):**
+
+The Super Learner ŷ_SL satisfies:
+
+R(ŷ_SL) ≤ min_{α ∈ A} R(ŷ_α) + O(log M / √n)
+
+where:
+- A: convex hull of base learners
+- M: number of base learners
+- Rate: O(log M / √n) → 0 as n → ∞
+
+**Interpretation:**
+- Super Learner asymptotically performs as well as best weighted combination
+- Achieves oracle risk (best possible within class) up to O(log M / √n)
+- No free lunch: requires sufficient data (n >> M)
+
+**Stacking vs Blending:**
+
+**Blending:**
+- Hold out validation set V ⊂ D
+- Train base learners on D \ V
+- Generate predictions on V only
+- Train meta-learner on V predictions
+
+**Comparison:**
+
+┌─────────────────┬──────────────┬──────────────┐
+│ Aspect          │ Stacking     │ Blending     │
+├─────────────────┼──────────────┼──────────────┤
+│ Data efficiency │ Higher       │ Lower        │
+│ Meta-training   │ Full dataset │ Holdout only │
+│ Computation     │ K× slower    │ Faster       │
+│ Variance        │ Lower        │ Higher       │
+│ Implementation  │ Complex      │ Simple       │
+└─────────────────┴──────────────┴──────────────┘
+
+**When to use:**
+- Stacking: Sufficient data, need best performance
+- Blending: Limited data or time, simpler implementation
+
+**Multi-Level Stacking:**
+
+Can stack meta-learners recursively:
+
+Level 0: Base learners {f_1, ..., f_M}
+Level 1: Meta-learners {g_1, ..., g_L} on base predictions
+Level 2: Super-meta-learner h on Level 1 predictions
+...
+
+**Caution:** Diminishing returns and overfitting risk!
+- Typically stop at 2 levels
+- Each level needs K-fold CV
+- Computational cost: O(K^L) for L levels
+
+**Practical Guidelines:**
+
+1. **Diverse base learners:** Different algorithms (tree, linear, SVM, neural net)
+2. **Different hyperparameters:** Same algorithm with varied configs
+3. **Different features:** Same algorithm on feature subsets
+4. **Regularize meta-learner:** Ridge, Lasso, or elastic net
+5. **Use 5-10 fold CV:** Balance bias-variance in meta-features
+6. **Check for overfitting:** Validate on separate test set
 
 ```python
 from sklearn.ensemble import StackingClassifier
