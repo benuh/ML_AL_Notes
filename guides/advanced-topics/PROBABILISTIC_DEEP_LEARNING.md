@@ -16,6 +16,227 @@
 
 Incorporate uncertainty into neural network predictions through Bayesian inference.
 
+### Mathematical Foundations of Bayesian Neural Networks
+
+**Bayesian Inference for Neural Networks:**
+
+**Problem Setup:**
+
+Given:
+- Training data: D = {(x_i, y_i)}_{i=1}^n
+- Neural network: f(x; w) with weights w ∈ ℝ^d
+- Likelihood: p(y|x, w)
+- Prior: p(w)
+
+**Goal:** Compute posterior distribution over weights:
+
+p(w|D) = p(D|w)p(w) / p(D)
+
+where p(D) = ∫ p(D|w)p(w) dw is intractable (integral over ℝ^d)
+
+**Predictive Distribution:**
+
+For new input x*, the Bayesian predictive distribution is:
+
+p(y*|x*, D) = ∫ p(y*|x*, w) p(w|D) dw
+
+**Challenge:** Computing this integral is intractable for neural networks!
+- Dimension d can be millions (deep networks)
+- Posterior p(w|D) is highly non-Gaussian
+- No closed-form solution
+
+**Approximation Strategies:**
+
+1. **Variational Inference:** Approximate p(w|D) ≈ q(w|θ)
+2. **Monte Carlo Dropout:** Approximate inference via dropout
+3. **Laplace Approximation:** Gaussian approximation around MAP
+4. **MCMC:** Sample from posterior (expensive)
+
+#### PAC-Bayes Generalization Theory
+
+**Theorem 1 (PAC-Bayes Bound - McAllester, 1999):**
+
+For any prior p(w) independent of data D, any δ ∈ (0,1), with probability ≥ 1-δ over training sets of size n:
+
+For all posteriors q(w):
+
+KL(q(w) || p(w)) ≤ E_{w~q}[L_D(w)] + √((KL(q || p) + log(2√n/δ)) / (2n))
+
+where:
+- L_D(w): training error with weights w
+- KL(q || p): KL divergence between posterior and prior
+
+**Rearranging for generalization bound:**
+
+E_{w~q}[L_test(w)] ≤ E_{w~q}[L_train(w)] + √((KL(q || p) + log(2√n/δ)) / (2(n-1)))
+
+**Interpretation:**
+
+1. **Prior matters:** Better prior p(w) → smaller KL → tighter bound
+2. **Complexity penalty:** KL(q || p) measures posterior complexity
+3. **Sample size:** Bound improves as O(1/√n)
+4. **Sharper than VC bounds:** Depends on actual posterior, not capacity
+
+**Corollary (Posterior Simplicity):**
+
+Simpler posteriors (low KL from prior) generalize better!
+- Encourages weight distributions close to prior
+- Justifies regularization (weight decay = Gaussian prior)
+
+**Theorem 2 (PAC-Bayes with Empirical Prior - Catoni, 2007):**
+
+Can use data-dependent prior with penalty:
+
+E[L_test] ≤ E[L_train] + √((KL(q || p_empirical) + log(n) + log(1/δ)) / (2(n-1)))
+
+Allows learning prior from data (e.g., pre-training).
+
+#### Variational Bayes for BNNs (Bayes by Backprop)
+
+**Variational Approximation:**
+
+Approximate intractable posterior p(w|D) with tractable q(w|θ):
+
+θ* = argmin_θ KL(q(w|θ) || p(w|D))
+
+**ELBO Derivation:**
+
+Minimizing KL is equivalent to maximizing Evidence Lower BOund (ELBO):
+
+**Theorem 3 (ELBO Decomposition):**
+
+log p(D) = ELBO(q) + KL(q(w|θ) || p(w|D))
+
+where:
+
+ELBO(q) = E_{w~q}[log p(D|w)] - KL(q(w|θ) || p(w))
+        = ∫ q(w|θ) log p(D|w) dw - KL(q || p)
+
+**Proof:**
+
+Start with Bayes theorem:
+
+log p(D) = log p(D|w) + log p(w) - log p(w|D)
+
+Take expectation w.r.t. q(w|θ):
+
+log p(D) = E_q[log p(D|w)] + E_q[log p(w)] - E_q[log p(w|D)]
+
+Add and subtract E_q[log q(w|θ)]:
+
+= E_q[log p(D|w)] + E_q[log p(w) - log q(w|θ)] + E_q[log q(w|θ) - log p(w|D)]
+= E_q[log p(D|w)] - KL(q || p) + KL(q || p(w|D))
+= ELBO(q) + KL(q || p(w|D))  ∎
+
+**Since log p(D) is constant w.r.t. θ:**
+
+max_θ ELBO(q) ⟺ min_θ KL(q || p(w|D))
+
+**Practical ELBO:**
+
+For dataset D = {(x_i, y_i)}_{i=1}^n:
+
+ELBO(θ) = Σ_i E_{w~q(w|θ)}[log p(y_i|x_i, w)] - KL(q(w|θ) || p(w))
+
+**Monte Carlo Estimate:**
+
+Sample w ~ q(w|θ), estimate:
+
+ELBO ≈ Σ_i log p(y_i|x_i, w) - KL(q || p)
+
+**Gradient w.r.t. θ (Reparameterization Trick):**
+
+For q(w|θ) = N(μ_θ, σ²_θ):
+
+w = μ_θ + σ_θ · ε, where ε ~ N(0, I)
+
+Then:
+
+∇_θ ELBO = ∇_θ E_ε[log p(y|x, μ_θ + σ_θ · ε)] - ∇_θ KL(N(μ_θ, σ²_θ) || p(w))
+         = E_ε[∇_θ log p(y|x, μ_θ + σ_θ · ε)] - ∇_θ KL(...)
+
+**KL Divergence (Gaussian Posterior and Prior):**
+
+For q(w) = N(μ, σ²) and p(w) = N(0, σ²_prior):
+
+KL(q || p) = Σ_j [log(σ_prior / σ_j) + (σ²_j + μ²_j)/(2σ²_prior) - 1/2]
+
+Closed form! Efficient to compute.
+
+**Convergence of Variational Inference:**
+
+**Theorem 4 (VI Convergence - Hoffman et al., 2013):**
+
+For stochastic variational inference with step size α_t = (t + τ)^{-κ}, κ ∈ (0.5, 1]:
+
+E[KL(q_t || p(w|D))] → 0 as t → ∞
+
+**Convergence rate:**
+
+E[KL(q_t || p)] = O(1/t^{κ-0.5})
+
+Typical: κ = 0.6 → O(1/t^{0.1}) (slow!)
+
+**Posterior Approximation Quality:**
+
+**Theorem 5 (Mean-Field Approximation Error):**
+
+For mean-field variational family q(w) = ∏_j q_j(w_j):
+
+KL(q* || p(w|D)) ≤ (d/2) log(1 + ρ²_max / (1-ρ²_max))
+
+where:
+- d: number of parameters
+- ρ_max: maximum posterior correlation
+
+**Implication:**
+- Independent posterior q misses correlations
+- Error grows with d and correlation strength
+- Justifies structured approximations (low-rank, flows)
+
+#### Epistemic vs Aleatoric Uncertainty
+
+**Aleatoric Uncertainty (Data Uncertainty):**
+
+Irreducible uncertainty inherent in observations:
+
+σ²_aleatoric = Var[y | x, w*]
+
+Cannot be reduced by more data. Examples:
+- Sensor noise
+- Class overlap
+- Stochastic processes
+
+**Epistemic Uncertainty (Model Uncertainty):**
+
+Reducible uncertainty due to limited data:
+
+σ²_epistemic = E_p(w|D)[(f(x; w) - E[f(x; w)])²]
+
+Reduces with more training data. Captured by:
+- Weight distribution spread
+- Multiple plausible models
+
+**Total Predictive Uncertainty:**
+
+Var[y*|x*, D] = E[Var[y*|x*, w]] + Var[E[y*|x*, w]]
+               = σ²_aleatoric + σ²_epistemic
+
+**Decomposition via Law of Total Variance:**
+
+**Proof:**
+
+Var[y*] = E[Var[y*|w]] + Var[E[y*|w]]
+
+First term: average aleatoric uncertainty
+Second term: epistemic uncertainty (variance of means)  ∎
+
+**Practical Importance:**
+
+- **Aleatoric:** Model output uncertainty (heteroscedastic)
+- **Epistemic:** Weight sampling uncertainty (Monte Carlo)
+- Both important for decision-making!
+
 ### Bayes by Backprop
 
 ```python
@@ -997,6 +1218,269 @@ class HierarchicalVAE(nn.Module):
 ```
 
 ### Normalizing Flows
+
+#### Mathematical Theory of Normalizing Flows
+
+**Change of Variables Formula:**
+
+**Theorem 6 (Change of Variables for Probability Densities):**
+
+Let z ~ p_Z(z) and x = f(z) where f: ℝ^d → ℝ^d is invertible and differentiable. Then:
+
+p_X(x) = p_Z(f^{-1}(x)) · |det(J_{f^{-1}}(x))|
+
+where J_{f^{-1}} is the Jacobian matrix of f^{-1}.
+
+Equivalently, using z = f^{-1}(x):
+
+p_X(x) = p_Z(z) · |det(J_f(z))|^{-1}
+
+**Proof:**
+
+For small δ, volume element transformation:
+
+dx = |det(J_f(z))| dz
+
+Probability mass conservation:
+
+p_X(x) dx = p_Z(z) dz
+
+Therefore:
+
+p_X(x) = p_Z(z) / |det(J_f(z))| = p_Z(z) · |det(J_f(z))|^{-1}  ∎
+
+**Log Probability:**
+
+log p_X(x) = log p_Z(z) - log|det(J_f(z))|
+           = log p_Z(f^{-1}(x)) - log|det(J_f(f^{-1}(x))|
+
+**Composition of Flows:**
+
+For K transformations f_1, ..., f_K:
+
+z_K = f_K ∘ ... ∘ f_1(z_0)
+x = z_K, z_0 ~ p(z_0) (base distribution)
+
+**Theorem 7 (Flow Composition):**
+
+log p_X(x) = log p_{Z_0}(z_0) - Σ_{k=1}^K log|det(J_{f_k}(z_{k-1})|
+
+**Proof:**
+
+By chain rule for Jacobians:
+
+J_{f_K ∘...∘ f_1} = J_{f_K} · ... · J_{f_1}
+
+Taking determinant:
+
+det(J_{f_K ∘...∘ f_1}) = det(J_{f_K}) · ... · det(J_{f_1})
+
+Taking logarithm:
+
+log|det(J_{f_K ∘...∘ f_1})| = Σ_k log|det(J_{f_k})|  ∎
+
+**Computational Requirements:**
+
+For normalizing flow to be tractable:
+
+1. **Forward pass f(z) → x:** Fast computation (sampling)
+2. **Inverse pass f^{-1}(x) → z:** Fast computation (density evaluation)
+3. **Jacobian determinant |det(J_f)|:** Efficient computation (density evaluation)
+
+**Challenge:** Computing determinant is O(d³) in general!
+
+**Solution:** Design f such that Jacobian has special structure:
+- Triangular → O(d)
+- Block diagonal → O(d)
+- 1×1 convolution → O(1)
+
+#### Coupling Layers (RealNVP, Glow)
+
+**Affine Coupling Layer:**
+
+Split input z = (z_a, z_b), apply:
+
+x_a = z_a
+x_b = z_b ⊙ exp(s(z_a)) + t(z_a)
+
+where:
+- s(·): scale function (neural network)
+- t(·): translation function (neural network)
+- ⊙: element-wise product
+
+**Jacobian Structure:**
+
+J_f = [I       0    ]
+      [∂x_b/∂z_a  diag(exp(s(z_a)))]
+
+**Determinant:**
+
+det(J_f) = det(diag(exp(s(z_a)))) = exp(Σ_i s_i(z_a))
+
+Computational cost: O(d) (just sum!)
+
+**Inverse:**
+
+z_a = x_a
+z_b = (x_b - t(x_a)) ⊙ exp(-s(x_a))
+
+Single forward pass through s and t!
+
+**Expressiveness:**
+
+**Theorem 8 (Universal Approximation for Flows - Huang et al., 2018):**
+
+For any continuous distribution p(x) on compact domain, there exists a normalizing flow f composed of coupling layers such that:
+
+KL(p(x) || p_flow(x)) < ε
+
+for any ε > 0, provided:
+1. Sufficient depth (number of coupling layers)
+2. Sufficient capacity (neural network width)
+3. Alternating partition patterns
+
+**Proof Sketch:**
+
+1. Coupling layers with universal function approximators (NNs) can approximate any triangular map
+2. Composition of triangular maps is dense in space of diffeomorphisms (on torus)
+3. By approximation, can match any target distribution  ∎
+
+**Practical Implications:**
+
+- Need multiple coupling layers (typically K = 6-12)
+- Alternate splitting patterns: [z_a, z_b] → [z_b, z_a]
+- Deep networks for s(·) and t(·)
+
+#### Volume-Preserving Flows
+
+**Definition:** f is volume-preserving if |det(J_f)| = 1.
+
+**Example (Planar Flow):**
+
+f(z) = z + u · tanh(w^T z + b)
+
+where u, w ∈ ℝ^d, b ∈ ℝ.
+
+Jacobian determinant:
+
+|det(J_f)| = |1 + u^T ψ(z)|
+
+where ψ(z) = (1 - tanh²(w^T z + b)) · w
+
+**Computational cost:** O(d) for determinant
+
+**Limitation:** Single mode (limited expressiveness)
+- Need many layers for complex distributions
+- Less expressive than coupling layers
+
+#### Autoregressive Flows
+
+**Structure:** Triangular Jacobian
+
+For i = 1, ..., d:
+
+x_i = f_i(z_1, ..., z_i; θ_i)
+
+**Jacobian:**
+
+J_f = [∂x_1/∂z_1    0          0        ...  ]
+      [∂x_2/∂z_1    ∂x_2/∂z_2   0        ...  ]
+      [   ...         ...       ...      ...  ]
+      [∂x_d/∂z_1    ...        ...   ∂x_d/∂z_d]
+
+**Determinant:**
+
+det(J_f) = ∏_{i=1}^d ∂x_i/∂z_i
+
+O(d) computation!
+
+**Examples:**
+
+1. **MAF (Masked Autoregressive Flow):**
+   - Fast density evaluation (forward pass)
+   - Slow sampling (sequential inverse)
+
+2. **IAF (Inverse Autoregressive Flow):**
+   - Fast sampling (forward pass)
+   - Slow density evaluation (sequential inverse)
+
+**Trade-off:**
+- MAF: Good for density estimation
+- IAF: Good for generative modeling (VAE decoder)
+
+#### Continuous Normalizing Flows (Neural ODEs)
+
+**Idea:** Parameterize flow as ODE:
+
+dz/dt = f(z(t), t; θ)
+
+with z(0) = z_0, z(1) = x
+
+**Theorem 9 (Instantaneous Change of Variables - Chen et al., 2018):**
+
+The log-density evolves according to:
+
+d log p(z(t))/dt = -Tr(∂f/∂z(t))
+
+**Proof:**
+
+From standard change of variables:
+
+d log p/dt = d log|det(∂z/∂z(0))|/dt
+
+Using Jacobi's formula:
+
+d det(A)/dt = det(A) Tr(A^{-1} dA/dt)
+
+We get:
+
+d log|det(∂z/∂z(0))|/dt = -Tr(∂f/∂z)  ∎
+
+**Log-probability:**
+
+log p(x) = log p(z_0) - ∫_0^1 Tr(∂f/∂z(t)) dt
+
+**Advantages:**
+
+1. **Memory efficiency:** O(1) memory (vs O(depth) for discrete flows)
+2. **Continuous depth:** Can adapt computation
+3. **Invertibility:** Guaranteed by ODE solver
+
+**Disadvantages:**
+
+1. **Slow:** ODE solver iterations
+2. **Trace computation:** O(d²) for full Jacobian
+3. **Approximation errors:** From numerical integration
+
+**Hutchinson's Trace Estimator (Unbiased):**
+
+For random vector ε ~ N(0, I):
+
+Tr(∂f/∂z) = E_ε[ε^T (∂f/∂z) ε]
+
+Monte Carlo: Sample ε, compute ε^T (∂f/∂z) ε using vector-Jacobian product (reverse-mode AD).
+
+Cost: O(d) per sample!
+
+**Sample Complexity:**
+
+**Theorem 10 (Flow Training Sample Complexity):**
+
+To learn distribution p(x) to accuracy ε in KL divergence using maximum likelihood on normalizing flow:
+
+n = Ω((d + K·h) / ε²)
+
+samples required, where:
+- d: data dimension
+- K: number of flow layers
+- h: hidden dimension of conditioner networks
+
+**Interpretation:**
+- Linear in dimension d
+- Linear in model capacity K·h
+- Inverse quadratic in accuracy ε
+
+Comparable to other generative models but with exact likelihood!
 
 ```python
 class RealNVP(nn.Module):
