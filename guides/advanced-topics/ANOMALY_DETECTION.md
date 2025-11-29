@@ -139,6 +139,233 @@ Trade-off: Decreasing α typically increases β
 Goal: Minimize both errors subject to constraints
 ```
 
+#### PAC Bounds for Anomaly Detection
+
+**Theorem 1 (PAC Bound for Outlier Detection - Steinwart et al., 2005):**
+
+Let f: X → ℝ be an anomaly score function learned from n samples. For any δ ∈ (0,1), with probability ≥ 1-δ:
+
+|P(f(X) > τ) - P̂_n(f(X) > τ)| ≤ √((log(2/δ))/(2n))
+
+where:
+- P: true probability
+- P̂_n: empirical probability on n samples
+- τ: threshold
+
+**Interpretation:**
+- Sample complexity: n = O(log(1/δ)/ε²) for ε-accurate FPR estimation
+- Finite-sample guarantee independent of dimension d
+- Applies to any scoring function f
+
+**Corollary (Threshold Selection):**
+
+To achieve false positive rate α ± ε with confidence 1-δ, need:
+
+n ≥ log(2/δ)/(2ε²)
+
+Example: α = 0.01, ε = 0.001, δ = 0.05 requires n ≥ 18,445 samples
+
+**Theorem 2 (Concentration of Mahalanobis Distance - Laurent & Massart, 2000):**
+
+For x ~ N(0, I_d) and empirical covariance Σ̂ from n samples, the Mahalanobis distance satisfies:
+
+P(|x^T Σ̂^{-1} x - d| > t) ≤ 2 exp(-cnt²)
+
+for constant c depending on n/d ratio.
+
+**Requirement:** n ≥ c·d for reliable covariance estimation
+
+**Implication:**
+- Need n >> d for accurate Mahalanobis distance
+- High dimensions: empirical Σ̂ poor estimate
+- Justifies dimensionality reduction or regularization
+
+#### One-Class Learning Theory
+
+**Problem Formulation:**
+
+Given:
+- Normal data: D_n = {x_i}_{i=1}^n ~ p_0(x)
+- Goal: Learn decision boundary separating normal from anomalies
+
+**No anomaly examples during training!**
+
+**Definition 1 (ν-Property):**
+
+A one-class classifier has ν-property if:
+
+1. Fraction of training data classified as anomalies ≤ ν
+2. Fraction of test normal data classified as anomalies ≥ ν (with high probability)
+
+**One-Class SVM Objective (Schölkopf et al., 2001):**
+
+min_{w,ρ,ξ} (1/2)||w||² + (1/νn)Σ_i ξ_i - ρ
+
+subject to:
+w^T φ(x_i) ≥ ρ - ξ_i
+ξ_i ≥ 0
+
+where:
+- φ(·): feature map (kernel trick)
+- ρ: offset (margin from origin)
+- ξ_i: slack variables
+- ν ∈ (0,1): controls FPR and support vector fraction
+
+**Theorem 3 (One-Class SVM Properties - Schölkopf et al., 2001):**
+
+For optimal solution (w*, ρ*, ξ*):
+
+1. **Lower bound on ν:**
+   ν ≥ #{support vectors}/n
+
+2. **Upper bound on training errors:**
+   #{ξ_i > 0}/n ≤ ν
+
+3. **Decision function:**
+   f(x) = sign(w*^T φ(x) - ρ*)
+
+**Generalization Bound:**
+
+With probability ≥ 1-δ over training sets:
+
+P_{x~p_0}[f(x) = -1] ≤ (E[#SV] + log(1/δ))/n
+
+where E[#SV] = expected number of support vectors
+
+**Typical:** #SV/n ≈ 0.05-0.3 for good kernel choice
+
+**Kernel Choice Impact:**
+
+**Theorem 4 (RBF Kernel Universality for OC-SVM):**
+
+For RBF kernel k(x,x') = exp(-γ||x-x'||²), the decision boundary can approximate any closed set C with:
+
+P(x ∈ C) = 1 - ν
+
+to arbitrary accuracy as n → ∞, provided γ chosen appropriately.
+
+**Practical Guideline:**
+
+γ = 1/(d·median(||x_i - x_j||²))
+
+Adapts to data scale and dimension.
+
+#### Concentration Inequalities for Anomaly Detection
+
+**Theorem 5 (Hoeffding's Inequality for False Alarm Rate):**
+
+Let X_1, ..., X_n be i.i.d. with P(X_i is anomaly) = α (true FPR). Let α̂ = (1/n)Σ I(X_i is anomaly) be empirical FPR.
+
+P(|α̂ - α| > ε) ≤ 2 exp(-2nε²)
+
+**Application:**
+
+To estimate FPR α within ε with confidence 1-δ:
+
+n ≥ log(2/δ)/(2ε²)
+
+Independent of dimension or distribution!
+
+**Theorem 6 (McDiarmid's Inequality for Bounded Differences):**
+
+Let f(X_1, ..., X_n) be anomaly score satisfying bounded differences:
+
+|f(x_1, ..., x_i, ..., x_n) - f(x_1, ..., x'_i, ..., x_n)| ≤ c_i
+
+Then:
+
+P(|f(X_1, ..., X_n) - E[f]| > t) ≤ 2 exp(-2t²/Σc_i²)
+
+**Example (Local Outlier Factor):**
+
+For LOF score, changing one point affects at most k neighbors.
+
+Bounded difference: c_i = O(k/n)
+
+Concentration: LOF(x) concentrates around E[LOF(x)] at rate O(√(k/n))
+
+**Theorem 7 (Bernstein's Inequality for Sub-Gaussian):**
+
+For sub-Gaussian anomaly scores with variance σ²:
+
+P(|score(x) - E[score]| > t) ≤ 2 exp(-t²/(2σ² + ct/3))
+
+Better tail bounds than Hoeffding when variance is small!
+
+#### Robust Statistics for Anomaly Detection
+
+**Breakdown Point:**
+
+**Definition 2 (Breakdown Point):**
+
+The breakdown point ε*(T, P) of estimator T at distribution P is the smallest fraction of contamination that can make T arbitrarily bad:
+
+ε*(T, P) = min{ε : sup_{P':|P'-P|≤ε} |T(P') - T(P)| = ∞}
+
+**Examples:**
+- Sample mean: ε* = 0 (single outlier breaks it)
+- Sample median: ε* = 0.5 (optimal!)
+- MCD covariance: ε* ≈ 0.5
+- Trimmed mean (α): ε* = α
+
+**Theorem 8 (Median Absolute Deviation Consistency):**
+
+For symmetric distribution with median m and scale parameter σ:
+
+MAD = median(|X_i - m|) →^{P} σ·Φ^{-1}(3/4)
+
+where Φ is standard normal CDF.
+
+For normal distribution: Φ^{-1}(3/4) ≈ 0.6745
+
+Thus: σ ≈ 1.4826·MAD (robust scale estimate)
+
+**Influence Function:**
+
+**Definition 3 (Influence Function):**
+
+IF(x; T, P) = lim_{ε→0} [T((1-ε)P + εδ_x) - T(P)]/ε
+
+Measures effect of infinitesimal contamination at x.
+
+**Bounded Influence:**
+- Robust estimator: |IF(x; T, P)| < ∞ for all x
+- Sample mean: IF unbounded (not robust)
+- Huber M-estimator: IF bounded (robust)
+
+**Theorem 9 (Huber M-Estimator Efficiency):**
+
+The Huber estimator with tuning constant k achieves:
+
+- Breakdown point: ε* ≈ 0.5
+- Efficiency at normal: 95% (k = 1.345)
+- Bounded influence: |IF| ≤ k
+
+Optimal trade-off between robustness and efficiency!
+
+**Minimum Covariance Determinant (MCD):**
+
+**Objective:**
+
+min_{H: |H|=h} det(Σ_H)
+
+where:
+- H ⊆ {1, ..., n}: subset of h observations
+- Σ_H: covariance of {x_i : i ∈ H}
+- h ≥ ⌈(n+d+1)/2⌉: minimum subset size
+
+**Theorem 10 (MCD Breakdown Point - Rousseeuw, 1984):**
+
+ε*(MCD) = (n - h + 1)/n
+
+For h = ⌈(n+d+1)/2⌉:
+
+ε*(MCD) ≈ 0.5 (optimal!)
+
+**Computational Complexity:**
+- Exact: O(n^d) (intractable)
+- FAST-MCD algorithm: O(n²d²) (practical)
+
 **Neyman-Pearson Lemma:**
 ```
 Theorem (Neyman-Pearson, 1933):
@@ -629,6 +856,179 @@ class GrubbsTest:
 Traditional ML methods for anomaly detection.
 
 ### Isolation Forest
+
+#### Mathematical Theory of Isolation Forests
+
+**Core Intuition (Liu et al., 2008):**
+
+Anomalies are:
+1. **Few:** Rare in the dataset
+2. **Different:** Have attribute values very different from normal
+
+**Consequence:** Anomalies are easier to isolate (require fewer splits)
+
+**Path Length Analysis:**
+
+**Definition 4 (Path Length):**
+
+h(x) = path length from root to leaf for point x in isolation tree
+
+**Expected Path Length for Normal Points:**
+
+For random binary tree with n points:
+
+E[h(x)] ≈ 2H(n-1) - 2(n-1)/n ≈ 2 ln(n)
+
+where H(n) = Σ_{i=1}^n 1/i is the harmonic number
+
+**For Anomalies:**
+
+E[h(x_anomaly)] ≪ E[h(x_normal)]
+
+Anomalies isolated near root → short path length
+
+**Theorem 11 (Isolation Forest Anomaly Score - Liu et al., 2012):**
+
+The anomaly score for point x is:
+
+s(x, ψ) = 2^{-E[h(x)]/c(ψ)}
+
+where:
+- E[h(x)]: average path length over ensemble
+- c(ψ): normalization constant for subsample size ψ
+- c(ψ) = 2H(ψ-1) - 2(ψ-1)/ψ
+
+**Properties:**
+
+1. **s(x) → 1:** Strong anomaly (very short path)
+2. **s(x) → 0.5:** Normal instance (average path)
+3. **s(x) → 0:** Extremely normal (very long path)
+
+**Normalization Constant Derivation:**
+
+c(ψ) equals average path length in BST with ψ nodes.
+
+For BST built on random permutation:
+
+c(n) = 2(ln(n-1) + γ) - 2(n-1)/n + O(1/n)
+
+where γ ≈ 0.5772 is Euler-Mascheroni constant.
+
+**Approximation for large n:**
+
+c(n) ≈ 2 ln(n) - 1.386
+
+**Theorem 12 (Convergence of Isolation Forest Score):**
+
+Let s_T(x) be anomaly score with T trees. Then:
+
+|s_T(x) - s_∞(x)| = O_p(1/√T)
+
+where s_∞(x) is the limit score with infinite trees.
+
+**Proof Sketch:**
+
+Each tree gives independent estimate h_t(x). By CLT:
+
+(1/T)Σ h_t(x) → E[h(x)] at rate O(1/√T)
+
+Monotone transformation 2^{-h/c} preserves convergence rate. ∎
+
+**Sample Complexity:**
+
+To achieve ε-accurate score with probability 1-δ:
+
+T = O(σ²log(1/δ)/ε²)
+
+where σ² = Var[h(x)] ≈ O(log n)
+
+Typical: T = 100-200 trees sufficient
+
+**Subsampling Size ψ:**
+
+**Theorem 13 (Optimal Subsample Size - Liu et al., 2008):**
+
+For dataset size n and contamination rate α:
+
+Optimal ψ ≈ min(256, n)
+
+**Rationale:**
+
+1. **Too small ψ:** High variance in path length estimates
+2. **Too large ψ:** Expensive computation, no benefit
+3. **ψ = 256:** Balances efficiency and accuracy
+
+Empirically verified across many datasets!
+
+**Computational Complexity:**
+
+**Training:**
+- Build T trees: O(T · ψ · log ψ)
+- Typical: T = 100, ψ = 256 → O(1.8 × 10⁵) operations
+
+**Prediction:**
+- Score n points: O(n · T · log ψ)
+- Linear in n, logarithmic in ψ
+
+**Space:**
+- T trees with ψ points: O(T · ψ)
+- Typical: ~25MB for standard settings
+
+**Comparison with Other Methods:**
+
+| Method | Training | Prediction | Space |
+|--------|----------|------------|-------|
+| IF | O(Tψ log ψ) | O(nT log ψ) | O(Tψ) |
+| LOF | O(n² log n) | O(kn log n) | O(n²) |
+| OC-SVM | O(n²d) | O(n_sv d) | O(n_sv d) |
+
+IF much faster for large n!
+
+**Advantages of Isolation Forest:**
+
+1. **Linear time complexity** in n
+2. **Works well in high dimensions** (no distance computation)
+3. **No distance metric required**
+4. **Interpretable** (path length has intuitive meaning)
+5. **Few hyperparameters** (T, ψ, contamination)
+
+**Limitations:**
+
+1. **Assumes anomalies are isolated** (fails for clustered anomalies)
+2. **Random splits** (may miss axis-aligned structures)
+3. **No probabilistic interpretation** (unlike density-based methods)
+
+**Extended Isolation Forest (EIF - Hariri et al., 2019):**
+
+**Improvement:** Use random hyperplanes instead of axis-aligned splits
+
+Split: n^T x < c
+
+where n ~ Uniform(S^{d-1}) (random unit vector)
+
+**Advantage:** Can isolate anomalies in any direction, not just axis-aligned
+
+**Theorem 14 (EIF Consistency):**
+
+Extended IF with random hyperplanes converges to true anomaly density:
+
+s_EIF(x) → f_anomaly(x) as T → ∞
+
+for any anomaly distribution concentrated on lower-dimensional manifolds.
+
+**Robustness to Contamination:**
+
+**Theorem 15 (IF Breakdown Point):**
+
+Isolation Forest has breakdown point:
+
+ε*(IF) ≥ 1/2
+
+Meaning: Can tolerate up to 50% contamination before failure!
+
+**Proof Sketch:**
+
+Even with 50% anomalies, normal points still have longer average path length than anomalies (by concentration). Beyond 50%, definition of "anomaly" becomes ambiguous. ∎
 
 ```python
 class SimpleIsolationTree:
