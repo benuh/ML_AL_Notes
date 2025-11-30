@@ -14,6 +14,111 @@ Scale ML training to multiple GPUs, nodes, and clusters for massive models and d
 
 ## Why Distributed Training
 
+### Theoretical Foundations
+
+#### Communication Complexity in Distributed Training
+
+**Definition (Distributed Training Setup):**
+- P workers (GPUs/nodes)
+- Model with d parameters θ ∈ ℝ^d
+- Mini-batch size B per worker
+- Effective batch size: B_eff = P · B
+
+**Theorem 1 (Communication vs Computation Trade-off - Dean et al., 2012):**
+For synchronous SGD with P workers:
+
+T_iter = T_comp + T_comm
+
+where:
+- T_comp = O(B·d·C) - computation time (C = FLOPs per sample)
+- T_comm = O(d/BW) - communication time (BW = bandwidth)
+
+**Optimal Workers:** P* satisfies:
+
+P* ≈ (B·C·BW) / d
+
+**Beyond P*:** Communication dominates, diminishing returns.
+
+**Example:** For ResNet-50 (d=25M), B=32, C=4GFLOPs, BW=100Gbps:
+P* ≈ (32·4·10^9·10^11) / (25·10^6) ≈ 512 workers
+
+**Theorem 2 (Scaling Efficiency - Horovod, 2018):**
+Define scaling efficiency as:
+
+η(P) = T_1 / (P·T_P)
+
+where T_P is time with P workers.
+
+**Linear scaling:** η(P) = 1 (ideal)
+**Sub-linear scaling:** η(P) < 1 (typical due to communication)
+
+**Amdahl's Law Bound:**
+If α fraction of training is parallelizable:
+
+Speedup(P) ≤ 1 / ((1-α) + α/P)
+
+**Practical Communication Overhead:**
+η(P) ≈ 1 / (1 + d/(B·C·BW·P))
+
+**Key Insight:** Efficiency decreases as:
+1. Model size d increases (more to communicate)
+2. Batch size B decreases (less computation per communication)
+3. Bandwidth BW decreases (slower communication)
+
+#### Data Parallelism Theory
+
+**Theorem 3 (Convergence of Synchronous SGD - Chen et al., 2016):**
+For L-smooth, μ-strongly convex objectives with P workers:
+
+E[f(θ_T)] - f* ≤ (1 - μη)^T [f(θ_0) - f*] + (L·σ²·η) / (2·P·B·μ)
+
+where:
+- η: learning rate
+- σ²: gradient variance
+- T: iterations
+
+**Key Properties:**
+1. **Convergence rate:** Same as single worker (synchronous = no degradation)
+2. **Variance reduction:** 1/(P·B) - larger effective batch reduces variance
+3. **Trade-off:** Large P·B may hurt generalization (large batch effect)
+
+**Theorem 4 (Linear Scaling Rule - Goyal et al., 2017):**
+When scaling batch size from B to P·B, scale learning rate:
+
+η_new = P · η_old
+
+maintains convergence speed.
+
+**Proof Sketch:**
+Gradient update: θ_{t+1} = θ_t - η·∇L_B(θ_t)
+
+With P·B batch size, gradient variance reduces by P:
+Var[∇L_{PB}] = Var[∇L_B] / P
+
+To maintain step size in parameter space:
+η_new = P · η_old
+
+compensates for reduced variance. ∎
+
+**Limitations:**
+- Works for η_old·P < η_max (maximum stable learning rate)
+- May require warmup for large P
+- Generalizes less well with very large P·B (>8K-32K)
+
+**Theorem 5 (Communication Complexity per Iteration):**
+
+| Operation | Complexity | Description |
+|-----------|------------|-------------|
+| **AllReduce** | O(d·log P) | Sum gradients across workers |
+| **Broadcast** | O(d·log P) | Send parameters to all workers |
+| **Reduce** | O(d) | Collect to single worker |
+| **AllGather** | O(d·P) | Gather from all workers |
+
+**Ring AllReduce (bandwidth-optimal):**
+- Latency: O(d/BW)
+- Independent of P for large d!
+- Used by Horovod, PyTorch DDP
+
 ### When You Need Distributed Training
 
 **Use distributed training when:**
@@ -197,6 +302,96 @@ torchrun --nproc_per_node=4 \
 ```
 
 ---
+
+### Gradient Compression Theory
+
+**Theorem 6 (Gradient Compression - Alistarh et al., 2017):**
+Compress gradients g ∈ ℝ^d to C(g) ∈ ℝ^k where k << d before communication.
+
+**Compression Methods:**
+
+1. **Top-K Sparsification:**
+   C_top-k(g) = keep largest k entries, zero rest
+   - Compression ratio: d/k
+   - Error: ||g - C(g)||² ≤ ||g||² · (1 - k/d)
+
+2. **Random-K Sparsification:**
+   C_rand-k(g) = sample k entries uniformly, rescale
+   - Unbiased: E[C(g)] = g
+   - Variance: Var[C(g)] = ||g||² · (d/k - 1)
+
+3. **Quantization (k-bit):**
+   C_quant(g) = quantize each entry to k bits
+   - Compression ratio: 32/k (from FP32)
+   - Error: ||g - C(g)||² = O(d/2^k · ||g||²)
+
+**Theorem 7 (Convergence with Compression - Karimireddy et al., 2019):**
+For unbiased compression with compression error ω:
+
+E[f(θ_T)] - f* ≤ (1 - μη)^T [f(θ_0) - f*] + (L·σ²·η·ω) / (2·P·B·μ)
+
+**Key Insight:** Convergence rate O((1-μη)^T) unchanged, but variance term multiplied by ω!
+
+**Practical Compression Ratios:**
+- Top-1%: ω ≈ 100, 100× communication reduction
+- 8-bit quantization: ω ≈ 4, 4× communication reduction
+- 1-bit (sign): ω ≈ 1000, 1000× reduction but requires error compensation
+
+**Theorem 8 (Error Feedback for Compressed Gradients - Stich et al., 2018):**
+Maintain error accumulation e_t to compensate for compression:
+
+g_t^comp = C(g_t + e_t)
+e_{t+1} = e_t + g_t - g_t^comp
+
+**Convergence:** Recovers same rate as uncompressed SGD!
+
+**Algorithm (Compressed SGD with Error Feedback):**
+```
+Initialize: θ_0, e_0 = 0
+For t = 0, 1, 2, ...:
+  g_t = ∇L(θ_t)                    # Compute gradient
+  g_t^{corrected} = g_t + e_t       # Add accumulated error
+  g_t^{comp} = C(g_t^{corrected})   # Compress
+  e_{t+1} = g_t^{corrected} - g_t^{comp}  # Update error
+  θ_{t+1} = θ_t - η·g_t^{comp}      # Update parameters
+```
+
+#### Asynchronous SGD Theory
+
+**Theorem 9 (Asynchronous SGD Convergence - Recht et al., 2011):**
+With P workers updating parameters asynchronously with staleness τ (delay):
+
+E[f(θ_T)] - f* ≤ (1 - μη/2)^T [f(θ_0) - f*] + O(L·σ²·η·τ² / μ)
+
+**Key Property:** Staleness τ degrades convergence by τ² factor!
+
+**Hogwild! Theorem (Lock-Free Async SGD):**
+If gradient sparsity s << d, P workers can update without locks:
+
+Speedup ≈ P   (near-linear!)
+
+**Condition:** s·P·τ << d (sparse gradients, low contention)
+
+**Theorem 10 (Optimal Staleness Bound):**
+For convergence to ε-optimal solution:
+
+τ_max = O(√(μ/(L·η)))
+
+**Example:** For η = 0.01, L/μ = 100:
+τ_max ≈ √(1/(100·0.01)) = √1 = 1
+
+**Practical Implication:** Asynchronous SGD requires frequent parameter synchronization (τ ≤ 1-5).
+
+**Theorem 11 (Synchronous vs Asynchronous Comparison):**
+
+| Aspect | Synchronous | Asynchronous |
+|--------|-------------|--------------|
+| **Convergence** | Guaranteed (same as single worker) | Degraded by τ² |
+| **Speedup** | ≤ P/(1 + overhead) | ≈ P (with low τ) |
+| **Staleness** | τ = 0 (wait for all) | τ > 0 (don't wait) |
+| **Stragglers** | Blocks on slowest | Tolerates stragglers |
+| **Complexity** | Simple | Requires careful tuning |
+| **Best for** | Homogeneous cluster | Heterogeneous cluster |
 
 ### Gradient Accumulation
 
