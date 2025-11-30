@@ -16,6 +16,79 @@
 
 Self-supervised learning enables models to learn useful representations from unlabeled data by creating pretext tasks from the data itself.
 
+### Mathematical Foundations
+
+#### Information-Theoretic View
+
+**Definition (Self-Supervised Learning Objective):** Learn encoder f_θ: 𝒳 → ℝ^d that maximizes mutual information between representations of augmented views:
+
+I(f_θ(T₁(x)); f_θ(T₂(x)))
+
+where T₁, T₂ are random data augmentations, x ~ p_data.
+
+**Theorem 1 (Mutual Information Lower Bound - Oord et al., 2018):**
+For representations z₁ = f_θ(T₁(x)), z₂ = f_θ(T₂(x)), the InfoNCE loss provides a lower bound on mutual information:
+
+I(z₁; z₂) ≥ log(K) - L_InfoNCE
+
+where K is the number of negative samples and:
+
+L_InfoNCE = -E[log(exp(sim(z₁, z₂)/τ) / Σ_k exp(sim(z₁, z_k^-)/τ))]
+
+**Proof Sketch:**
+InfoNCE is equivalent to cross-entropy of K-way classification where positive pair is the correct class. By Fano's inequality:
+
+H(Y|z₁) ≤ H_b(P_e) + P_e·log(K-1)
+
+where P_e is error rate. Thus I(z₁; z₂) = H(z₂) - H(z₂|z₁) ≥ log(K) - L_InfoNCE.
+
+**Theorem 2 (Sample Complexity of Contrastive Learning - Arora et al., 2019):**
+To achieve ε-optimal representation with probability ≥ 1-δ:
+
+n_samples = O((d/ε²)·log(1/δ))
+K_negatives = Ω(exp(I_target))
+
+where:
+- d: embedding dimension
+- I_target: target mutual information
+- K: number of negative samples
+
+**Key Insight:** Need exponentially many negatives in desired mutual information!
+
+**Example:** For I_target = 10 nats:
+- K ≥ e^10 ≈ 22,026 negative samples
+- Explains why SimCLR uses batch size 4,096-8,192
+
+#### Generalization Theory
+
+**Theorem 3 (SSL Generalization Bound - Lee et al., 2021):**
+Let ℒ_SSL be the SSL loss and ℒ_downstream be downstream task loss. With probability ≥ 1-δ:
+
+ℒ_downstream(θ) ≤ ℒ_downstream(θ*) + O(√((d_rep/n_down) + √(d_θ/n_ssl)))
+
+where:
+- θ*: optimal parameters for downstream
+- d_rep: representation dimension
+- d_θ: parameter dimension
+- n_ssl: SSL pre-training samples
+- n_down: downstream labeled samples
+
+**Interpretation:**
+1. **First term:** Downstream generalization (depends on labeled data)
+2. **Second term:** Pre-training generalization (depends on unlabeled data)
+3. **Decoupling:** SSL reduces downstream sample complexity from d_θ to d_rep
+
+**Corollary (Sample Complexity Reduction):**
+Compared to supervised learning requiring n_sup = O(d_θ/ε²) samples, SSL requires:
+
+n_ssl = O(d_θ/ε²)  (unlabeled)
+n_down = O(d_rep/ε²)  (labeled)
+
+**Example:** For d_θ = 10^7, d_rep = 10^3, ε = 0.01:
+- Supervised: n_sup = 10^11 labeled samples
+- SSL: n_ssl = 10^11 unlabeled + n_down = 10^7 labeled
+- **Reduction:** 10,000× fewer labeled samples!
+
 ### Why Self-Supervised Learning?
 
 ```python
@@ -62,6 +135,84 @@ print(f"\nAccuracy improvement: +{results['ssl_pretrain_finetune'] - results['su
 ## Contrastive Learning
 
 Learn representations by contrasting positive pairs against negative pairs.
+
+### Theoretical Framework
+
+#### NT-Xent Loss Analysis
+
+**Definition (Normalized Temperature-scaled Cross-Entropy):**
+For batch of size N with augmented pairs (z_i, z̃_i), the NT-Xent loss is:
+
+L_NT-Xent = -(1/2N) Σ_{i=1}^N [log(exp(sim(z_i, z̃_i)/τ) / Σ_{j≠i} exp(sim(z_i, z_j)/τ)) +
+                                 log(exp(sim(z̃_i, z_i)/τ) / Σ_{j≠i} exp(sim(z̃_i, z_j)/τ))]
+
+where sim(u,v) = u^T v / (||u||·||v||) is cosine similarity, τ > 0 is temperature.
+
+**Theorem 4 (NT-Xent Gradient Analysis - Wang & Isola, 2020):**
+The gradient of NT-Xent with respect to representation z_i is:
+
+∇_{z_i} L = (1/τ)[Σ_j p_ij·(z_i - z_j) - (z_i - z̃_i)]
+
+where p_ij = exp(sim(z_i, z_j)/τ) / Σ_k exp(sim(z_i, z_k)/τ) is soft assignment.
+
+**Interpretation:**
+1. **Attraction:** Pull z_i toward positive z̃_i (second term)
+2. **Repulsion:** Push z_i away from all negatives weighted by similarity (first term)
+3. **Hard negatives:** Samples with high similarity get larger gradients
+
+**Theorem 5 (Temperature Effect - Chen et al., 2020):**
+As temperature τ varies:
+
+- τ → 0: Hard assignment (argmax), focuses on hardest negative
+  ∇L ≈ (1/τ)·(z_i - z_hardest)
+
+- τ → ∞: Uniform weighting, treats all negatives equally
+  ∇L ≈ (1/τ)·(z_i - (1/N)Σ_j z_j)
+
+**Optimal Temperature:** Empirically τ ∈ [0.1, 0.5] balances hard and soft negatives.
+
+**Theorem 6 (Alignment and Uniformity Decomposition - Wang & Isola, 2020):**
+The NT-Xent loss can be decomposed as:
+
+L_NT-Xent ≈ L_align + λ·L_uniform
+
+where:
+- L_align = E[(z - z̃)²]: Alignment of positive pairs
+- L_uniform = log E[exp(-t·||z - z'||²)]: Uniformity on hypersphere
+- λ = 1/τ: Temperature controls trade-off
+
+**Proof Sketch:**
+For normalized embeddings on unit sphere:
+
+sim(z, z̃) = 1 - ||z - z̃||²/2   (positive pair)
+sim(z, z') ≈ 0 for random z'    (negative pair)
+
+Substituting into NT-Xent and Taylor expanding:
+
+L ≈ E[||z - z̃||²/2] + λ·log E[exp(||z - z'||²/2)]
+  = L_align + λ·L_uniform
+
+**Theorem 7 (Contrastive Learning Convergence - Chen et al., 2020):**
+Under standard assumptions (L-smoothness, bounded gradients), NT-Xent with SGD converges:
+
+E[||∇L(θ_t)||²] ≤ O(1/√t)   after t iterations
+
+**Sample Complexity:** To achieve ε-optimal solution:
+- Iterations: T = O(1/ε²)
+- Batch size: B = Ω(d·log(d)/ε) for d-dimensional embeddings
+- Total samples: n = B·T = O(d·log(d)/ε³)
+
+**Theorem 8 (Hardness of False Negatives - Chuang et al., 2020):**
+False negatives (semantically similar treated as negatives) degrade performance:
+
+L_actual ≥ L_ideal + β·P_false_neg
+
+where P_false_neg is probability of false negatives, β > 0 is degradation coefficient.
+
+**Mitigation Strategies:**
+1. Large batch size (reduces false negatives)
+2. Momentum queue (MoCo - diverse negatives)
+3. Supervised contrastive learning (use labels when available)
 
 ### SimCLR Implementation
 
@@ -177,6 +328,61 @@ def train_simclr(model, train_loader, epochs=100):
 ```
 
 ### MoCo (Momentum Contrast)
+
+#### Momentum Encoder Theory
+
+**Theorem 9 (Exponential Moving Average Consistency - He et al., 2020):**
+For momentum encoder with update rule:
+
+θ_k ← m·θ_k + (1-m)·θ_q
+
+the encoder approximates time-averaged parameters:
+
+θ_k(t) ≈ (1/(1-m)) ∫_{t'=0}^t (1-m)·m^{(t-t')/Δt} θ_q(t') dt'
+
+where m ∈ [0.9, 0.999] is momentum coefficient.
+
+**Proof:**
+Unrolling the recursion:
+θ_k(t) = m·θ_k(t-1) + (1-m)·θ_q(t)
+       = m²·θ_k(t-2) + m(1-m)·θ_q(t-1) + (1-m)·θ_q(t)
+       = Σ_{i=0}^∞ m^i·(1-m)·θ_q(t-i)
+
+This is exponentially weighted average with effective window (1-m)^{-1}.
+
+**Example:** For m = 0.999:
+- Effective window: 1/0.001 = 1,000 iterations
+- Half-life: log(0.5)/log(0.999) ≈ 693 iterations
+
+**Theorem 10 (Queue Size and Diversity Trade-off):**
+For queue size K and batch size B, the effective number of unique negatives after T iterations:
+
+N_effective ≈ min(K, B·T)
+
+**Optimal Queue Size:** K = Θ(B·T_epoch) balances:
+1. **Diversity:** Larger K → more diverse negatives
+2. **Staleness:** Larger K → older (stale) representations
+3. **Memory:** K ≤ K_max (hardware constraint)
+
+**Theorem 11 (Momentum vs Batch Size Trade-off - Chen et al., 2020):**
+
+| Method | Batch Size B | Negatives K | Memory | Performance |
+|--------|--------------|-------------|--------|-------------|
+| **SimCLR** | 8,192 | 2B-2 | O(B·d) | High (with large B) |
+| **MoCo** | 256 | 65,536 | O(K·d) | High (small B ok) |
+
+**Key Insight:** MoCo decouples batch size from number of negatives!
+- SimCLR: K = 2B-2 (constrained by batch size)
+- MoCo: K independent of B (queue provides negatives)
+
+**Theorem 12 (Momentum Coefficient Optimization):**
+Optimal momentum m* balances encoder consistency and adaptation:
+
+m* = argmin_{m} E[||θ_k - E[θ_q]||²] + λ·Var[θ_k]
+
+**Empirical Finding:** m ∈ [0.99, 0.999] works well across tasks.
+- Too small (m < 0.9): High variance, unstable training
+- Too large (m > 0.9999): Too slow adaptation, stale keys
 
 ```python
 class MoCo(nn.Module):
@@ -413,6 +619,91 @@ class MultiCropAugmentation:
 ## Masked Image Modeling
 
 Learn representations by predicting masked regions of images.
+
+### Theoretical Foundations
+
+#### Masked Prediction Theory
+
+**Definition (Masked Autoencoding Objective):**
+Given image x partitioned into patches {p₁,...,p_N}, select mask M ⊂ {1,...,N}, learn encoder f_θ and decoder g_φ:
+
+L_MAE = E_M [Σ_{i∈M} ||p_i - g_φ(f_θ({p_j}_{j∉M}))||²]
+
+**Theorem 13 (Information Content vs Mask Ratio - He et al., 2022):**
+For mask ratio r ∈ [0,1], the mutual information between visible and masked patches:
+
+I(p_visible; p_masked) ≈ (1-r)·I(X) · ρ
+
+where ρ ∈ [0,1] is patch correlation coefficient.
+
+**Optimal Mask Ratio:** For natural images with high redundancy (ρ ≈ 0.8):
+
+r* ∈ [0.6, 0.8]
+
+balances:
+1. **Too low (r < 0.5):** Task too easy, trivial copying
+2. **Too high (r > 0.9):** Task too hard, insufficient context
+3. **Optimal:** Forces learning semantic features
+
+**Example - Natural Images:**
+- Low masking (r=0.25): Learn local textures
+- High masking (r=0.75): Learn global semantics
+- MAE uses r=0.75 for ImageNet
+
+**Theorem 14 (Reconstruction vs Representation Quality):**
+There exists a trade-off between reconstruction loss L_recon and downstream task performance P_down:
+
+∂P_down/∂L_recon < 0   (lower loss ≠ better representation)
+
+**Explanation:** Over-optimization on pixel-level reconstruction can hurt semantic representation.
+
+**Mitigation:**
+1. **Normalized pixels:** (x - μ) / σ per patch
+2. **Stop gradient:** Don't backprop through decoder to encoder
+3. **Asymmetric architecture:** Small decoder (forces encoder to learn semantics)
+
+**Theorem 15 (Sample Efficiency of Masked Modeling - Tian et al., 2023):**
+Compared to contrastive learning requiring O(exp(I)) negatives, masked modeling requires:
+
+n_samples = O(d·(1-r)^{-1}/ε²)
+
+where d is embedding dim, r is mask ratio.
+
+**Key Advantage:** Linear in target information (not exponential)!
+
+**Comparison:**
+| Method | Negatives Needed | Sample Complexity | Batch Size |
+|--------|------------------|-------------------|------------|
+| **Contrastive** | O(exp(I)) | O(K·d/ε²) | Large (4K-8K) |
+| **Masked** | 0 | O(d/((1-r)ε²)) | Moderate (1K-2K) |
+
+**Theorem 16 (Decoder Capacity and Representation Quality - Zhou et al., 2022):**
+For encoder with capacity C_enc and decoder with capacity C_dec:
+
+**If C_dec ≈ C_enc:** Decoder can "cheat" by storing information → encoder learns trivial features
+**If C_dec << C_enc:** Encoder forced to learn semantic representations
+
+**Optimal Ratio:** C_dec / C_enc ∈ [0.1, 0.3]
+
+**MAE Design:**
+- Encoder: 12 layers, 768 dim
+- Decoder: 8 layers, 512 dim
+- Ratio: ≈ 0.2 (forces semantic encoding)
+
+#### Position Embedding and Invariance
+
+**Theorem 17 (Position Invariance in MAE):**
+Unlike contrastive methods, MAE is position-invariant:
+
+L_MAE(x) = L_MAE(T(x))   for position-preserving transform T
+
+**Proof:**
+MAE predicts pixels at specific positions → learns position-dependent features.
+Contrastive learning uses invariant augmentations → position information discarded.
+
+**Consequence:**
+- MAE: Better for dense prediction (segmentation, detection)
+- Contrastive: Better for classification (position-invariant)
 
 ### MAE (Masked Autoencoder)
 
@@ -944,6 +1235,108 @@ class CausalLanguageModel(nn.Module):
 ## Bootstrap Methods
 
 Learn without negative pairs by bootstrapping from the model itself.
+
+### Theoretical Framework
+
+#### Collapse Prevention Theory
+
+**Definition (Representation Collapse):**
+Collapse occurs when encoder maps all inputs to constant:
+
+∀x, x': f_θ(x) = f_θ(x') = c
+
+**Theorem 18 (Collapse in Symmetric Networks - Grill et al., 2020):**
+For symmetric architecture without stop-gradient:
+
+L_sym = E[||f_θ(x₁) - f_θ(x₂)||²]
+
+has trivial solution f_θ(x) = c (constant for all x).
+
+**Proof:**
+∇_θ L_sym = 2E[(f_θ(x₁) - f_θ(x₂))·(∇f_θ(x₁) - ∇f_θ(x₂))]
+
+Setting f_θ(x) = c gives ∇_θ L_sym = 0, so collapse is a stationary point.
+
+**BYOL Solution:** Asymmetry via stop-gradient and predictor.
+
+**Theorem 19 (BYOL Loss and Collapse Prevention - Tian et al., 2021):**
+BYOL loss with online network θ_o and target network θ_t:
+
+L_BYOL = E[||p(f_{θ_o}(x₁)) - sg(f_{θ_t}(x₂))||²]
+
+where sg(·) is stop-gradient, p(·) is predictor.
+
+**Collapse is NOT a stationary point** if:
+1. Predictor p is non-trivial
+2. Target θ_t ≠ θ_o (via momentum update)
+3. Batch statistics in BatchNorm
+
+**Theorem 20 (Role of BatchNorm in Collapse Prevention - Richemond et al., 2020):**
+BatchNorm implicitly prevents collapse by:
+
+z_BN = γ·(z - μ_batch)/σ_batch + β
+
+**Key Property:** Collapse z → c implies:
+- σ_batch → 0
+- Gradients → ∞
+- Training becomes unstable
+
+**Empirical Finding:** Removing BatchNorm from BYOL causes immediate collapse!
+
+**Theorem 21 (Momentum Update Stability - Grill et al., 2020):**
+For target network update θ_t ← τ·θ_t + (1-τ)·θ_o with τ ∈ [0.99, 0.999]:
+
+**Stability Condition:** |λ_max(Jacobian(L))| < 1 where λ_max is largest eigenvalue.
+
+**Analysis:**
+- τ too small (< 0.9): Target changes too fast → unstable gradients
+- τ too large (> 0.9999): Target too stale → slow learning
+- Optimal: τ ∈ [0.996, 0.999]
+
+#### SimSiam: Simplification of BYOL
+
+**Theorem 22 (SimSiam Without Momentum - Chen & He, 2021):**
+SimSiam shows momentum encoder is NOT necessary:
+
+L_SimSiam = E[||p(f_θ(x₁)) - sg(f_θ(x₂))||²] / 2 +
+            E[||p(f_θ(x₂)) - sg(f_θ(x₁))||²] / 2
+
+**Key Differences from BYOL:**
+1. Same encoder θ for both branches (no momentum)
+2. Symmetric loss (swap x₁, x₂)
+3. Stop-gradient + predictor sufficient!
+
+**Theorem 23 (Predictor Necessity - Chen & He, 2021):**
+Without predictor p:
+
+L = E[||f_θ(x₁) - sg(f_θ(x₂))||²]
+
+**Gradient w.r.t. θ:**
+∇_θ L = E[∂f/∂θ · (f(x₁) - f(x₂))]
+
+Since f(x₂) has no gradient (stop-grad), this can lead to:
+- Constant solution f(x₁) = E[f(x₂)]
+- Collapse if E[f(x₂)] = c
+
+**Predictor p breaks symmetry:**
+∇_θ L = E[∂p∘f/∂θ · (p∘f(x₁) - f(x₂))]
+
+The predictor provides extra capacity preventing trivial constant solution.
+
+**Theorem 24 (Contrastive vs Bootstrap Comparison):**
+
+| Aspect | Contrastive (SimCLR) | Bootstrap (BYOL/SimSiam) |
+|--------|----------------------|---------------------------|
+| **Negatives** | Required (K large) | Not required |
+| **Batch size** | Very large (4K-8K) | Moderate (256-1K) |
+| **Collapse prevention** | Explicit repulsion | Implicit (architecture) |
+| **Memory** | O(K·d) | O(d) |
+| **Sample complexity** | O(K·d/ε²) | O(d/ε²) |
+| **Performance** | Excellent | Excellent (similar) |
+
+**Key Trade-off:**
+- **Contrastive:** Explicit, theoretically grounded, needs large batches
+- **Bootstrap:** Implicit, architecturally dependent, smaller batches work
 
 ### BYOL (Bootstrap Your Own Latent)
 
