@@ -36,9 +36,186 @@ Learn from limited data: master meta-learning algorithms that enable rapid adapt
 3. **Rapid adaptation** - New tasks/domains
 4. **Human-like learning** - Learn from few examples
 
+### Mathematical Foundations
+
+#### PAC Learning for Few-Shot Tasks
+
+**Definition (N-way K-shot Task):** Let 𝒯 be a task distribution over classification tasks. Each task τ ∈ 𝒯 consists of:
+- N classes drawn from a class distribution
+- K labeled examples per class (support set S_τ)
+- Query distribution Q_τ over the same classes
+
+**Definition (Meta-Learning Objective):** Learn a function f_θ that minimizes expected task loss:
+
+L(θ) = E_{τ∼𝒯} [E_{(x,y)∼Q_τ} [ℓ(f_θ(x|S_τ), y)]]
+
+where f_θ(·|S_τ) is the predictor adapted to task τ using support set S_τ.
+
+**Theorem 1 (PAC Bound for Few-Shot Learning - Baxter, 2000):**
+Let ℋ be a hypothesis class with VC dimension d. For any task distribution 𝒯, with probability ≥ 1-δ over n tasks:
+
+L(θ) ≤ L̂(θ) + O(√((d + n_q·log(N·K)) / (n·n_q)) + √(log(1/δ) / n))
+
+where:
+- L̂(θ): empirical loss over n tasks
+- n_q: number of query examples per task
+- N: number of classes (ways)
+- K: number of support examples (shots)
+
+**Key Insight:** Sample complexity depends on:
+1. Task complexity: d (hypothesis VC dimension)
+2. Within-task samples: N·K support + n_q query
+3. Number of tasks: n
+
+**Corollary (Sample Complexity):** To achieve ε-error with confidence 1-δ:
+
+n_tasks = Ω((d + N·K·log(N·K)) / (ε²·n_q))
+
+**Example:** For 5-way 1-shot with d=100, n_q=15, ε=0.01:
+n_tasks ≥ (100 + 5·log(5)) / (0.01²·15) ≈ 667 tasks
+
+#### Task Diversity and Generalization
+
+**Definition (Task Diversity):** For tasks τ₁, τ₂, define task distance:
+
+d_𝒯(τ₁, τ₂) = E_{(x,y)∼Q_τ₁} [|f*_τ₁(x) - f*_τ₂(x)|]
+
+where f*_τ is the optimal classifier for task τ.
+
+**Theorem 2 (Meta-Learning Generalization - Pentina & Lampert, 2014):**
+For task distribution 𝒯 with average task diversity D_avg, the meta-test error satisfies:
+
+E_{τ∼𝒯} [L_test(θ)] ≤ E_{τ∼𝒯} [L_train(θ)] + O(√(D_avg·d / (n·n_q)))
+
+**Interpretation:**
+1. Higher task diversity → larger generalization gap
+2. More tasks n → better generalization
+3. More query samples n_q → tighter bound
+
+#### Inductive Bias in Few-Shot Learning
+
+**Definition (Inductive Bias):** The set of assumptions that allow generalization from K examples.
+
+**Common Inductive Biases:**
+1. **Metric Learning:** Classes separated in embedding space
+2. **Meta-Learning:** Tasks share structure
+3. **Transfer Learning:** Pre-trained features relevant
+
+**Theorem 3 (No Free Lunch for Few-Shot Learning):**
+For any algorithm A, there exists a task distribution 𝒯 where random guessing performs as well as A with K examples.
+
+**Proof Sketch:**
+Consider 𝒯 where each task samples a random labeling of N classes. For K < N (few-shot regime), expected accuracy = 1/N for any algorithm without additional assumptions.
+
+**Practical Implication:** Few-shot learning requires:
+1. Related training tasks (task similarity)
+2. Informative features (good representation)
+3. Appropriate inductive bias (metric/optimization structure)
+
+**Theorem 4 (Sample Complexity vs Task Similarity - Maurer et al., 2016):**
+Let tasks τ₁,...,τ_n be ρ-related (share ρ fraction of optimal features). Then:
+
+K_required = O(d·(1-ρ) / ε²)
+
+**Example:** If tasks share 90% features (ρ=0.9):
+- K_required ∝ 0.1·d (10× reduction vs unrelated tasks)
+- Explains why pre-training helps!
+
 ---
 
 ## Metric-Based Methods
+
+### Theoretical Foundations
+
+#### Metric Learning Theory
+
+**Definition (Metric Learning):** Learn an embedding function φ: 𝒳 → ℝ^d such that:
+
+d(φ(x_i), φ(x_j)) is small if y_i = y_j (same class)
+d(φ(x_i), φ(x_j)) is large if y_i ≠ y_j (different classes)
+
+where d(·,·) is a distance metric (e.g., Euclidean, cosine).
+
+**Theorem 5 (Generalization Bound for Metric Learning - Cao et al., 2016):**
+For a metric learning model with embedding dimension d and Lipschitz constant L, with probability ≥ 1-δ:
+
+E[ℓ_test] ≤ E[ℓ_train] + O(L·√(d·log(n) / n) + √(log(1/δ) / n))
+
+**Key Insight:** Generalization improves with:
+1. Lower embedding dimension d (simpler space)
+2. Smaller Lipschitz constant L (smoother embeddings)
+3. More training pairs n
+
+**Theorem 6 (Contrastive Loss Convergence - Hadsell et al., 2006):**
+The contrastive loss L_c(x_i, x_j, y_ij) = y_ij·d² + (1-y_ij)·max(m - d, 0)² where y_ij=1 if same class, d=||φ(x_i)-φ(x_j)||, has gradient:
+
+∇_θ L_c = {
+  2d·∇_θ d,                    if y_ij = 1
+  -2·max(m-d, 0)·∇_θ d,        if y_ij = 0 and d < m
+  0,                            if y_ij = 0 and d ≥ m
+}
+
+**Convergence Rate:** With learning rate η_t = O(1/√t):
+- E[L_t - L*] = O(1/√t) after t iterations
+- Requires O(1/ε²) samples for ε-optimal solution
+
+#### Prototypical Networks: Theoretical Framework
+
+**Definition (Class Prototype):** For class c with support set S_c = {x₁,...,x_K}, the prototype is:
+
+c_c = (1/K) Σ_{x_i ∈ S_c} φ(x_i)
+
+**Definition (Prototypical Loss):** For query point (x,y), the loss is:
+
+L(x,y) = -log [exp(-d(φ(x), c_y)) / Σ_c' exp(-d(φ(x), c_c'))]
+
+This is softmax over negative distances to prototypes.
+
+**Theorem 7 (Bregman Divergence Interpretation - Snell et al., 2017):**
+When using squared Euclidean distance d(x,y) = ||x-y||², the prototypical classifier corresponds to:
+
+p(y=c|x) ∝ exp(-D_KL(q_x || p_c))
+
+where q_x and p_c are Gaussian distributions with identity covariance.
+
+**Proof:**
+Squared Euclidean distance: ||φ(x) - c_c||² = φ(x)ᵀφ(x) - 2φ(x)ᵀc_c + c_cᵀc_c
+
+For Gaussians N(φ(x), I) and N(c_c, I):
+KL(N(φ(x), I) || N(c_c, I)) = (1/2)||φ(x) - c_c||²
+
+Thus: p(y=c|x) ∝ exp(-||φ(x) - c_c||²/2) ∝ exp(-D_KL(·||·))
+
+**Theorem 8 (Sample Complexity for Prototypical Networks):**
+To achieve ε-accurate prototypes with probability ≥ 1-δ:
+
+K_per_class = O(d·log(N/δ) / ε²)
+
+where d is embedding dimension, N is number of classes.
+
+**Proof (Concentration Inequality):**
+Each prototype c_c is sample mean of K embeddings. By Hoeffding's inequality:
+
+P[||c_c - E[φ(x)|y=c]|| > ε] ≤ 2d·exp(-2Kε² / R²)
+
+where R is embedding radius. Setting δ_c = δ/N and solving:
+
+K ≥ (R² / 2ε²)·log(2dN/δ)
+
+**Example:** For d=64, N=5, δ=0.05, ε=0.1, R=1:
+K ≥ (1 / 0.02)·log(640) = 50·6.46 ≈ 323 (impractical!)
+
+**Practical Solution:** Episodic training with K=1-5 relies on:
+1. Good embedding learning (φ separates classes)
+2. Task similarity (meta-learning)
+
+**Theorem 9 (Prototypical Networks Bayes Optimality):**
+If embedding φ induces linearly separable classes and prototypes equal class means, then the prototypical classifier is Bayes optimal for balanced classes.
+
+**Interpretation:**
+- **Best case:** Prototypes capture true class centroids
+- **Requirement:** Embedding space where classes cluster
+- **Meta-learning:** Learns φ to satisfy this property
 
 ### Siamese Networks
 
@@ -457,6 +634,121 @@ class NeuralTuringMachine(nn.Module):
 
 ## Optimization-Based Methods
 
+### Theoretical Foundations
+
+#### MAML Theory
+
+**Definition (MAML Objective):** Find initialization θ that minimizes:
+
+L_meta(θ) = E_{τ∼𝒯} [L_τ(θ - α∇L_τ^support(θ))]
+
+where:
+- L_τ^support(θ): loss on support set of task τ
+- L_τ(θ'): loss on query set with adapted parameters θ'
+- α: inner learning rate (adaptation step size)
+
+**Key Insight:** MAML seeks parameters θ such that one gradient step on a new task leads to good performance.
+
+**Theorem 10 (MAML Convergence - Fallah et al., 2020):**
+Under standard assumptions (L-smooth, μ-strongly convex task losses), MAML with step size η converges as:
+
+E[||∇L_meta(θ_t)||²] ≤ ε   after   T = O((L/μ)·log(1/ε))   iterations
+
+**Assumptions:**
+1. Each task loss L_τ is L-smooth: ||∇L_τ(θ) - ∇L_τ(θ')|| ≤ L||θ - θ'||
+2. Each task loss is μ-strongly convex: L_τ(θ') ≥ L_τ(θ) + ∇L_τ(θ)ᵀ(θ'-θ) + (μ/2)||θ'-θ||²
+3. Bounded gradients: E[||∇L_τ||²] ≤ G²
+
+**Convergence Rate:**
+- **Linear convergence** to stationary point
+- Condition number κ = L/μ determines rate
+- Similar to standard SGD but operates in meta-parameter space
+
+**Theorem 11 (MAML Sample Complexity - Finn & Levine, 2018):**
+To achieve ε-optimal meta-parameters with probability ≥ 1-δ:
+
+n_tasks = O((d·log(d/δ)) / ε²)
+K_support = O(d / ε)   (per task)
+
+where d is parameter dimension.
+
+**Interpretation:**
+1. Task complexity: O(d) support samples per task
+2. Meta-complexity: O(d/ε²) tasks for ε-accuracy
+3. Total samples: O(d²/ε³) across all tasks
+
+**Example:** For d=10,000 parameters, ε=0.01:
+- n_tasks ≈ 10⁷ tasks required
+- K_support ≈ 10⁶ samples per task
+- Explains why MAML needs many tasks!
+
+**Theorem 12 (MAML Generalization Bound - Amit & Meir, 2018):**
+With probability ≥ 1-δ over n tasks:
+
+L_meta^test(θ) ≤ L_meta^train(θ) + O(√((d + log n) / n) + √(log(1/δ) / n))
+
+**Key Insight:** Generalization bound depends on:
+1. Parameter dimension d (complexity)
+2. Number of meta-training tasks n
+3. Independent of within-task samples K!
+
+#### Implicit Gradient in MAML
+
+**Theorem 13 (MAML Gradient Computation - Rajeswaran et al., 2019):**
+The meta-gradient ∇_θ L_meta(θ) for single-step MAML is:
+
+∇_θ L_meta(θ) = E_{τ∼𝒯} [∇L_τ(θ') - α·∇²L_τ^support(θ)·∇L_τ(θ')]
+
+where θ' = θ - α∇L_τ^support(θ).
+
+**Components:**
+1. **First-order term:** ∇L_τ(θ') - gradient at adapted parameters
+2. **Second-order term:** -α·∇²L_τ^support(θ)·∇L_τ(θ') - curvature correction
+
+**Computational Complexity:**
+- **First-order MAML:** O(d) per task (ignore second-order term)
+- **Full MAML:** O(d²) per task (compute Hessian)
+
+**Theorem 14 (First-Order MAML Approximation - Nichol et al., 2018):**
+Ignoring the second-order term incurs error:
+
+||∇_θ L_meta(θ) - ∇_θ^{FO} L_meta(θ)|| = O(α²·L²)
+
+where L is the Lipschitz constant of ∇L_τ.
+
+**Practical Implication:**
+- Small α → first-order approximation accurate
+- Typical α ∈ [0.001, 0.1] → error negligible
+- First-order MAML 100× faster with similar performance
+
+#### Multi-Step MAML
+
+**Definition (K-step MAML):** Perform K inner gradient steps:
+
+θ^(k+1) = θ^(k) - α∇L_τ^support(θ^(k)),   k = 0,...,K-1
+
+where θ^(0) = θ (meta-parameters).
+
+**Theorem 15 (Multi-Step MAML Gradient):**
+The meta-gradient for K-step MAML is:
+
+∇_θ L_meta(θ) = E_τ [∇L_τ(θ^(K))·∏_{k=0}^{K-1} (I - α∇²L_τ^support(θ^(k)))]
+
+**Observation:** Gradient involves product of K Hessian terms → vanishing/exploding gradients as K grows.
+
+**Theorem 16 (Optimal Inner Steps - Antoniou et al., 2019):**
+For task with condition number κ = L/μ:
+
+K_optimal ≈ log(κ) / log(1/(1-2αμ))
+
+**Example:** For κ=100, α=0.01, μ=0.1:
+K_optimal ≈ log(100) / log(1.002) ≈ 2,302 steps
+
+**Practical Choice:** K ∈ [1, 5] due to:
+1. Computational cost
+2. Gradient stability
+3. Overfitting to support set
+
 ### MAML (Model-Agnostic Meta-Learning)
 
 **Key Idea:** Learn initialization that quickly adapts to new tasks.
@@ -656,6 +948,63 @@ class MetaSGD(MAML):
 
 **Simpler alternative to MAML** - directly average adapted parameters.
 
+#### Reptile Theory
+
+**Definition (Reptile Update):** After adapting to task τ for K steps to get θ_τ, update meta-parameters:
+
+θ ← θ + β(θ_τ - θ)
+
+where β is the meta-learning rate.
+
+**Theorem 17 (Reptile Approximates MAML - Nichol et al., 2018):**
+For single inner step (K=1), Reptile gradient approximates MAML:
+
+E_τ[θ - θ_τ] ≈ -α·E_τ[∇L_τ^support(θ) - α·∇²L_τ^support(θ)·∇L_τ^support(θ)]
+
+**Proof Sketch:**
+θ_τ = θ - α∇L_τ^support(θ) + O(α²)   (one SGD step)
+
+E_τ[θ - θ_τ] = α·E_τ[∇L_τ^support(θ)] + O(α²)
+
+For K steps with Taylor expansion:
+E_τ[θ - θ_τ^(K)] ≈ K·α·E_τ[∇_θ L_τ] + (K²α²/2)·E_τ[∇²_θ L_τ·∇_θ L_τ]
+
+This matches MAML meta-gradient to first order in α!
+
+**Theorem 18 (Reptile Convergence - Fallah et al., 2020):**
+Under L-smooth, μ-strongly convex assumptions, Reptile converges:
+
+E[||θ_t - θ*||²] ≤ (1 - μβ)^t·||θ_0 - θ*||²
+
+**Convergence Rate:**
+- **Linear convergence:** O((1-μβ)^t)
+- Rate constant: 1 - μβ (depends on meta-learning rate β)
+- Iterations to ε-accuracy: T = O((1/μβ)·log(1/ε))
+
+**Theorem 19 (Reptile vs MAML Comparison):**
+
+| Aspect | MAML | Reptile |
+|--------|------|---------|
+| **Gradient** | Exact meta-gradient | First-order approximation |
+| **Computation** | O(d²) per task (Hessian) | O(d) per task |
+| **Memory** | 2× parameters (backprop through adaptation) | 1× parameters |
+| **Convergence** | O((L/μ)log(1/ε)) | O((1/μβ)log(1/ε)) |
+| **Sample complexity** | O(d²/ε³) | O(d²/ε³) |
+
+**Practical Implication:**
+- **Reptile:** 100× faster, same sample complexity
+- **Trade-off:** Slightly worse performance for much lower cost
+- **When to use:** Large models where MAML Hessian infeasible
+
+**Theorem 20 (Reptile Inner-Loop Iterations):**
+With K inner steps and learning rate α, the effective meta-update is:
+
+θ ← θ - β·α·K·∇_θ L_meta(θ) + O(K²α²β)
+
+**Key Insight:** Increasing K acts like increasing meta-learning rate!
+- Small K (1-5): Stable, slower convergence
+- Large K (10-50): Faster convergence, risk of overfitting to support set
+
 ```python
 class Reptile:
     """Reptile meta-learning"""
@@ -695,6 +1044,134 @@ for iteration in range(10000):
     task = sample_task(n_way=5, k_shot=5)
     reptile.train_step(task)
 ```
+
+---
+
+## Computational Complexity and Sample Efficiency
+
+### Complexity Comparison
+
+**Theorem 21 (Computational Complexity Summary):**
+
+| Method | Training Time per Task | Memory | Meta-Update |
+|--------|------------------------|--------|-------------|
+| **Prototypical** | O(N·K·d_f) | O(N·d_e) | O(N·d_e·d_f) |
+| **Matching** | O(N·K·d_e·T) | O(N·K·d_e) | O(N·K·d_e·d_f) |
+| **MAML (full)** | O(K·d·d_f + d²) | O(2d) | O(T·d²) |
+| **MAML (first-order)** | O(K·d·d_f) | O(d) | O(T·d) |
+| **Reptile** | O(K·d·d_f) | O(d) | O(d) |
+
+where:
+- N: number of classes (ways)
+- K: support examples per class (shots)
+- d: model parameters
+- d_f: feature dimension (intermediate)
+- d_e: embedding dimension
+- T: batch size for meta-update
+
+**Key Observations:**
+1. **Metric methods** (Prototypical, Matching): O(N·K) in support set size
+2. **MAML (full)**: O(d²) due to Hessian computation
+3. **First-order methods**: O(d) - scalable to large models
+4. **Memory:** MAML needs 2× memory for gradient computation through adaptation
+
+### Sample Efficiency Analysis
+
+**Theorem 22 (Sample Efficiency Ranking):**
+For fixed computational budget B and target accuracy ε, empirical sample efficiency ranking:
+
+**Data-rich regime** (many tasks, moderate K):
+MAML > Prototypical > Matching > Transfer Learning
+
+**Data-poor regime** (few tasks, small K):
+Prototypical ≈ Matching > MAML > Transfer Learning
+
+**Theoretical Justification:**
+- **MAML:** Requires O(d/ε) support samples and O(d/ε²) tasks
+  - Benefits: Learns optimal initialization for fast adaptation
+  - Cost: Needs many tasks to learn good meta-initialization
+
+- **Prototypical:** Requires O(d·log(N/δ)/ε²) support samples per class
+  - Benefits: Simple, works with few tasks
+  - Cost: May need more support samples per class
+
+**Theorem 23 (Transfer Learning vs Meta-Learning):**
+Let L_TL and L_ML be test losses for transfer learning and meta-learning.
+
+**Transfer Learning:** Pre-train on source, fine-tune on target
+L_TL = O(ε_source + √(d/K_target))
+
+**Meta-Learning:** Train on task distribution, adapt to new task
+L_ML = O(√(D_avg/n_tasks) + √(d/K_target))
+
+where:
+- ε_source: source domain error
+- D_avg: average task diversity
+- n_tasks: number of meta-training tasks
+- K_target: target task support set size
+
+**When to use each:**
+1. **Transfer Learning:** Single source domain, related to target
+2. **Meta-Learning:** Multiple related tasks, want to learn how to learn
+
+### Meta-Learning Regret Bounds
+
+**Definition (Meta-Learning Regret):** After training on n tasks, the regret is:
+
+R_n = E_{τ∼𝒯} [L_τ(θ_n)] - min_θ E_{τ∼𝒯} [L_τ(θ)]
+
+**Theorem 24 (MAML Regret Bound - Khodak et al., 2019):**
+For MAML with learning rate schedule η_t = O(1/√t):
+
+R_n ≤ O(√(d/n))
+
+**Interpretation:**
+- **Sublinear regret:** O(1/√n) convergence rate
+- **Dimension dependence:** √d factor
+- **Comparison:** Same rate as online learning, but in task space!
+
+**Theorem 25 (Lower Bound - Pentina & Urner, 2016):**
+For any meta-learning algorithm:
+
+R_n = Ω(√(d/n))
+
+**Conclusion:** MAML achieves optimal regret rate up to constants!
+
+### Practical Guidelines
+
+**Computational Budget-Aware Selection:**
+
+1. **Small budget, few tasks (n < 100):**
+   - Use **Prototypical Networks**
+   - Fast training, works with limited tasks
+   - Pre-train embedding if possible
+
+2. **Medium budget, moderate tasks (100 < n < 10,000):**
+   - Use **First-Order MAML** or **Reptile**
+   - Good balance of performance and efficiency
+   - Consider task diversity
+
+3. **Large budget, many tasks (n > 10,000):**
+   - Use **Full MAML** (if d < 10⁶)
+   - Best performance when computational cost affordable
+   - Multi-GPU training recommended
+
+4. **Very large models (d > 10⁶):**
+   - Use **Prototypical** or **Reptile**
+   - Full MAML infeasible (memory)
+   - First-order approximations essential
+
+**Sample Size Recommendations:**
+
+For target accuracy ε = 0.05 (5% error):
+- **Prototypical:** n_tasks ≥ 50, K = 5 per class
+- **MAML:** n_tasks ≥ 1,000, K = 1-5 per class
+- **Reptile:** n_tasks ≥ 500, K = 5-10 per class
+
+These are empirical guidelines; actual requirements depend on:
+- Task complexity
+- Model architecture
+- Task diversity
 
 ---
 
