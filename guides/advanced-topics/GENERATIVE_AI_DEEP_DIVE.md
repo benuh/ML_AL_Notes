@@ -39,6 +39,124 @@ Master the art of generating new data: images, text, audio, and more.
 
 ## Variational Autoencoders
 
+### Mathematical Foundations
+
+#### ELBO Derivation and Theory
+
+**Definition (Generative Model):**
+Want to model data distribution p(x) using latent variable z:
+
+p(x) = ∫ p(x|z) p(z) dz
+
+**Problem:** Intractable for complex p(x|z) (e.g., neural networks).
+
+**Solution:** Variational inference with approximate posterior q(z|x).
+
+**Theorem 1 (Evidence Lower Bound - ELBO):**
+The log evidence decomposes as:
+
+log p(x) = ELBO(q) + KL(q(z|x) || p(z|x))
+
+where:
+
+ELBO(q) = E_{z~q(z|x)} [log p(x|z)] - KL(q(z|x) || p(z))
+
+**Proof:**
+log p(x) = log ∫ p(x,z) dz
+         = log ∫ q(z|x) · (p(x,z)/q(z|x)) dz
+         ≥ ∫ q(z|x) log(p(x,z)/q(z|x)) dz    (Jensen's inequality)
+         = E_q[log p(x,z) - log q(z|x)]
+         = E_q[log p(x|z) + log p(z) - log q(z|x)]
+         = E_q[log p(x|z)] - KL(q(z|x) || p(z))
+         = ELBO(q) ∎
+
+**Equality:** log p(x) = ELBO(q) iff q(z|x) = p(z|x) (true posterior).
+
+**Corollary:** Maximizing ELBO(q) simultaneously:
+1. Maximizes log p(x) (evidence)
+2. Minimizes KL(q(z|x) || p(z|x)) (approximate posterior to true posterior)
+
+**Theorem 2 (ELBO Decomposition for VAE):**
+With Gaussian prior p(z) = 𝒩(0, I) and Gaussian posterior q(z|x) = 𝒩(μ(x), Σ(x)):
+
+ELBO = E_{z~q}[log p(x|z)] - (1/2) Σ_i [μ_i² + σ_i² - log σ_i² - 1]
+
+**Proof:**
+For Gaussians:
+
+KL(𝒩(μ, Σ) || 𝒩(0, I)) = (1/2) [tr(Σ) + μᵀμ - k - log det(Σ)]
+
+With diagonal Σ = diag(σ₁², ..., σ_k²):
+
+KL = (1/2) Σ_i [σ_i² + μ_i² - 1 - log σ_i²] ∎
+
+**Practical VAE Objective:**
+L_VAE = -E[log p(x|z)] + β·KL(q(z|x) || p(z))
+
+where:
+- First term: Reconstruction loss (e.g., BCE, MSE)
+- Second term: Regularization (keeps latent close to prior)
+- β: Weight parameter (β=1 for standard VAE, β>1 for β-VAE)
+
+#### Reparameterization Trick
+
+**Theorem 3 (Reparameterization - Kingma & Welling, 2014):**
+To enable backpropagation through sampling:
+
+z ~ q(z|x) = 𝒩(μ(x), σ²(x))
+
+Reparameterize as:
+
+z = μ(x) + σ(x) ⊙ ε   where ε ~ 𝒩(0, I)
+
+**Gradient:**
+∇_θ E_{z~q} [f(z)] = ∇_θ E_ε [f(μ + σ ⊙ ε)]
+                   = E_ε [∇_θ f(μ + σ ⊙ ε)]
+                   ≈ (1/L) Σ_l ∇_θ f(μ + σ ⊙ ε_l)    (Monte Carlo)
+
+**Key Property:** Gradient flows through μ(x) and σ(x) deterministically!
+
+**Variance:** Much lower than REINFORCE (score function estimator).
+
+#### Posterior Collapse
+
+**Definition (Posterior Collapse):**
+Occurs when q(z|x) = p(z) for all x, meaning:
+
+KL(q(z|x) || p(z)) ≈ 0
+
+**Problem:** Latent code z becomes uninformative, decoder ignores z.
+
+**Theorem 4 (Conditions for Posterior Collapse):**
+Collapse occurs when:
+
+1. **Powerful decoder:** p(x|z) can model data without using z
+2. **Weak encoder:** q(z|x) cannot encode useful information
+3. **High KL penalty:** β too large in β-VAE
+
+**Proof Sketch:**
+If decoder is autoregressive: p(x|z) = Π_t p(x_t|x_{<t}, z)
+
+Can ignore z and use p(x|z) ≈ Π_t p(x_t|x_{<t})
+
+Then ELBO maximized by setting q(z|x) = p(z) (KL=0). ∎
+
+**Solutions:**
+1. **KL Annealing:** Start with β=0, gradually increase
+2. **Free Bits:** Constrain KL ≥ λ per dimension
+3. **Cyclical Annealing:** Periodically reduce β
+4. **Weakening decoder:** Limit decoder capacity
+
+**Theorem 5 (β-VAE Trade-off - Higgins et al., 2017):**
+For β > 1:
+
+- **Pros:** More disentangled latent factors
+- **Cons:** Worse reconstruction quality
+
+**Disentanglement:** Each z_i encodes single factor of variation.
+
+**Optimal β:** Empirically β ∈ [4, 10] for disentanglement.
+
 ### VAE Fundamentals
 
 **Key Idea:** Learn a latent representation z that can generate data x.
@@ -238,6 +356,159 @@ class BetaVAE(VAE):
 ---
 
 ## Generative Adversarial Networks
+
+### Mathematical Foundations
+
+#### Minimax Game Theory
+
+**Definition (GAN Objective - Goodfellow et al., 2014):**
+Generator G and Discriminator D play minimax game:
+
+min_G max_D V(D,G) = E_{x~p_data} [log D(x)] + E_{z~p_z} [log(1 - D(G(z)))]
+
+where:
+- D(x): Probability that x is real (not generated)
+- G(z): Generator mapping noise z to data space
+- p_data: Real data distribution
+- p_z: Noise distribution (usually 𝒩(0, I))
+
+**Theorem 6 (Global Optimum - Goodfellow et al., 2014):**
+For fixed G, optimal discriminator is:
+
+D*_G(x) = p_data(x) / (p_data(x) + p_G(x))
+
+where p_G is distribution induced by G.
+
+**Proof:**
+For any G, maximize:
+
+V(D, G) = ∫_x p_data(x) log D(x) dx + ∫_x p_G(x) log(1 - D(x)) dx
+
+Taking derivative w.r.t. D(x) and setting to 0:
+
+∂V/∂D(x) = p_data(x)/D(x) - p_G(x)/(1-D(x)) = 0
+
+Solving: D(x) = p_data(x) / (p_data(x) + p_G(x)) ∎
+
+**Theorem 7 (Optimal Generator):**
+The global minimum of C(G) = max_D V(D,G) is achieved iff p_G = p_data.
+
+**Value at Optimum:**
+C(G*) = -log 4
+
+**Proof:**
+Substituting D*_G into V:
+
+C(G) = E_x[log(p_data/(p_data + p_G))] + E_x[log(p_G/(p_data + p_G))]
+
+Using KL and JS divergence:
+
+C(G) = -log 4 + 2·JSD(p_data || p_G)
+
+where JSD is Jensen-Shannon divergence.
+
+Since JSD ≥ 0 with equality iff p_data = p_G:
+
+C(G) ≥ -log 4   with equality iff p_G = p_data ∎
+
+**Corollary:** Training GAN minimizes Jensen-Shannon divergence between p_data and p_G.
+
+#### Convergence Theory
+
+**Theorem 8 (Nash Equilibrium):**
+The pair (G*, D*) is Nash equilibrium if:
+
+1. D* = argmax_D V(D, G*)
+2. G* = argmin_G V(D*, G)
+
+**Problem:** Nash equilibria may not exist or be unique in general!
+
+**Theorem 9 (Non-Convergence of Simultaneous Gradient Descent):**
+Simultaneous gradient descent on:
+
+∇_θ_G V(D, G) and ∇_θ_D (-V(D, G))
+
+does NOT guarantee convergence even for convex-concave games.
+
+**Proof (Counterexample):**
+Consider f(x,y) = xy (bilinear game).
+
+Gradient dynamics:
+- x_{t+1} = x_t - η·y_t
+- y_{t+1} = y_t + η·x_t
+
+Eigenvalues of Jacobian: ±iη (purely imaginary)
+→ Orbits spiral, never converge! ∎
+
+**Practical Implications:**
+- GANs often oscillate or fail to converge
+- Mode collapse: G generates limited variety
+- Vanishing gradients: If D too strong, G receives no signal
+
+**Theorem 10 (Mode Collapse):**
+When G collapses to producing single mode x*, discriminator loss:
+
+L_D → log 2   (50% accuracy)
+
+**Condition:** p_G = δ(x - x*) (point mass).
+
+**Proof:**
+D*(x*) = 1/(1 + p_data(x*)/1) → 0.5 (ambiguous)
+All other x: D*(x) → 1 (clearly real)
+
+Average: E[log D(x)] ≈ log 0.5 = log 2 ∎
+
+**Solutions:**
+1. **Unrolled GAN:** Optimize G against future D
+2. **Minibatch discrimination:** Penalize similar outputs
+3. **Feature matching:** Match statistics instead of fooling D
+
+#### Wasserstein GAN Theory
+
+**Definition (Wasserstein Distance / Earth Mover's Distance):**
+For distributions p, q:
+
+W(p, q) = inf_{γ∈Π(p,q)} E_{(x,y)~γ} [||x - y||]
+
+where Π(p,q) is set of joint distributions with marginals p, q.
+
+**Kantorovich-Rubinstein Dual:**
+For 1-Lipschitz function f:
+
+W(p, q) = sup_{||f||_L≤1} E_{x~p}[f(x)] - E_{x~q}[f(x)]
+
+**Theorem 11 (WGAN Objective - Arjovsky et al., 2017):**
+Train discriminator (critic) with Lipschitz constraint:
+
+min_G max_{||D||_L≤1} E_{x~p_data}[D(x)] - E_{z~p_z}[D(G(z))]
+
+**Key Advantages:**
+1. Meaningful loss (correlates with sample quality)
+2. No vanishing gradients
+3. Training stability
+
+**Lipschitz Constraint Methods:**
+- **Weight clipping:** Clip weights to [-c, c] (simple but biased)
+- **Gradient penalty (WGAN-GP):** Penalize ||∇D(x)|| ≠ 1
+
+**WGAN-GP Loss:**
+L = E_z[D(G(z))] - E_x[D(x)] + λ·E_x̂[(||∇D(x̂)|| - 1)²]
+
+where x̂ = εx + (1-ε)G(z), ε ~ U(0,1)
+
+**Theorem 12 (WGAN Convergence - Arjovsky et al., 2017):**
+Under Lipschitz continuity, WGAN gradient is bounded:
+
+||∇_θ W(p_data, p_θ)|| ≤ K
+
+for some K > 0, ensuring stable gradients even when p_data, p_θ are disjoint.
+
+**Contrast with JS Divergence:**
+JSD(p, q) = log 2 when p, q have disjoint supports
+→ Constant gradient (vanishing signal!)
+
+Wasserstein distance continuous even for disjoint supports
+→ Meaningful gradients everywhere
 
 ### Basic GAN
 
