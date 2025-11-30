@@ -116,6 +116,245 @@ Challenges:
 5. Mixed variable types (continuous, discrete, categorical)
 ```
 
+#### Statistical Learning Theory for Hyperparameter Optimization
+
+**Generalization Error Decomposition:**
+
+**Theorem 1 (Bias-Variance-Optimization Tradeoff for Model Selection):**
+
+For hyperparameter configuration θ, the expected test error decomposes as:
+
+E[L_test(θ)] = E[L_train(θ)] + Complexity(θ) + Estimation_Error(n, θ)
+
+where:
+- E[L_train(θ)]: Training performance
+- Complexity(θ): Model complexity penalty
+- Estimation_Error(n, θ): Error from finite sample size n
+
+**Detailed:**
+
+E[L_test] = Bias²[A_θ] + Var[A_θ] + σ² + O(1/n)
+
+**Hyperparameter Impact:**
+
+- **Increasing model capacity** (e.g., more layers, larger hidden size):
+  - Decreases Bias²
+  - Increases Var
+  - Increases O(1/n) term (more parameters to estimate)
+
+- **Increasing regularization** (e.g., dropout, weight decay):
+  - Increases Bias²
+  - Decreases Var
+  - Optimal λ balances bias-variance
+
+**Theorem 2 (Validation Set Bias - Rao & Tibshirani, 1997):**
+
+Let θ̂ = argmin_θ L(A_θ, D_val) be hyperparameters chosen via validation set of size n_val. Then:
+
+E[L_test(θ̂)] ≥ min_θ E[L_test(θ)] + O(√(log k / n_val))
+
+where k = number of hyperparameter configurations tried.
+
+**Interpretation:**
+- More configurations tried → higher overfitting to validation set
+- Validation set acts as "indirect training data"
+- Need n_val = Ω(k log k) to avoid significant overfitting
+
+**Corollary (Validation Set Size):**
+
+To select among k configurations with ε-accuracy:
+
+n_val = Ω(k log k / ε²)
+
+Example: k = 100 configurations, ε = 0.01 requires n_val ≥ 46,052
+
+**Hold-out vs Cross-Validation Trade-off:**
+
+**Hold-out:**
+- Bias: E[L_val] ≈ E[L_test] (unbiased if val independent of train)
+- Variance: High (single split)
+- Computation: O(k) for k configurations
+
+**K-fold CV:**
+- Bias: Slight optimism (trains on (K-1)/K of data)
+- Variance: Lower (K estimates averaged)
+- Computation: O(K·k)
+
+**Theorem 3 (K-Fold CV Variance Reduction):**
+
+Var[CV_K] ≈ Var[Hold-out] · (1 + (K-1)ρ) / K²
+
+where ρ = correlation between fold errors.
+
+For independent folds (ρ = 0): Var[CV_K] = Var[Hold-out]/K
+
+Practical: ρ ≈ 0.5, K = 5 → Variance reduction ≈ 40%
+
+#### No Free Lunch Theorem for Hyperparameter Search
+
+**Theorem 4 (NFL for Optimization - Wolpert & Macready, 1997):**
+
+Averaged over all possible objective functions f: Θ → ℝ:
+
+E_f[Performance(Algorithm_A)] = E_f[Performance(Algorithm_B)]
+
+for any two search algorithms A and B.
+
+**Implication:**
+- No search strategy is universally better
+- Bayesian optimization good for smooth functions
+- Random search good for sparse important dimensions
+- Grid search good when all dimensions equally important
+
+**Practical Consequence:**
+
+Leverage problem structure:
+- Smoothness → Gaussian processes
+- Low effective dimension → Random search
+- Known bounds → Bounded optimization
+
+#### Sample Complexity of Hyperparameter Search
+
+**Theorem 5 (Random Search Sample Complexity - Bergstra & Bengio, 2012):**
+
+For hyperparameter space Θ with distribution p(θ), define:
+
+ε-good region: G_ε = {θ : L(θ) ≤ L* + ε}
+
+If P(θ ∈ G_ε) = α, then random search with n samples finds ε-good solution with probability:
+
+P(success) = 1 - (1-α)^n ≥ 1 - δ
+
+Solving for n:
+
+n ≥ log(δ) / log(1-α) ≈ log(1/δ) / α
+
+**Example:**
+- ε-good region α = 0.1 (10% of space is good)
+- Confidence δ = 0.05 (95% success)
+- Required samples: n ≥ log(20)/log(10/9) ≈ 28
+
+**Grid Search Sample Complexity:**
+
+For d-dimensional grid with m points per dimension:
+
+Total configurations: m^d
+
+To find ε-optimal with resolution m:
+
+m = O(1/ε) per dimension
+
+Total: n = O((1/ε)^d) - **exponential in d!**
+
+**Curse of Dimensionality:**
+
+Grid search requires exponentially many samples.
+Random search requires only O(log(1/δ)/α) - **independent of d!**
+
+**Theorem 6 (Effective Dimensionality - Bergstra & Bengio, 2012):**
+
+If objective f(θ) depends on only d_eff ≪ d dimensions, random search finds ε-good solution in:
+
+n = O(log(1/δ) / α_eff)
+
+where α_eff is probability of hitting good region in effective dimensions.
+
+**Empirical finding:** Most ML objectives have d_eff ≈ 2-5 even when d ≈ 10-20
+
+This explains why random search often outperforms grid search!
+
+#### Regret Bounds for Sequential Search
+
+**Cumulative Regret:**
+
+R_T = Σ_{t=1}^T [L(θ_t) - L(θ*)]
+
+where θ_t is configuration tested at round t.
+
+**Simple Regret:**
+
+r_T = L(θ̂_T) - L(θ*)
+
+where θ̂_T = argmin_{t≤T} L(θ_t) is best found so far.
+
+**Theorem 7 (Random Search Regret):**
+
+For random search over compact space Θ:
+
+E[r_T] = O(1/T)
+
+**Proof:** Each sample i.i.d., minimum of T samples concentrates at rate O(1/T). ∎
+
+**Bayesian Optimization Regret:**
+
+For GP-based Bayesian optimization with GP-UCB acquisition:
+
+**Theorem 8 (GP-UCB Regret - Srinivas et al., 2010):**
+
+R_T = O(√(T γ_T log T))
+
+where γ_T is maximum information gain:
+
+- Squared Exponential kernel: γ_T = O((log T)^{d+1})
+- Matérn kernel: γ_T = O(T^{d/(2ν+d)} (log T)^{d/(2ν+d)})
+
+**Interpretation:**
+- Sublinear regret: O(√T polylog T)
+- Much better than random search for smooth functions!
+- Grows with dimension d via γ_T
+
+**Comparison:**
+
+| Method | Cumulative Regret | Simple Regret |
+|--------|-------------------|---------------|
+| Random | O(T) | O(1/T) |
+| BO (GP-UCB) | O(√T polylog T) | O(1/√T polylog T) |
+| Grid (d-dim) | O(T^{1-1/d}) | O(T^{-1/d}) |
+
+BO optimal for smooth, low-dimensional problems!
+
+#### Multi-Fidelity Optimization Theory
+
+**Setting:** Evaluate f(θ, s) where s = fidelity (e.g., training epochs, data fraction)
+
+**Goal:** Find θ* = argmin_θ f(θ, s_max) using cheaper evaluations at s < s_max
+
+**Successive Halving (SHA - Jamieson & Talwalkar, 2016):**
+
+**Algorithm:**
+1. Start with n configurations, budget B
+2. Round r: Evaluate surviving configs at fidelity s_r
+3. Keep top 1/η fraction, increase fidelity by η
+
+**Theorem 9 (SHA Sample Complexity):**
+
+For Lipschitz objective with gap Δ between best and second-best:
+
+SHA finds ε-optimal solution with probability ≥ 1-δ using:
+
+B = O((log n / Δ²) · log(log n / δ))
+
+evaluations at maximum fidelity.
+
+**Reduction factor:** O(log n) compared to evaluating all n at max fidelity!
+
+**Hyperband (Li et al., 2018):**
+
+Runs SHA with multiple bracket schedules to handle unknown optimal fidelity allocation.
+
+**Theorem 10 (Hyperband Regret):**
+
+Hyperband achieves:
+
+r_B = O((log B)^c / B^{1/2})
+
+for constant c depending on problem smoothness.
+
+**Practical Impact:**
+- 10-100× speedup over full evaluation
+- Near-optimal resource allocation
+- Robust to fidelity choice
+
 **Search Space Complexity:**
 ```
 Grid Search Complexity:
