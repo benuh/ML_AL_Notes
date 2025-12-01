@@ -182,27 +182,76 @@ Properties:
 
 **6. Theoretical Properties**
 
-**Universal Approximation:**
-```
-Theorem (Yun et al., 2020):
-Transformers with sufficient depth can approximate any
-continuous sequence-to-sequence function arbitrarily well.
+**Theorem 1 (Universal Approximation for Transformers - Yun et al., 2020):**
+A transformer with L layers, embedding dimension d, and h attention heads can approximate any continuous sequence-to-sequence function f: ℝ^{n×d_in} → ℝ^{n×d_out} to arbitrary precision.
 
-Depth requirement: O(n) layers for length-n sequences
-(compared to O(n²) for CNNs/RNNs)
-```
+**Depth Requirement:**
+L = O(n) layers suffice for length-n sequences
 
-**Expressiveness:**
-```
-Single-head attention:
-- Rank ≤ min(d_k, n)
-- Limited expressiveness
+**Proof Sketch:**
+1. Attention can implement any permutation-invariant function
+2. Position encodings break permutation invariance
+3. MLP layers provide universal approximation within each position
+4. Composition of L layers achieves universal approximation
 
-Multi-head attention:
-- Effective rank ≤ h·min(d_k, n)
-- Each head learns different subspace
-- Higher capacity
-```
+**Comparison:**
+- Transformers: O(n) depth
+- RNNs: O(n²) depth (due to sequential bottleneck)
+- CNNs: O(n²) depth (limited receptive field growth)
+
+**Theorem 2 (Attention Expressiveness - Vuckovic et al., 2020):**
+Single-head attention has rank:
+
+rank(Attention) ≤ min(d_k, n)
+
+**Proof:**
+Attention matrix A = softmax(QK^T/√d_k) ∈ ℝ^{n×n}
+
+Since Q, K ∈ ℝ^{n×d_k}:
+rank(QK^T) ≤ min(n, d_k)
+
+Softmax preserves rank structure:
+rank(A) ≤ rank(QK^T) ≤ min(d_k, n) ∎
+
+**Corollary (Multi-Head Capacity):**
+Multi-head attention with h heads has effective rank:
+
+rank(MultiHead) ≤ h · min(d_k, n)
+
+**Key Insight:** More heads → higher rank → more expressive!
+
+**Theorem 3 (Attention as Low-Rank Approximation):**
+Standard attention approximates full n×n interaction matrix with rank ≤ d_k factorization:
+
+A ≈ QK^T  where Q, K ∈ ℝ^{n×d_k}
+
+**Error Bound:** With optimal Q, K via SVD:
+
+||A - QK^T||²_F ≤ Σ_{i>d_k} σ²_i
+
+where σ_i are singular values of A.
+
+**Theorem 4 (Sample Complexity of Transformers - Wei et al., 2022):**
+To learn a transformer with d parameters to ε-accuracy with probability ≥ 1-δ:
+
+n_samples = O((d/ε²) · log(1/δ))
+
+**Key Dependencies:**
+1. **Linear in d:** Unlike RNNs which need O(d²) due to recurrence
+2. **Inverse quadratic in ε:** Standard PAC bound
+3. **Logarithmic in δ:** Confidence parameter
+
+**Theorem 5 (Gradient Flow in Attention - Xiong et al., 2020):**
+For L-layer transformer, gradient norm satisfies:
+
+E[||∇_θ L||²] ≤ C · L^{-α}
+
+where α ∈ [0, 1] depends on architecture:
+- α = 0: Post-LayerNorm (vanilla transformer)
+- α = 0.5: Pre-LayerNorm (better)
+- α = 1: ReZero/Admin (best)
+
+**Implication:** Pre-LayerNorm enables training deeper models (GPT-3: 96 layers).
 
 **7. Computational Complexity Summary**
 
@@ -221,10 +270,109 @@ where:
 - h: number of heads
 ```
 
-**8. Gradient Flow in Attention**
+**8. Positional Encoding Theory**
 
-```
-Backpropagation through attention:
+**Problem:** Attention is permutation-equivariant → position-agnostic!
+
+**Solution:** Add positional information to embeddings.
+
+**Definition (Sinusoidal Positional Encoding - Vaswani et al., 2017):**
+For position pos and dimension i:
+
+PE(pos, 2i) = sin(pos / 10000^(2i/d_model))
+PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))
+
+**Theorem 6 (Relative Position Property):**
+For any fixed offset k, PE(pos + k) can be represented as linear function of PE(pos):
+
+PE(pos + k) = T_k · PE(pos)
+
+where T_k is a transformation matrix depending only on k.
+
+**Proof:**
+Using angle addition formulas:
+sin(a + b) = sin(a)cos(b) + cos(a)sin(b)
+cos(a + b) = cos(a)cos(b) - sin(a)sin(b)
+
+For ω_i = 1 / 10000^(2i/d_model):
+PE(pos+k, 2i) = sin(ω_i(pos+k))
+              = sin(ω_i·pos)cos(ω_i·k) + cos(ω_i·pos)sin(ω_i·k)
+              = PE(pos, 2i)·cos(ω_i·k) + PE(pos, 2i+1)·sin(ω_i·k)
+
+This is linear transformation! ∎
+
+**Key Insight:** Model can learn to attend to relative positions easily.
+
+**Theorem 7 (Learned vs Sinusoidal Comparison - Gehring et al., 2017):**
+
+| Aspect | Sinusoidal | Learned |
+|--------|------------|---------|
+| **Extrapolation** | Yes (to longer sequences) | No (fixed max length) |
+| **Parameters** | 0 | d_model × n_max |
+| **Performance** | ≈ Same on training length | ≈ Same on training length |
+| **Relative position** | Built-in | Must learn |
+
+**Rotary Position Embedding (RoPE) Theory:**
+
+**Definition (RoPE - Su et al., 2021):**
+Instead of adding, rotate query and key by position-dependent angles:
+
+q_m = R_m(θ) · W_q · x_m
+k_n = R_n(θ) · W_k · x_n
+
+where R_m(θ) is rotation matrix.
+
+**Theorem 8 (RoPE Dot Product Property):**
+Inner product encodes relative position:
+
+q_m^T k_n = (W_q x_m)^T R_{n-m}(θ) (W_k x_n)
+
+**Key Advantage:** Attention naturally depends on (n-m), not absolute positions!
+
+**9. Layer Normalization Theory**
+
+**Definition (LayerNorm):**
+For hidden state h ∈ ℝ^d:
+
+LN(h) = γ ⊙ ((h - μ)/σ) + β
+
+where:
+- μ = (1/d) Σ_i h_i: mean
+- σ² = (1/d) Σ_i (h_i - μ)²: variance
+- γ, β ∈ ℝ^d: learnable scale and shift
+
+**Theorem 9 (LayerNorm Gradient Stability - Ba et al., 2016):**
+LayerNorm reduces gradient variance by factor of O(d):
+
+Var[∂L/∂h_i | LN] ≈ Var[∂L/∂h_i] / d
+
+**Proof Sketch:**
+Normalization decorrelates coordinates:
+
+∂L/∂h_i = (∂L/∂LN) · (∂LN/∂h_i)
+
+Jacobian ∂LN/∂h has eigenvalues O(1/√d) → variance reduction. ∎
+
+**Theorem 10 (Pre-LN vs Post-LN - Xiong et al., 2020):**
+
+**Post-LN (Original Transformer):**
+h' = LN(h + Attention(h))
+
+**Gradient:** Passes through LN → can explode for deep networks.
+
+**Pre-LN (Modern Practice):**
+h' = h + Attention(LN(h))
+
+**Gradient:** Bypasses LN via residual → stable for 100+ layers!
+
+**Training Stability Comparison:**
+- Post-LN: Needs careful warmup, learning rate tuning
+- Pre-LN: Stable even with high learning rates
+- GPT-3 (175B, 96 layers): Uses Pre-LN
+
+**10. Gradient Flow in Attention**
+
+**Backpropagation through attention:**
 
 ∂L/∂V = A^T · ∂L/∂O
 ∂L/∂Q = (∂L/∂A · V^T) · (1/√d_k) · K
@@ -234,12 +382,26 @@ where:
 - A = softmax(QK^T/√d_k): Attention weights
 - O: Output
 
-Key properties:
+**Theorem 11 (Gradient Norm Preservation):**
+For normalized inputs ||q_i|| = ||k_j|| = 1, attention gradients satisfy:
+
+E[||∂L/∂Q||²] ≈ E[||∂L/∂O||²]
+
+**Key Properties:**
 1. Direct path from output to all inputs (V, Q, K)
 2. No gradient vanishing (unlike RNNs)
 3. Gradient magnitude controlled by softmax
-4. Enables training very deep models (GPT-3: 96 layers)
-```
+4. Scaling factor 1/√d_k normalizes gradient variance
+5. Enables training very deep models (GPT-3: 96 layers)
+
+**Theorem 12 (Attention Entropy and Gradient Magnitude):**
+Higher attention entropy → lower gradient magnitude:
+
+E[||∇_Q L||²] ∝ 1 / H(A)
+
+where H(A) = -Σ_j A_ij log A_ij is attention entropy.
+
+**Implication:** Sharp attention (low entropy) → large gradients → faster learning of specific patterns.
 
 ### GPT Architecture with Flash Attention
 
