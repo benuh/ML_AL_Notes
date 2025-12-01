@@ -16,6 +16,204 @@
 
 State-of-the-art object detection with modern architectures.
 
+### Theoretical Foundations
+
+#### Intersection over Union (IoU) Theory
+
+**Definition (IoU):**
+For predicted box B_pred and ground truth box B_gt:
+
+IoU(B_pred, B_gt) = Area(B_pred ∩ B_gt) / Area(B_pred ∪ B_gt)
+
+Properties:
+- IoU ∈ [0, 1]
+- IoU = 1 iff B_pred = B_gt (perfect overlap)
+- IoU = 0 iff boxes don't overlap
+
+**Theorem 1 (IoU as Distance Metric):**
+IoU does NOT satisfy triangle inequality, but d_IoU = 1 - IoU is a valid distance:
+
+d_IoU(B₁, B₂) = 0 iff B₁ = B₂
+d_IoU(B₁, B₂) = d_IoU(B₂, B₁)  (symmetry)
+
+**Generalized IoU (GIoU - Rezatofighi et al., 2019):**
+
+GIoU = IoU - |C \ (B_pred ∪ B_gt)| / |C|
+
+where C is smallest box containing both B_pred and B_gt.
+
+**Properties:**
+1. GIoU ∈ [-1, 1]
+2. GIoU = IoU when boxes overlap
+3. GIoU < 0 when boxes don't overlap (addresses IoU=0 problem)
+4. GIoU → -1 as boxes move infinitely apart
+
+**Distance IoU (DIoU - Zheng et al., 2020):**
+
+DIoU = IoU - ρ²(b_pred, b_gt) / c²
+
+where:
+- ρ(b_pred, b_gt): Euclidean distance between box centers
+- c: diagonal length of smallest enclosing box
+
+**Theorem 2 (DIoU Convergence):**
+DIoU loss L_DIoU = 1 - DIoU has faster convergence than IoU loss:
+
+- Directly minimizes center distance
+- Considers box overlap
+- Invariant to scale
+
+**Complete IoU (CIoU):**
+
+CIoU = IoU - ρ²/c² - αv
+
+where:
+- α = v / (1 - IoU + v): trade-off parameter
+- v = (4/π²)(arctan(w_gt/h_gt) - arctan(w_pred/h_pred))²: aspect ratio consistency
+
+**Theorem 3 (CIoU Optimality):**
+CIoU considers three geometric factors simultaneously:
+1. Overlap area
+2. Center distance
+3. Aspect ratio
+
+Minimizing CIoU → consistent box regression in all aspects.
+
+#### Anchor-Based vs Anchor-Free Detection
+
+**Anchor-Based (Faster R-CNN, YOLO v3):**
+
+**Definition:** Predefined anchor boxes at each spatial location:
+
+B_pred = (t_x, t_y, t_w, t_h) relative to anchor (a_x, a_y, a_w, a_h)
+
+**Decoding:**
+x = a_x + a_w · σ(t_x)
+y = a_y + a_h · σ(t_y)
+w = a_w · exp(t_w)
+h = a_h · exp(t_h)
+
+where σ is sigmoid function.
+
+**Sample Complexity:** With K anchors per location and N spatial locations:
+- Positive samples: O(K·N) candidates, ~10-100 positives
+- Negative samples: O(K·N) background
+
+**Anchor-Free (FCOS, YOLOv8):**
+
+**Definition:** Direct prediction without anchors:
+
+For point (x, y), predict:
+- (l, t, r, b): distances to box edges
+- confidence score
+- class probability
+
+**Theorem 4 (Anchor-Free Sample Efficiency - Tian et al., 2019):**
+Anchor-free methods achieve comparable performance with:
+- No hyperparameter tuning for anchor sizes
+- All points within GT box are positive samples
+- Sample imbalance: O(N) positives vs O(N²) negatives
+
+**Advantage:** ~10× more positive samples than anchor-based!
+
+**Center Assignment Strategy:**
+
+**Definition (Center Sampling):**
+Only points within center region (radius r) of GT box are positive:
+
+r = min(w, h) / k
+
+where k ∈ [1.5, 2.5] is scaling factor.
+
+**Theorem 5 (Center vs Full Assignment):**
+Center sampling reduces ambiguity:
+- Full assignment: corners produce poor features
+- Center sampling: focuses on informative regions
+- Performance: +2-3 mAP on COCO
+
+#### Non-Maximum Suppression (NMS) Theory
+
+**Definition (NMS):**
+Given detections D = {(b_i, s_i)} where b_i is box and s_i is score:
+
+```
+NMS(D, τ):
+  R = []  # Results
+  Sort D by score descending
+  While D not empty:
+    b* = argmax_{b∈D} score(b)
+    R.append(b*)
+    D = {b ∈ D : IoU(b, b*) < τ}
+  Return R
+```
+
+**Theorem 6 (NMS Complexity):**
+- Time: O(N² · K) where N = number of boxes, K = IoU computation cost
+- Can be optimized to O(N log N) with spatial sorting
+
+**Soft-NMS (Bodla et al., 2017):**
+
+Instead of removing boxes, decay scores:
+
+s_i ← s_i · f(IoU(b_i, b*))
+
+where f(iou) = exp(-iou² / σ)
+
+**Theorem 7 (Soft-NMS vs Hard-NMS):**
+Soft-NMS improves recall for occluded objects:
+- Hard-NMS: Binary threshold (keep or discard)
+- Soft-NMS: Continuous decay (better for crowded scenes)
+- mAP improvement: +1-2% on COCO
+
+#### Focal Loss Theory
+
+**Problem:** Class imbalance in object detection
+- Easy negatives: ~99.9% of anchors
+- Hard negatives: ~0.1%
+- Positives: ~10-100 per image
+
+**Cross-Entropy Loss:**
+CE(p, y) = -y log(p) - (1-y) log(1-p)
+
+**Issue:** Easy negatives dominate loss, overwhelming rare positives.
+
+**Definition (Focal Loss - Lin et al., 2017):**
+
+FL(p_t) = -α_t (1 - p_t)^γ log(p_t)
+
+where:
+- p_t = p if y=1, else 1-p (probability of correct class)
+- α_t: class weighting
+- γ ≥ 0: focusing parameter
+
+**Theorem 8 (Focal Loss Down-weighting):**
+For well-classified examples (p_t → 1):
+
+FL(p_t) → 0  as  p_t → 1
+
+**Proof:**
+(1 - p_t)^γ → 0 faster than log(p_t) → 0
+
+Down-weighting factor: (1 - p_t)^γ
+
+**Example:**
+- γ = 2, p_t = 0.9: weight = 0.01 (100× reduction)
+- γ = 2, p_t = 0.5: weight = 0.25 (4× reduction)
+
+**Theorem 9 (Focal Loss Optimal γ):**
+Empirically, γ = 2 achieves best trade-off:
+- γ = 0: Standard CE (no focusing)
+- γ = 1: Moderate focusing
+- γ = 2: Strong focusing (used in RetinaNet)
+- γ > 3: Too aggressive, can hurt easy examples
+
+**Gradient Analysis:**
+∂FL/∂z = α_t (1 - p_t)^γ · (-y + p_t) + α_t γ (1 - p_t)^{γ-1} p_t (1 - p_t) log(p_t)
+
+where z is logit and p = σ(z).
+
+**Key Property:** Gradient → 0 for easy examples, focusing on hard examples.
+
 ### YOLO v8 Implementation
 
 ```python
