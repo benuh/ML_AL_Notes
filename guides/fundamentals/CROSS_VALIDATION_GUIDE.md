@@ -650,6 +650,146 @@ for fold, (train_idx, test_idx) in enumerate(
 - IoT/sensor data: Gap accounts for data transmission, processing latency
 - Sales forecasting: Gap accounts for inventory ordering lead time
 
+### Rigorous Theory of Time Series Cross-Validation
+
+```
+Time Series CV Challenge:
+Standard CV assumes i.i.d. samples: (x₁,y₁), ..., (xₙ,yₙ) ~ P^n
+Time series violates this: Data has temporal dependence!
+
+Temporal Dependence:
+Autocorrelation: Cov(yₜ, yₜ₋ₖ) ≠ 0  for lag k
+⇒ Cannot randomly shuffle data
+⇒ Training/test must respect temporal order
+
+Theorem 7 (Bias in Standard CV for Time Series - Bergmeir & Benítez 2012):
+If data has autocorrelation ρ(k) and we use standard K-fold CV (random splits):
+
+Bias(CV_K) ≈ -2ρ(1)·σ² / √n
+
+Negative bias = optimistic estimate!
+
+Reason:
+- Random splits put correlated observations in different folds
+- Training on t+1 to predict t exploits future information
+- Artificially inflates performance
+
+Example:
+ρ(1) = 0.5 (moderate autocorrelation)
+⇒ CV underestimates error by ~70% of σ/√n
+
+For n=100, σ=1:
+Optimistic bias ≈ 0.07 (7% of error magnitude)
+
+Solution: Time-Respecting Splits
+Only use past to predict future: Train on [1, ..., t], Test on [t+1, ..., t+h]
+
+TimeSeriesSplit Properties:
+
+Forward-Chaining (Expanding Window):
+Fold k: Train on [1, ..., kh], Test on [kh+1, ..., (k+1)h]
+
+Training size grows: |Train_k| = kh
+All data eventually used for testing
+Mimics realistic scenario: more data over time
+
+Blocked CV (Fixed Window):
+Fold k: Train on [(k-1)h+1, ..., kh], Test on [kh+1, ..., (k+1)h]
+
+Training size fixed: |Train_k| = h
+More similar folds (same amount of data)
+Better for stationary processes
+
+Theorem 8 (Consistency of Time Series CV - Tashman 2000):
+For stationary time series with mixing:
+
+|CV_TS - E[MSE]| →_P 0  as n → ∞
+
+Provided:
+1. h → ∞ (test size grows)
+2. h/n → 0 (test fraction shrinks)
+3. Gap g ≥ max-lag of dependencies
+
+Mixing Condition:
+Time series is α-mixing if:
+α(k) = sup_{A,B} |P(A ∩ B) - P(A)P(B)| → 0  as k → ∞
+
+where A depends on {y₁, ..., yₜ}, B depends on {yₜ₊ₖ, ...}
+
+Interpretation: Far-apart observations become independent
+Most ARMA, GARCH, etc. satisfy this
+
+Gap Selection Theory:
+
+Theorem 9 (Optimal Gap for Forecasting - Racine 2000):
+For h-step-ahead forecast, optimal gap:
+
+g* = h + τ
+
+where τ = minimum lag with |ρ(τ)| < ε (typically ε = 0.05)
+
+Reasoning:
+- Need gap ≥ h to avoid direct information leakage
+- Need gap ≥ τ for autocorrelation to decay
+- g* = max(h, τ) ensures both
+
+Example (AR(1) with ρ(1) = 0.8):
+ρ(k) = 0.8^k
+For ε = 0.05: 0.8^τ < 0.05 ⇒ τ ≈ 14
+
+For 1-day-ahead forecast: g* = max(1, 14) = 14 days
+
+Rolling Origin Evaluation:
+
+Instead of fixed K folds, use all possible train-test splits:
+For each origin t ∈ {t_min, ..., n-h}:
+- Train on [1, ..., t]
+- Test on [t+1, ..., t+h]
+
+Advantage: Maximum use of data for evaluation
+Disadvantage: Highly correlated estimates (overlapping training sets)
+
+Correlation between consecutive origins:
+Corr(MSE_t, MSE_{t+1}) ≈ (t-1)/t → 1  as t → ∞
+
+Standard error adjustment:
+SE(MSĒ) ≠ σ/√K  (as in i.i.d. case)
+
+Harvey-Leybourne-Newbold Correction:
+SE_corrected = SE_naive · √(1 + 2Σₖ₌₁^{K-1} (1 - k/K)·ρ̂(k))
+
+where ρ̂(k) = autocorrelation of {MSE_t} at lag k
+
+Typically ρ̂(1) ≈ 0.5-0.8 for rolling origin
+⇒ SE_corrected ≈ 1.5-2× SE_naive
+
+Time Series Specific Metrics:
+
+Traditional: Average test MSE across folds
+Better: Directional accuracy, coverage of prediction intervals
+
+Diebold-Mariano Test for Forecast Comparison:
+H₀: E[Loss_A(t)] = E[Loss_B(t)]  (equal forecast accuracy)
+
+Test statistic:
+DM = d̄ / √(Var(d̄))  ~ N(0,1) under H₀
+
+where d̄ = (1/n)Σₜ (Loss_A(t) - Loss_B(t))
+
+With autocorrelation correction:
+Var(d̄) = γ₀/n · (1 + 2Σₖ₌₁^{n-1} (1 - k/n)·ρ(k))
+
+Practical Recommendations:
+
+1. Always use time-respecting splits for temporal data
+2. Include gap: g ≥ forecast horizon h
+3. For highly autocorrelated data: g = 2h to 4h
+4. Use expanding window (forward chaining) for growing datasets
+5. Use fixed window for concept drift/non-stationarity
+6. Report SE with autocorrelation correction
+7. Use Diebold-Mariano for model comparison
+```
+
 ---
 
 ## Nested Cross-Validation
