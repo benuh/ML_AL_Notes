@@ -1201,7 +1201,42 @@ Properties:
 2. Smaller α for common features
 3. No manual tuning of individual learning rates
 
-Convergence (for convex f):
+**Theorem 17 (AdaGrad Regret Bound - Duchi et al., 2011):**
+For convex f with bounded gradients ||∇f(x)|| ≤ G:
+
+Regret_T = Σₜ₌₁ᵀ [f(xₜ) - f(x*)] ≤ O(√T · ||x* - x₀||₂ · Σᵢ₌₁ᵈ ||gᵢ,₁:T||₂)
+
+where gᵢ,₁:T = [gᵢ,₁, ..., gᵢ,T] is gradient sequence for dimension i.
+
+**Key Insight:** AdaGrad adapts to geometry of data!
+- For sparse gradients: much better than O(√T · d · G²)
+- Effective dimension << d
+
+**Proof Sketch:**
+Define potential function:
+
+Φₜ = Σᵢ₌₁ᵈ (xᵢ,ₜ - x*ᵢ)² · √Gᵢ,ₜ
+
+where Gᵢ,ₜ = Σₛ₌₁ᵗ gᵢ,ₛ².
+
+Show Φₜ₊₁ - Φₜ bounded by:
+- Gradient term: -gₜᵀ(xₜ - x*)
+- Remainder: O(||gₜ||²/√Gᵢ,ₜ)
+
+Telescoping sum gives regret bound. ∎
+
+**Corollary (Sparse Setting):**
+If only k dimensions have non-zero gradients:
+
+Regret_T = O(√T · k · G²)  instead of O(√T · d · G²)
+
+Improvement factor: d/k (massive for sparse problems!)
+
+**Example (NLP with d=10⁶ vocabulary):**
+- Per sample: k ≈ 100 non-zero gradient dimensions
+- Effective regret: ~100× better than standard SGD
+
+**Average Convergence:**
 E[f(x̄ₖ) - f(x*)] ≤ O(1/√k)
 
 Same rate as SGD, but better constants in practice
@@ -1407,6 +1442,112 @@ Advantages:
 - Weight decay independent of gradient scaling
 - Better generalization (empirically)
 - Easier to tune λ and α separately
+
+**Theorem 18 (Exponential Moving Average Properties):**
+For momentum mₜ = β₁mₜ₋₁ + (1-β₁)gₜ:
+
+**Unrolling:**
+mₜ = (1-β₁) Σₛ₌₁ᵗ β₁ᵗ⁻ˢ gₛ + β₁ᵗ m₀
+
+**Effective window:** τ = 1/(1-β₁)
+- β₁ = 0.9: τ = 10 steps
+- β₁ = 0.99: τ = 100 steps
+
+**Proof of Bias:**
+E[mₜ] = E[(1-β₁) Σₛ₌₁ᵗ β₁ᵗ⁻ˢ gₛ]
+      = (1-β₁)·E[g]·Σₛ₌₁ᵗ β₁ᵗ⁻ˢ
+      = (1-β₁)·E[g]·(1 - β₁ᵗ)/(1-β₁)
+      = (1 - β₁ᵗ)·E[g]
+
+**Bias factor:** (1 - β₁ᵗ) → 1 as t → ∞
+
+**Bias correction:** m̂ₜ = mₜ/(1 - β₁ᵗ) gives E[m̂ₜ] = E[g] ✓
+
+**Variance Analysis:**
+Var[mₜ] = (1-β₁)² Σₛ₌₁ᵗ β₁²⁽ᵗ⁻ˢ⁾ Var[gₛ]
+        ≤ (1-β₁)² · σ²_g · 1/(1-β₁²)
+        = (1-β₁)/(1+β₁) · σ²_g
+
+**Variance reduction:** Factor of (1-β₁)/(1+β₁)
+- β₁ = 0.9: Reduction by 0.053 (~20× variance reduction)
+- β₁ = 0.99: Reduction by 0.005 (~200× variance reduction)
+
+**Theorem 19 (Adam Step Size Analysis):**
+Effective step size in Adam:
+
+ηₜ,ᵢ = α · m̂ₜ,ᵢ / √v̂ₜ,ᵢ
+
+**Bounds (Kingma & Ba, 2015):**
+When |m̂ₜ,ᵢ| ≈ √v̂ₜ,ᵢ (gradient consistent in sign and magnitude):
+
+|ηₜ,ᵢ| ≈ α
+
+When |m̂ₜ,ᵢ| << √v̂ₜ,ᵢ (gradient changes sign frequently):
+
+|ηₜ,ᵢ| << α
+
+**Trust region property:**
+|Δxₜ,ᵢ| = |ηₜ,ᵢ| ≤ α · |m̂ₜ,ᵢ|/√v̂ₜ,ᵢ ≤ α · √(1-β₂)/(1-β₁)
+
+With default β₁=0.9, β₂=0.999:
+|Δxₜ,ᵢ| ≤ α · √0.001/0.1 = α · 0.1
+
+**Maximum step bound:** Updates bounded by α · √((1-β₂)/(1-β₁))
+
+**Theorem 20 (Adam vs SGD with Momentum Comparison):**
+
+| Aspect | SGD + Momentum | Adam |
+|--------|----------------|------|
+| **First moment** | mₜ = βmₜ₋₁ + gₜ | mₜ = β₁mₜ₋₁ + (1-β₁)gₜ |
+| **Second moment** | None | vₜ = β₂vₜ₋₁ + (1-β₂)gₜ² |
+| **Step size** | α (global) | α/√vₜ (adaptive) |
+| **Convergence (convex)** | O(1/√T) guaranteed | O(1/√T) (with AMSGrad) |
+| **Convergence (non-convex)** | To stationary point | To stationary point |
+| **Hyperparameter sensitivity** | High (need tune α) | Low (α=0.001 often works) |
+| **Sparse gradients** | Suboptimal | Excellent (per-parameter α) |
+| **Memory** | O(d) | O(2d) |
+| **Computational cost** | 1× | 1.2× (sqrt, division) |
+
+**When to use each:**
+- **SGD + Momentum:** Computer vision, well-tuned learning rate schedules
+- **Adam/AdamW:** NLP, RL, quick prototyping, sparse gradients
+- **AMSGrad:** When convergence stability critical
+
+**Theorem 21 (Lookahead Optimizer - Zhang et al., 2019):**
+
+**Algorithm:** Maintain two sets of weights:
+- Fast weights φₜ: updated by any optimizer (SGD, Adam, etc.)
+- Slow weights θₖ: updated every k steps
+
+```
+For t = 1, 2, ..., T:
+  # Inner loop: k fast weight updates
+  For i = 1, ..., k:
+    φₜ,ᵢ = φₜ,ᵢ₋₁ - αfast · ∇L(φₜ,ᵢ₋₁)
+
+  # Outer loop: slow weight interpolation
+  θₜ = θₜ₋₁ + β(φₜ,ₖ - θₜ₋₁)
+  φₜ₊₁,₀ = θₜ
+```
+
+**Hyperparameters:**
+- k ∈ [5, 10]: synchronization period
+- β ∈ [0.5, 0.8]: slow weight step size
+
+**Theorem Statement:**
+For L-smooth loss and inner optimizer with convergence rate ρ:
+
+E[||∇L(θₜ)||²] ≤ O(ρᵏ · ε + L · β · ||φ - θ||)
+
+**Key Properties:**
+1. **Variance reduction:** Slow weights smooth out fast weight oscillations
+2. **Better generalization:** Achieves flatter minima
+3. **Optimizer-agnostic:** Works with any base optimizer
+
+**Empirical results:**
+- ImageNet (ResNet-50): +0.5% top-1 accuracy
+- CIFAR-100: +1-2% accuracy improvement
+- Training stability: More robust to hyperparameters
 
 Optimal λ Selection:
 λ ~ 1/T where T is total training steps
