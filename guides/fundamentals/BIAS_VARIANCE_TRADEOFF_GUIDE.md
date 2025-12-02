@@ -301,6 +301,124 @@ Bias-Variance interpretation:
 - High VCdim → high variance (needs more samples)
 ```
 
+**PAC Learning Bounds and Bias-Variance:**
+
+```
+Theorem (PAC Learning Bound - Valiant, 1984):
+A hypothesis class F is PAC-learnable if there exists algorithm A such that:
+For any ε, δ > 0, and any distribution D, with probability ≥ 1-δ:
+
+R(ĥ) ≤ min_{h ∈ F} R(h) + ε
+
+using n ≥ n₀(ε, δ) samples, where n₀ is polynomial in 1/ε, 1/δ, and complexity of F.
+
+Connection to Bias-Variance:
+- min_{h ∈ F} R(h) = Approximation Error (Bias from F)
+- ε = Estimation Error (Variance from finite n)
+- Total error = Bias + Variance + Noise
+
+Sample Complexity Bound:
+n = O((VCdim(F)/ε²)·log(1/δ))
+
+Interpretation:
+- Higher VCdim → need more samples for same ε
+- Lower VCdim → lower variance but possibly higher bias
+- Optimal F balances VCdim and approximation capability
+```
+
+**Rademacher Complexity Bounds:**
+
+```
+Theorem (Rademacher Generalization Bound - Bartlett & Mendelson, 2002):
+With probability ≥ 1-δ over n training samples:
+
+R(ĥ) - R̂(ĥ) ≤ 2·Rad_n(F) + 3·M·√(log(2/δ)/(2n))
+
+where:
+- Rad_n(F) = Rademacher complexity
+- M = bound on loss function
+- F = hypothesis class
+
+Rademacher Complexity Definition:
+Rad_n(F) = E_σ,S[sup_{h ∈ F} (1/n)Σᵢ₌₁ⁿ σᵢ·h(xᵢ)]
+
+where σᵢ ∈ {-1,+1} are Rademacher variables
+
+Key Properties:
+1. Rad_n(F) measures capacity to fit random noise
+2. Rad_n(F) ≤ √(VCdim(F)/n) (VC bound)
+3. For linear models: Rad_n(F_lin) = E[||X^T σ||/(√n·||X||_F)]
+
+Concrete Examples:
+- Linear functions in ℝᵈ with ||w|| ≤ W, ||x|| ≤ R:
+  Rad_n(F) ≤ WR/√n
+
+- ReLU networks with L layers, W weights, spectral norms σᵢ:
+  Rad_n(F) ≤ (∏ᵢ σᵢ)·√(2·log(2d)/n)
+
+Connection to Bias-Variance:
+Rad_n(F) formalizes variance component!
+- Larger Rad_n(F) → more variance
+- Smaller Rad_n(F) → less variance (but potentially more bias)
+```
+
+**Concentration Inequalities for Learning:**
+
+```
+Theorem (McDiarmid's Inequality - McDiarmid, 1989):
+Let f: 𝒳ⁿ → ℝ be a function with bounded differences:
+|f(S) - f(S')| ≤ cᵢ  when S, S' differ only in ith sample
+
+Then with probability ≥ 1-δ:
+|f(S) - E[f(S)]| ≤ √((Σᵢ cᵢ²)·log(2/δ)/2)
+
+Application to Empirical Risk:
+f(S) = R̂_S(h) - R(h)  (empirical minus true risk)
+
+Bounded difference: cᵢ = M/n (changing one sample changes R̂ by ≤ M/n)
+
+Result:
+|R̂(h) - R(h)| ≤ M·√(log(2/δ)/(2n))  with probability ≥ 1-δ
+
+For all h ∈ F simultaneously (union bound):
+|R̂(h) - R(h)| ≤ M·√(log(|F|/δ)/(2n))  ∀h ∈ F
+
+Sample Complexity:
+n = O((M²/ε²)·log(|F|/δ))  for ε-accurate risk estimate
+
+Infinite F: Replace log(|F|) with VCdim(F) or Rad_n(F) terms
+```
+
+**Minimax Lower Bounds - Fundamental Limits:**
+
+```
+Theorem (Minimax Lower Bound - Assouad, 1983):
+For any learning algorithm A, there exists distribution D such that:
+
+E[R(ĥ_A)] ≥ min_{h ∈ F} R(h) + Ω(√(VCdim(F)/n))
+
+Interpretation:
+- Cannot do better than O(√(d/n)) estimation error
+- Fundamental limit from finite samples
+- Lower bound matches upper bound (tight!)
+
+Proof Sketch:
+1. Construct "hard" distribution over d binary functions
+2. Show information-theoretic limit: ≥ Ω(d) samples needed to distinguish
+3. Average-case analysis gives √(d/n) rate
+
+Practical implication:
+Variance ≥ Ω(√(d/n)) is UNAVOIDABLE
+Only bias can be reduced by better model class!
+
+Bias-Variance Fundamental Tradeoff:
+Total Error ≥ min_{F} [Bias²(F) + Ω(√(VCdim(F)/n))]
+
+Optimal model class F* balances:
+- Approximation: min_{h ∈ F} R(h)  (decreases as F grows)
+- Estimation: √(VCdim(F)/n)  (increases as F grows)
+```
+
 **Modern Insight: Double Descent Phenomenon:**
 
 ```
@@ -341,6 +459,35 @@ Reconciliation with bias-variance:
 Practical implication:
 More parameters can help, even with small datasets!
 (Contradicts classical advice to reduce model size)
+
+Rigorous Double Descent Theory (Bartlett et al., 2020):
+
+Theorem (Benign Overfitting):
+For linear regression with d > n and appropriate regularization:
+
+E[R(ŵ) - R(w*)] = O((d-n)/d + n/d²·tr(Σ²))
+
+where Σ = covariance matrix of features
+
+Key insights:
+1. Error decreases as d → ∞ (while d > n)!
+2. Implicit regularization from min-norm solution
+3. ŵ = argmin{||w|| : Xw = y}  picks smallest norm
+
+Conditions for benign overfitting:
+- Signal-to-noise ratio > critical threshold
+- Eigenvalues of Σ decay sufficiently fast
+- Regularization (explicit or implicit) present
+
+When does double descent occur?
+Peak at d ≈ n:
+- Unstable inversion of nearly singular matrix
+- Largest variance amplification
+
+Second descent for d >> n:
+- More parameters → more degrees of freedom
+- Min-norm interpolation finds smooth solution
+- Effective complexity controlled by regularization
 ```
 
 ```python
