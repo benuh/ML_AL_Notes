@@ -193,27 +193,194 @@ Diffusion models generate high-quality images by learning to reverse a noise-add
 
 ### Mathematical Foundation
 
-**Forward Process (Adding Noise):**
-```
-q(xₜ | xₜ₋₁) = N(xₜ; √(1-βₜ)xₜ₋₁, βₜI)
-```
-- Start with real image x₀
-- Gradually add Gaussian noise over T steps
-- End with pure noise xₜ ~ N(0, I)
+**Rigorous Theory of Diffusion Models:**
 
-**Reverse Process (Denoising):**
 ```
-pθ(xₜ₋₁ | xₜ) = N(xₜ₋₁; μθ(xₜ, t), Σθ(xₜ, t))
-```
-- Learn to predict and remove noise
-- Start from random noise
-- Gradually denoise to generate image
+Problem: Generate samples from data distribution p_data(x) without explicit density modeling
 
-**Training Objective:**
+Key Insight (Sohl-Dickstein et al., 2015):
+Reverse a gradual noising process by learning score function ∇_x log p(x)
 ```
-L = 𝔼ₜ,x₀,ε[||ε - εθ(xₜ, t)||²]
+
+**Theorem 1 (Forward Diffusion Process - DDPM):**
+
 ```
-Predict the noise ε that was added at timestep t.
+Forward process (fixed, no learning):
+q(xₜ | xₜ₋₁) = N(xₜ; √(1-βₜ)·xₜ₋₁, βₜI)
+
+where β₁, ..., βₜ is variance schedule with 0 < βₜ < 1
+
+Reparameterization:
+xₜ = √(1-βₜ)·xₜ₋₁ + √βₜ·εₜ₋₁,  εₜ₋₁ ~ N(0,I)
+
+Closed-form (key property):
+Let αₜ = 1 - βₜ, ᾱₜ = ∏ₛ₌₁ᵗ αₛ
+
+Then:
+q(xₜ | x₀) = N(xₜ; √ᾱₜ·x₀, (1-ᾱₜ)I)
+
+Proof (by induction):
+xₜ = √αₜ·xₜ₋₁ + √(1-αₜ)·ε
+   = √αₜ(√ᾱₜ₋₁·x₀ + √(1-ᾱₜ₋₁)·ε') + √(1-αₜ)·ε
+   = √(αₜᾱₜ₋₁)·x₀ + √(αₜ(1-ᾱₜ₋₁) + (1-αₜ))·ε''  (by Gaussian identity)
+   = √ᾱₜ·x₀ + √(1-ᾱₜ)·ε'' ∎
+
+This allows sampling xₜ directly from x₀ without iterating through all intermediate steps!
+
+Reparameterized sampling:
+xₜ = √ᾱₜ·x₀ + √(1-ᾱₜ)·ε,  ε ~ N(0,I)
+
+As t → T: ᾱₜ → 0, xₜ → N(0,I) (pure noise)
+```
+
+**Theorem 2 (Reverse Process and Score Matching):**
+
+```
+Reverse process (learned):
+pθ(xₜ₋₁ | xₜ) = N(xₜ₋₁; μθ(xₜ,t), Σθ(xₜ,t))
+
+Bayes rule (true posterior):
+q(xₜ₋₁ | xₜ, x₀) = N(xₜ₋₁; μ̃ₜ(xₜ,x₀), σ̃ₜ²I)
+
+where:
+μ̃ₜ(xₜ,x₀) = (√ᾱₜ₋₁·βₜ)/(1-ᾱₜ)·x₀ + (√αₜ·(1-ᾱₜ₋₁))/(1-ᾱₜ)·xₜ
+σ̃ₜ² = ((1-ᾱₜ₋₁)/(1-ᾱₜ))·βₜ
+
+Rewrite μ̃ₜ in terms of ε (noise):
+Since xₜ = √ᾱₜ·x₀ + √(1-ᾱₜ)·ε:
+x₀ = (xₜ - √(1-ᾱₜ)·ε)/√ᾱₜ
+
+Substituting:
+μ̃ₜ(xₜ,ε) = (1/√αₜ)·(xₜ - (βₜ/√(1-ᾱₜ))·ε)
+
+Parameterization: Learn εθ(xₜ,t) to predict noise
+μθ(xₜ,t) = (1/√αₜ)·(xₜ - (βₜ/√(1-ᾱₜ))·εθ(xₜ,t))
+
+Training objective (DDPM):
+L_simple(θ) = Eₜ,x₀,ε[||ε - εθ(√ᾱₜ·x₀ + √(1-ᾱₜ)·ε, t)||²]
+
+This is equivalent to score matching:
+∇_x log p(xₜ) = -ε/√(1-ᾱₜ)
+```
+
+**Theorem 3 (ELBO Derivation - Ho et al., 2020):**
+
+```
+Full training objective (variational lower bound):
+L_VLB = Eₓ₀[-log pθ(x₀)]
+      ≤ Eₓ₀,q[KL(q(xₜ|x₀) || pθ(xₜ)) + Σₜ KL(q(xₜ₋₁|xₜ,x₀) || pθ(xₜ₋₁|xₜ))]
+
+Simplification (Ho et al.):
+All KL terms are between Gaussians → closed form!
+
+KL(N(μ₁,Σ₁) || N(μ₂,Σ₂)) = (1/2)[tr(Σ₂⁻¹Σ₁) + (μ₂-μ₁)ᵀΣ₂⁻¹(μ₂-μ₁) - k + log(det(Σ₂)/det(Σ₁))]
+
+For fixed Σθ = σ̃ₜ²I (same as true posterior):
+L_t ∝ ||μ̃ₜ - μθ||²
+
+Substituting μ̃ₜ = (1/√αₜ)(xₜ - βₜ/√(1-ᾱₜ)·ε):
+L_t ∝ (βₜ²/(2αₜ(1-ᾱₜ)))·||ε - εθ||²
+
+Ignoring weighting factor (Ho et al. finding):
+L_simple = Eₜ[||ε - εθ||²] works better empirically!
+
+Sample complexity (Theorem - Song et al., 2021):
+To achieve ε-accurate samples from p_data:
+n_samples = O((d/ε²)·log(T/δ))
+
+where d = data dimensionality, T = diffusion steps
+```
+
+**Theorem 4 (DDIM - Deterministic Sampling):**
+
+```
+DDPM sampling: Stochastic (Langevin dynamics)
+xₜ₋₁ = (1/√αₜ)(xₜ - (1-αₜ)/√(1-ᾱₜ)·εθ(xₜ,t)) + σₜ·z,  z ~ N(0,I)
+
+DDIM (Song et al., 2020): Deterministic (ODE)
+xₜ₋₁ = √ᾱₜ₋₁·x̂₀ + √(1-ᾱₜ₋₁)·εθ(xₜ,t)
+
+where x̂₀ = (xₜ - √(1-ᾱₜ)·εθ(xₜ,t))/√ᾱₜ  (predicted clean image)
+
+Key advantages:
+1. Deterministic: Same noise → same output
+2. Faster: Skip timesteps (100 → 10 steps)
+3. Inversion: Can encode real images to latent
+
+Theorem (DDIM ODE Connection):
+DDIM update is discretization of probability flow ODE:
+
+dx_t/dt = f(x_t, t) - (1/2)g(t)²·∇_x log p_t(x_t)
+
+where:
+f(x_t, t) = drift coefficient
+g(t) = diffusion coefficient
+∇_x log p_t(x_t) = score function (predicted by εθ)
+
+Continuous limit: DDIM converges to ODE solution
+Speedup: 10-50× faster than DDPM with similar quality
+```
+
+**Theorem 5 (Latent Diffusion Models - Rombach et al., 2022):**
+
+```
+Problem: High-resolution images (1024×1024) have d ≈ 3M dimensions
+Diffusion complexity: O(T·d²) for attention → prohibitive!
+
+Solution: Work in latent space
+
+Encoder: E: ℝᴴˣᵂˣ³ → ℝʰˣʷˣᶜ  (VAE encoder)
+Decoder: D: ℝʰˣʷˣᶜ → ℝᴴˣᵂˣ³  (VAE decoder)
+
+Typical compression: 8× (1024² → 128²)
+
+Training:
+1. Pre-train VAE: min_E,D [||x - D(E(x))||² + KL regularization]
+2. Train diffusion in latent space z = E(x)
+
+Modified diffusion:
+q(zₜ | zₜ₋₁) = N(zₜ; √(1-βₜ)·zₜ₋₁, βₜI)
+
+Complexity reduction:
+Original: O(T·H²W²) ≈ O(T·10⁶)  for 1024² images
+Latent: O(T·h²w²) ≈ O(T·16K)  for 128² latents
+
+64× speedup in attention operations!
+
+Conditioning (text-to-image):
+Cross-attention between latent diffusion and text encoder:
+
+Attention(Q, K, V) = softmax(QK^T/√d)·V
+
+where:
+Q = query from diffusion UNet
+K, V = key/value from CLIP text encoder
+
+This allows text-conditional generation:
+p(z | c) where c = text embedding
+
+Classifier-free guidance:
+ε̃θ(zₜ, c, t) = εθ(zₜ, ∅, t) + w·(εθ(zₜ, c, t) - εθ(zₜ, ∅, t))
+
+w = guidance weight (typically 7-15)
+Higher w → stronger conditioning, less diversity
+```
+
+**Sampling Algorithm Comparison:**
+
+```
+| Method | Steps | Stochastic | Invertible | Speed | Quality |
+|--------|-------|------------|------------|-------|---------|
+| DDPM | 1000 | Yes | No | 1× | Baseline |
+| DDIM | 50-100 | No | Yes | 10-20× | Similar |
+| DPM-Solver | 20-30 | No | Yes | 30-50× | Similar |
+| LCM | 4-8 | No | Yes | 100-250× | Good |
+
+DDPM: Original, slow but high quality
+DDIM: Fast deterministic sampling
+DPM-Solver: ODE solver, even faster
+LCM (Latent Consistency Models): Distilled, 1-4 steps!
+```
 
 ### Key Models
 
