@@ -970,6 +970,60 @@ print(f"  Nesterov: {loss_nag[-1]:.2f}")
 
 **Adapts learning rate for each parameter** based on historical gradients.
 
+### Mathematical Theory of AdaGrad
+
+**Theorem 9 (AdaGrad Regret Bound - Duchi et al., 2011):**
+For online convex optimization, AdaGrad achieves the following regret bound:
+
+R_T = Σ_{t=1}^T [f_t(x_t) - f_t(x*)]
+
+≤ (||x*||₂ / (2α)) Σᵢ √(Σ_{t=1}^T g_{t,i}²) + (α/2) Σ_{t=1}^T ||g_t||²_{G_t^{-1}}
+
+where g_t is the gradient at step t, G_t = diag(Σ_{τ=1}^t g_τ²).
+
+**For sparse gradients** (at most s non-zero entries per g_t):
+R_T ≤ O(√s · T)
+
+This is much better than O(√d · T) for standard GD when s << d!
+
+**Proof sketch:**
+AdaGrad uses adaptive learning rates η_{t,i} = α/√(G_{t,i}):
+
+||x_{t+1} - x*||² = ||x_t - η_t ⊙ g_t - x*||²
+                   = ||x_t - x*||² - 2(x_t - x*)ᵀ(η_t ⊙ g_t) + ||η_t ⊙ g_t||²
+
+By telescoping and careful analysis of the adaptive rates, the bound follows. ∎
+
+**Theorem 10 (AdaGrad Convergence for Convex Functions):**
+For convex function f with ||∇f(x)|| ≤ G for all x, AdaGrad with α = 1 achieves:
+
+f(x̄_T) - f(x*) ≤ O(G·||x*|| / √T)
+
+where x̄_T = (1/T) Σ_{t=1}^T x_t is the average iterate.
+
+**Convergence rate:** O(1/√T) - same as SGD but with automatic adaptation!
+
+**Key advantage:** Works well for sparse gradients and non-uniform learning rates.
+
+**Theorem 11 (AdaGrad Learning Rate Decay Analysis):**
+The effective learning rate for coordinate i at step T is:
+
+α_T,i = α / √(Σ_{t=1}^T g_{t,i}²)
+
+**Decay behavior:**
+- For constant gradient g_i: α_T,i ≈ α/(g_i√T) → 0 at rate O(1/√T)
+- For sparse updates: coordinates updated k < T times have α_T,i ≈ α/√k
+
+**Fatal flaw:** Learning rates decay too aggressively for non-convex problems!
+
+**Example:**
+- Initial LR: α = 0.1
+- Gradient magnitudes: g_i ≈ 0.5 (constant)
+- After T = 100 steps: Σg² ≈ 25, effective LR ≈ 0.1/5 = 0.02 (5× reduction)
+- After T = 10,000 steps: Σg² ≈ 2,500, effective LR ≈ 0.1/50 = 0.002 (50× reduction!)
+
+Eventually α_T,i → 0, stopping all learning.
+
 ### Formula
 
 ```
@@ -1062,6 +1116,67 @@ print(f"  Effective learning rates: {0.5 / (np.sqrt(G) + 1e-8)}")
 ## RMSprop
 
 **Fixes AdaGrad's learning rate decay** using moving average.
+
+### Mathematical Theory of RMSprop
+
+**Theorem 12 (RMSprop Convergence for Non-Convex - Tieleman & Hinton, 2012):**
+For non-convex L-smooth function f, RMSprop with appropriate parameters achieves:
+
+min_{t≤T} E[||∇f(x_t)||²] ≤ O((√d·L·(f(x₀) - f*)) / √T)
+
+where d is dimension and f* is optimal value.
+
+**Convergence rate:** O(1/√T) to stationary point (∇f = 0)
+
+**Key difference from AdaGrad:** RMSprop maintains bounded effective learning rates!
+
+**Theorem 13 (RMSprop Effective Learning Rate Bounds):**
+For coordinate i with exponential moving average parameter β:
+
+α_min,i ≤ α_t,i ≤ α_max,i
+
+where:
+- α_min,i = α / √(g_max² + ε)  (when v_t,i = g_max²)
+- α_max,i = α / √ε  (when v_t,i → 0)
+
+**Bounded learning rates** prevent complete decay!
+
+**Analysis of exponential moving average:**
+v_t = β·v_{t-1} + (1-β)·g_t²
+
+At equilibrium with constant gradient g:
+v_∞ = (1-β)·g² / (1-(1-β)) = g²
+
+So effective LR: α_eff = α/√(g² + ε) ≈ α/|g| (constant!)
+
+**Theorem 14 (RMSprop Memory Length):**
+The effective memory length of RMSprop is:
+
+T_mem ≈ 1/(1-β)
+
+**Intuition:** Gradients from T_mem steps ago have weight ≈ β^T_mem ≈ 1/e ≈ 0.37
+
+**Common values:**
+- β = 0.9: T_mem ≈ 10 steps
+- β = 0.99: T_mem ≈ 100 steps
+- β = 0.999: T_mem ≈ 1,000 steps
+
+**Trade-offs:**
+- Small β (0.9): Fast adaptation, noisy estimates
+- Large β (0.999): Slow adaptation, stable estimates
+- Default: β = 0.9 balances adaptation vs stability
+
+**Theorem 15 (RMSprop vs AdaGrad Effective LR):**
+After T steps with constant gradient g:
+
+AdaGrad: α_T = α/(|g|√T) → 0 as T → ∞
+RMSprop: α_T ≈ α/|g| → constant
+
+**Ratio:** RMSprop LR is √T times larger than AdaGrad!
+
+For T = 10,000: RMSprop LR is 100× larger than AdaGrad.
+
+This is why RMSprop works for non-convex optimization (doesn't stop learning).
 
 ### Formula
 
@@ -1170,6 +1285,136 @@ print(f"  RMSprop final loss: {loss_rmsprop[-1]:.2f}")
 ## Adam
 
 **Adaptive Moment Estimation** - combines Momentum and RMSprop.
+
+### Mathematical Theory of Adam
+
+**Theorem 16 (Adam Algorithm - Kingma & Ba, 2015):**
+Adam maintains two exponential moving averages:
+
+m_t = β₁·m_{t-1} + (1-β₁)·g_t  (first moment, momentum)
+v_t = β₂·v_{t-1} + (1-β₂)·g_t²  (second moment, adaptive LR)
+
+With bias correction:
+m̂_t = m_t / (1-β₁^t)
+v̂_t = v_t / (1-β₂^t)
+
+Update: x_{t+1} = x_t - α·m̂_t / (√v̂_t + ε)
+
+**Why two moments?**
+- m_t: Provides momentum (acceleration + noise reduction)
+- v_t: Provides adaptive learning rates (per-parameter scaling)
+
+**Theorem 17 (Adam Convergence - Original Claim):**
+The original Adam paper claimed:
+
+E[f(x_T)] - f(x*) ≤ O(1/√T)
+
+However, **this claim was shown to be incorrect!**
+
+**Theorem 18 (Adam Non-Convergence - Reddi et al., 2018):**
+Adam can **fail to converge** even for simple convex problems.
+
+**Counterexample:**
+Consider online optimization with:
+- f₁(x) = 1,010·x at t ∈ {1, 2, 3}
+- f_t(x) = -x for t mod 3 = 0
+
+Optimal: x* = -1
+
+With parameters β₁ = 0, β₂ = 1/(1+10²):
+- Adam converges to x_∞ ≈ +1 (wrong direction!)
+- SGD converges to x* = -1 (correct)
+
+**Root cause:** v_t can **decrease** over time, causing learning rate to increase
+unexpectedly and overshoot.
+
+**Theorem 19 (AMSGrad Fix - Reddi et al., 2018):**
+AMSGrad guarantees convergence by using:
+
+v̂_t = max(v̂_{t-1}, v_t / (1-β₂^t))
+
+**Key change:** v̂_t is non-decreasing, ensuring learning rates never increase.
+
+**Convergence guarantee:**
+For convex functions:
+E[f(x_T)] - f(x*) ≤ O(1/√T)
+
+For non-convex functions:
+min_{t≤T} E[||∇f(x_t)||²] ≤ O(1/√T)
+
+**Theorem 20 (Adam Bias Correction Necessity):**
+Without bias correction (using m_t and v_t directly), Adam is biased toward zero
+in early iterations.
+
+**Expected value** with constant gradient g and starting from m₀ = v₀ = 0:
+E[m_t] = (1-β₁^t)·g ≠ g  (biased!)
+E[v_t] = (1-β₂^t)·g² ≠ g²  (biased!)
+
+**Corrected:**
+E[m̂_t] = g  (unbiased!)
+E[v̂_t] = g²  (unbiased!)
+
+**Impact magnitude** for β₁ = 0.9, β₂ = 0.999:
+- Step 1: bias factors 0.1 and 0.001 (10× and 1000× underestimate!)
+- Step 10: bias factors 0.651 and 0.010
+- Step 100: bias factors 0.99997 and 0.095
+- Step 1000: bias factors ≈ 1.0 and 0.632
+
+Bias correction critical for first ~1000 steps when β₂ = 0.999!
+
+**Theorem 21 (Adam Effective Learning Rate Analysis):**
+The effective learning rate for coordinate i at step t is:
+
+α_eff,t,i = α·m̂_t,i / √(v̂_t,i + ε)
+
+**Bounds:** For |m̂_t,i| ≤ |g_max| and v̂_t,i ∈ [v_min, v_max]:
+
+α·|g_max| / √(v_max + ε) ≤ |α_eff,t,i| ≤ α·|g_max| / √(v_min + ε)
+
+**Typical behavior:**
+- High curvature directions (large v̂): small effective LR
+- Low curvature directions (small v̂): large effective LR
+- Momentum |m̂| can exceed |g| by factor ~1/(1-β₁) ≈ 10 for β₁ = 0.9
+
+**Theorem 22 (Adam Hyperparameter Sensitivity):**
+The optimal hyperparameters depend on problem characteristics:
+
+**β₁ (momentum):**
+- High β₁ (0.95-0.99): Good for smooth, deterministic gradients
+- Low β₁ (0.8-0.9): Good for noisy, stochastic gradients
+- Default: β₁ = 0.9 (robust choice)
+
+**β₂ (adaptive LR):**
+- High β₂ (0.995-0.9999): Good for sparse gradients, stable curvature
+- Low β₂ (0.95-0.99): Good for non-stationary gradients
+- Default: β₂ = 0.999 (works for most cases)
+
+**α (learning rate):**
+- Typical range: [10⁻⁵, 10⁻²]
+- Deep learning default: α = 10⁻³
+- Needs tuning: multiply by {0.1, 1, 10} grid search
+
+**ε (numerical stability):**
+- Default: ε = 10⁻⁸ (sufficient for float32)
+- Use ε = 10⁻⁴ for float16 to avoid division by tiny numbers
+
+**Theorem 23 (Adam vs SGD+Momentum Generalization):**
+**Empirical finding (Wilson et al., 2017):**
+Adam often achieves:
+- Faster convergence (fewer iterations)
+- Worse generalization (higher test error)
+
+than SGD+Momentum with learning rate schedule.
+
+**Hypothesized causes:**
+1. Adaptive learning rates reduce effective noise in SGD (implicit regularization)
+2. Adam converges to sharper minima (poor generalization)
+3. Large effective learning rates from momentum accumulation
+
+**Practical recommendation:**
+- Use Adam for: quick prototyping, initial training, RL, NLP (transformers)
+- Use SGD+Momentum for: final training, computer vision, best generalization
+- Hybrid: Start with Adam, fine-tune with SGD+Momentum
 
 ### Formula
 
