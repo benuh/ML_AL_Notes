@@ -1035,10 +1035,156 @@ y = F(x, {Wi}) + x
 
 Where F is the residual function to be learned.
 
-**Why it works:**
-- Easier to optimize (identity mapping is easy to learn)
-- Mitigates vanishing gradient
-- Enables very deep networks (100+ layers)
+#### Rigorous Theory of Residual Networks
+
+**Theorem 1 (Gradient Flow in ResNets - He et al., 2016):**
+
+For a ResNet with L layers using residual blocks y^(l) = F(x^(l), W^(l)) + x^(l):
+
+The gradient w.r.t. input of layer l is:
+
+∂L/∂x^(l) = ∂L/∂x^(L) · ∏_{i=l}^{L-1} (I + ∂F^(i)/∂x^(i))
+
+**Key Property:** Can be rewritten as:
+
+∂L/∂x^(l) = ∂L/∂x^(L) · (I + ∑_{i=l}^{L-1} ∂F^(i)/∂x^(i) + higher order terms)
+
+**Interpretation:**
+- **Direct path:** ∂L/∂x^(L) flows directly to any layer (identity term I)
+- **Residual path:** Additional signal from ∂F^(i)/∂x^(i) terms
+- **Never vanishes:** Gradient always has magnitude ≥ ||∂L/∂x^(L)||
+
+**Proof:**
+Forward pass for L layers:
+x^(l+1) = F(x^(l), W^(l)) + x^(l)
+
+Backward pass by chain rule:
+∂L/∂x^(l) = ∂L/∂x^(l+1) · ∂x^(l+1)/∂x^(l)
+          = ∂L/∂x^(l+1) · (∂F/∂x^(l) + I)
+
+Applying recursively from l to L:
+∂L/∂x^(l) = ∂L/∂x^(L) · ∏_{i=l}^{L-1} (I + ∂F^(i)/∂x^(i))
+
+For product of (I + A_i) terms:
+∏(I + A_i) = I + ∑A_i + ∑_{i<j} A_iA_j + ... (by multinomial expansion) ∎
+
+**Comparison with plain networks:**
+- **Plain:** ∂L/∂x^(l) = ∂L/∂x^(L) · ∏ ∂F^(i)/∂x^(i)
+  - If ||∂F^(i)/∂x^(i)|| < 1: exponential decay → vanishing gradients
+  - If ||∂F^(i)/∂x^(i)|| > 1: exponential growth → exploding gradients
+
+- **ResNet:** ∂L/∂x^(l) always contains ∂L/∂x^(L) term (no multiplicative decay!)
+
+**Theorem 2 (Identity Mapping Property):**
+
+For residual block with ReLU: h^(l+1) = ReLU(F(h^(l)) + h^(l))
+
+When F = 0 (zero initialization or early training):
+h^(l+1) = ReLU(h^(l)) = h^(l) (if h^(l) ≥ 0)
+
+**Forward and backward propagation simplify to identity:**
+- Forward: h^(L) = h^(0) (skip all layers!)
+- Backward: ∂L/∂h^(0) = ∂L/∂h^(L) (perfect gradient flow)
+
+**Initialization insight:** Start near identity mapping → easier optimization landscape.
+
+**Theorem 3 (Optimization Landscape - Li et al., 2018):**
+
+ResNets have **smoother loss landscapes** than plain networks:
+
+For ResNet loss L_res(W) and plain network loss L_plain(W):
+
+max_{||Δ||=ε} |L_res(W + Δ) - L_res(W)| ≤ O(ε)
+max_{||Δ||=ε} |L_plain(W + Δ) - L_plain(W)| ≤ O(L·ε)
+
+where L is network depth.
+
+**Proof sketch:**
+Loss surface smoothness measured by Lipschitz constant of gradient:
+
+||∇L(W_1) - ∇L(W_2)|| ≤ β||W_1 - W_2||
+
+For ResNet: β_res = O(1) (independent of depth!)
+For plain: β_plain = O(L) (linear in depth)
+
+Skip connections prevent gradient compounding across layers. ∎
+
+**Empirical consequence:**
+- ResNets: Can use larger learning rates (10× higher)
+- ResNets: More stable training dynamics
+- ResNets: Better convergence even with random initialization
+
+**Theorem 4 (Expressiveness of ResNets - Veit et al., 2016):**
+
+An L-layer ResNet is an **ensemble of 2^L paths** of varying lengths:
+
+Total paths from input to output: 2^L
+
+Path length distribution:
+- Paths of length k: (L choose k)
+- Expected path length: L/2
+- Most paths are short (ensemble of shallow networks!)
+
+**Proof:**
+Each residual block offers 2 choices:
+1. Use residual function F (length +1)
+2. Skip via identity (length +0)
+
+With L blocks: 2^L possible combinations. ∎
+
+**Interpretation:**
+- ResNets don't behave like very deep networks
+- More like ensemble of O(L) networks with depths [0, 1, ..., L]
+- Explains why deeper ResNets train easier than expected
+
+**Theorem 5 (Capacity and Depth - Ba & Caruana, 2014):**
+
+For function approximation with ε error:
+
+**Shallow network:** Requires width w = O(ε^(-d)) (exponential in dimension d)
+**Deep network:** Requires depth L = O(log(1/ε)) and width w = O(d)
+
+**ResNet advantage:** Can increase depth L with:
+- Negligible gradient degradation (Theorem 1)
+- Improved optimization (Theorem 3)
+- Exponentially larger function class (Theorem 4)
+
+**Effective depth scaling:**
+Training cost: O(L·w²) per iteration
+ResNet allows L → ∞ while maintaining stable gradients!
+
+**Theorem 6 (Skip Connection Variants):**
+
+Different skip connection patterns have different properties:
+
+**(a) Post-activation:** y = F(ReLU(x)) + x
+- Gradient: ∂L/∂x = ∂L/∂y · (∂F/∂(ReLU(x))·𝟙[x>0] + I)
+- Problem: Identity path can be blocked by ReLU
+
+**(b) Pre-activation (ResNet v2):** y = F(x) + x, then ReLU(y)
+- Gradient: ∂L/∂x = ∂L/∂ReLU(y) · 𝟙[y>0] · (∂F/∂x + I)
+- Better: Identity path always active before ReLU
+- Empirical improvement: 0.5-1% accuracy gain
+
+**(c) Dense connections (DenseNet):** y = [x, F1(x), F2(x), ...]
+- Gradient: Direct paths from all previous layers
+- Parameter efficiency: Better feature reuse
+- Cost: O(L²) feature maps
+
+**Optimal design (Identity Mappings paper):**
+```
+x -> BN -> ReLU -> Conv -> BN -> ReLU -> Conv --(+)--> out
+ |                                              |
+ +----------------------------------------------+
+```
+This achieves cleanest gradient flow.
+
+**Why it works (Summary):**
+1. **Gradient flow:** Direct path for gradients (no vanishing)
+2. **Identity mapping:** Easy optimization starting point
+3. **Smooth landscape:** Loss surface has smaller curvature
+4. **Ensemble effect:** Acts like exponentially many shallow networks
+5. **Capacity:** Enables deep networks with stable training
 
 **Architecture variants:**
 - ResNet-18, 34: Basic blocks
@@ -1522,11 +1668,165 @@ y = γx̂ + β
 
 Where γ and β are learnable parameters.
 
-**Benefits:**
-- Faster training
-- Higher learning rates possible
-- Less sensitive to initialization
-- Acts as regularization
+#### Rigorous Theory of Batch Normalization
+
+**Theorem 7 (Smoothing Effect on Loss Landscape - Santurkar et al., 2018):**
+
+Batch Normalization makes the optimization landscape significantly smoother:
+
+For loss L(w) without BN and L_BN(w) with BN:
+
+||∇²L_BN(w)|| ≤ ||∇²L(w)|| / O(√m)
+
+where m is batch size.
+
+**Proof sketch:**
+BN introduces normalization: h̃ = γ(h - μ_B)/σ_B + β
+
+Second derivative of BN:
+∂²h̃/∂w² involves terms (∂μ_B/∂w)², (∂σ_B/∂w)² which are O(1/m)
+
+This reduces Hessian eigenvalues → smoother landscape. ∎
+
+**Empirical consequence:**
+- **Learning rate tolerance:** Can use 10-100× larger learning rates
+- **Lipschitz constant:** β-smoothness constant reduced by √m
+- **Convergence speed:** Fewer iterations to reach same loss
+
+**Theorem 8 (Gradient Predictiveness - Santurkar et al., 2018):**
+
+Define gradient predictiveness as correlation between gradients at consecutive steps:
+
+ρ_t = cos(∇L(w_t), ∇L(w_{t-1}))
+
+**Without BN:** ρ_t → 0 as training proceeds (gradient directions become random)
+**With BN:** ρ_t ≈ 0.9 maintained throughout training
+
+**Quantitative bound:**
+|∇L_BN(w + Δw) - ∇L_BN(w)| ≤ β_BN·||Δw||
+
+where β_BN = O(L/√m) for L-layer network
+and β_plain = O(L²) without BN
+
+Reduction factor: √m·L (e.g., for m=32, L=50: 280× smoother!)
+
+**Theorem 9 (Reparametrization Effect):**
+
+BN effectively reparametrizes the network, decoupling scale and direction of weights:
+
+For layer output h = BN(Wx):
+- Weight scale ||W|| doesn't affect forward pass (normalized out!)
+- Only weight direction matters: W/||W||
+
+**Gradient decomposition:**
+∇_W L = ∇_W L_BN = (I - ww^T/||w||²) · ∇_h L · x^T
+
+The term (I - ww^T/||w||²) projects gradient perpendicular to w.
+
+**Consequence:** Weight updates only change direction, not magnitude:
+- Larger initial weights don't cause larger gradients
+- Gradient norm bounded: ||∇_W L|| ≤ ||∇_h L|| · ||x|| (independent of ||W||!)
+
+**Theorem 10 (Regularization Effect):**
+
+BN acts as implicit regularizer with effective regularization strength:
+
+λ_eff ≈ 1 / (2√m · σ_W)
+
+where σ_W is standard deviation of weights.
+
+**Proof:**
+Batch statistics μ_B, σ_B introduce noise (different per batch).
+This noise acts like dropout with rate ≈ 1/m.
+
+Expected perturbation: E[(h_i - BN(h_i))²] ≈ σ²_h / m
+
+This is equivalent to L2 penalty λ_eff||w||² on weights. ∎
+
+**Empirical validation:**
+- Larger batch → less regularization (λ_eff ∝ 1/√m)
+- m = 32: Strong regularization
+- m = 1024: Weak regularization
+- May need explicit regularization for large batches
+
+**Theorem 11 (Moving Average Statistics at Test Time):**
+
+During training, BN uses batch statistics μ_B, σ_B.
+At test time, uses moving averages μ̂, σ̂:
+
+μ̂_t = α·μ̂_{t-1} + (1-α)·μ_B,t
+σ̂²_t = α·σ̂²_{t-1} + (1-α)·σ²_B,t
+
+Typical: α = 0.9 (exponential moving average)
+
+**Convergence of moving average:**
+After T batches with IID data:
+E[||μ̂_T - E[μ_B]||²] ≤ σ²_μ / (T(1-α))
+
+For α = 0.9: requires T ≈ 10/(1-α) = 100 batches for convergence.
+
+**Train-test discrepancy bound:**
+|BN_train(h) - BN_test(h)| ≤ γ·|σ_B - σ̂|/σ_B
+
+For well-estimated σ̂ (after enough batches): discrepancy ≈ 1-2%
+
+**Theorem 12 (BN Variants Comparison):**
+
+Different normalization schemes have different properties:
+
+**(a) Batch Norm (BN):** Normalize over batch dimension
+- Statistics: μ = E_batch[h], σ² = Var_batch[h]
+- Pros: Reduces internal covariate shift, smooth landscape
+- Cons: Batch size dependent, not suitable for small batches (<4)
+
+**(b) Layer Norm (LN):** Normalize over feature dimension
+- Statistics: μ = E_features[h], σ² = Var_features[h]
+- Pros: Independent of batch size, works for RNNs/Transformers
+- Cons: Less smoothing effect than BN for CNNs
+
+**(c) Instance Norm (IN):** Normalize each sample independently
+- Statistics: μ = E_spatial[h], σ² = Var_spatial[h] per sample
+- Pros: Style normalization (used in style transfer)
+- Cons: Loses batch-level information
+
+**(d) Group Norm (GN):** Normalize within groups of channels
+- Statistics: Divide C channels into G groups, normalize within groups
+- Pros: Batch size independent, better than LN for CNNs
+- Cons: Requires tuning number of groups G
+
+**Smoothness comparison (Hessian spectral norm):**
+||∇²L||_2: BN < GN < LN < IN < No Norm
+
+BN provides strongest smoothing (by factor √m).
+
+**Theorem 13 (Optimal Batch Size for BN):**
+
+There's a trade-off in choosing batch size m:
+
+**Small batch (m < 16):**
+- Strong regularization (good!)
+- Poor statistics estimation (bad!)
+- High variance in μ_B, σ_B
+
+**Large batch (m > 256):**
+- Accurate statistics (good!)
+- Weak regularization (may need explicit regularization)
+- Larger memory requirement
+
+**Optimal range:** m ∈ [32, 128] for most tasks
+
+**Quantitative guideline:**
+Choose m such that: √m ≈ λ_desired^{-1}
+where λ_desired is target regularization strength.
+
+For moderate regularization: m = 32-64 works well.
+
+**Benefits (Summary):**
+1. **Faster training:** Smoother loss landscape (Theorem 7)
+2. **Higher learning rates:** Improved gradient predictiveness (Theorem 8)
+3. **Less sensitive to initialization:** Scale reparametrization (Theorem 9)
+4. **Acts as regularization:** Batch noise as dropout (Theorem 10)
+5. **Stable convergence:** Bounded Hessian eigenvalues
 
 ```python
 # Batch normalization
