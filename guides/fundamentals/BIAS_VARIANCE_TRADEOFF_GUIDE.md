@@ -97,6 +97,260 @@ print(f"Training Error (High Variance): {np.mean((y - y_pred_variance)**2):.2f}"
 - Fits random noise
 - Overfitting
 
+### Rigorous Theory of Bias-Variance Decomposition
+
+**Theorem 1 (Bias-Variance Decomposition - Geman et al., 1992):**
+
+For a learning algorithm that produces estimator f̂(x) trained on dataset D:
+
+**Expected prediction error at point x:**
+
+E_D[(y - f̂(x))²] = Bias²(f̂(x)) + Var(f̂(x)) + σ²
+
+where:
+- **Bias²(f̂(x))** = (E_D[f̂(x)] - f(x))² = [E_D[f̂(x)] - E[y|x]]²
+- **Var(f̂(x))** = E_D[(f̂(x) - E_D[f̂(x)])²]
+- **σ²** = Var(ε) = irreducible error (inherent noise)
+- f(x) = E[y|x] = true underlying function
+
+**Proof:**
+Starting with MSE at point x:
+
+MSE(x) = E_D[(y - f̂(x))²]
+
+Add and subtract E_D[f̂(x)] and f(x):
+
+= E_D[(y - f(x) + f(x) - E_D[f̂(x)] + E_D[f̂(x)] - f̂(x))²]
+
+Expanding and taking expectations (y and f̂ are independent given x):
+
+= E[(y - f(x))²] + (f(x) - E_D[f̂(x)])² + E_D[(E_D[f̂(x)] - f̂(x))²]
+
+= σ² + Bias²(f̂(x)) + Var(f̂(x)) ∎
+
+**Interpretation:**
+- **Bias:** How far average prediction deviates from truth
+- **Variance:** How much predictions fluctuate across different training sets
+- **Noise:** Irreducible error in data
+
+**Theorem 2 (Integrated Bias-Variance Decomposition):**
+
+Expected error over entire input distribution:
+
+E_x,D[(y - f̂(x))²] = E_x[Bias²(f̂(x))] + E_x[Var(f̂(x))] + σ²
+
+**Simplified notation:**
+Total Error = Bias² + Variance + Irreducible Error
+
+**Key trade-off:**
+- Increasing model complexity: Bias↓, Variance↑
+- Decreasing model complexity: Bias↑, Variance↓
+- Optimal complexity minimizes total error
+
+**Theorem 3 (Bias-Variance for Ridge Regression - Hastie et al., 2009):**
+
+For ridge regression with parameter λ:
+
+**Bias:**
+Bias(ŵ_ridge) = -λ(X^T X + λI)^(-1) w*
+
+**Bias squared:**
+||Bias||² = λ² · w*^T (X^T X + λI)^(-2) w*
+
+**Variance:**
+Var(ŵ_ridge) = σ² · tr[(X^T X + λI)^(-1) X^T X (X^T X + λI)^(-1)]
+
+**Total MSE:**
+MSE(λ) = λ² · w*^T (X^T X + λI)^(-2) w* + σ² · tr[(X^T X + λI)^(-1) X^T X (X^T X + λI)^(-1)]
+
+**Optimal λ:** Minimizes MSE(λ), found by setting dMSE/dλ = 0
+
+**Example with eigendecomposition:**
+Let X^T X = UΣ²U^T with singular values σ_i.
+
+Bias² = Σ_i (λ·w*_i / (σ_i² + λ))²
+Variance = σ² Σ_i σ_i² / (σ_i² + λ)²
+
+**Trade-off visualization:**
+- λ = 0 (OLS): Bias = 0, Variance = σ² Σ_i 1/σ_i² (large if small σ_i!)
+- λ = ∞: Bias = ||w*||², Variance = 0
+
+**Theorem 4 (Bias-Variance for k-NN - Hastie et al., 2009):**
+
+For k-Nearest Neighbors at point x with k neighbors:
+
+**Bias:**
+Bias(f̂_k(x)) ≈ (k/n)^(2/(d+4)) · C_1
+
+where d is dimensionality, C_1 depends on smoothness of f.
+
+**Variance:**
+Var(f̂_k(x)) ≈ σ² / k
+
+**MSE:**
+MSE(x) ≈ C_1² · (k/n)^(4/(d+4)) + σ² / k
+
+**Optimal k:**
+k* ∝ n^(4/(d+4))
+
+**Key insight:** Curse of dimensionality!
+- As d increases, optimal k grows: need more neighbors
+- For d = 2: k* ∝ n^(2/3)
+- For d = 10: k* ∝ n^(4/14) ≈ n^(0.286)
+
+**Theorem 5 (Double Descent Phenomenon - Belkin et al., 2019):**
+
+**Classical regime (p < n):**
+As model complexity p increases:
+- Bias decreases monotonically
+- Variance increases monotonically
+- Total error: U-shaped curve (classical bias-variance tradeoff)
+
+**Interpolation threshold (p = n):**
+- Model perfectly fits training data
+- Risk peaks (highest test error)
+
+**Modern over-parameterized regime (p >> n):**
+- Test error decreases again! ("double descent")
+- Implicit regularization from optimization algorithm
+- Benign overfitting: interpolates training data but generalizes well
+
+**Mathematical explanation:**
+In over-parameterized regime, gradient descent finds minimum-norm solution:
+
+ŵ = argmin_{w: Xw=y} ||w||²
+
+This implicit regularization acts like Ridge with λ → 0, providing generalization.
+
+**Empirical finding:**
+- Deep neural networks: p = 10^6 to 10^9 parameters, n = 10^4 to 10^6 samples
+- p/n ratio: 10 to 1000 (heavily over-parameterized!)
+- Yet generalize well due to implicit regularization
+
+**Theorem 6 (Bias-Variance for Ensemble Methods - Breiman, 1996):**
+
+For ensemble of M models f̂_m(x), m = 1,...,M:
+
+**Ensemble prediction:** f̂_ens(x) = (1/M) Σ_m f̂_m(x)
+
+**Bias:**
+Bias(f̂_ens) = (1/M) Σ_m Bias(f̂_m)
+
+If models have same bias: Bias(f̂_ens) = Bias(f̂_single)
+
+**Variance (independent models):**
+Var(f̂_ens) = (1/M²) Σ_m Var(f̂_m) = (1/M) · Var(f̂_single)
+
+**Variance reduction:** Factor of M!
+
+**Variance (correlated models with correlation ρ):**
+Var(f̂_ens) = ρ·σ² + ((1-ρ)/M)·σ²
+
+where σ² = Var(f̂_single).
+
+**As M → ∞:** Var(f̂_ens) → ρ·σ² (correlation ρ limits variance reduction)
+
+**Key insight:** Ensemble reduces variance without increasing bias!
+
+**Practical implications:**
+- Bagging: Reduces variance by training on bootstrap samples
+- Random Forests: Reduces ρ by using feature subsets
+- Boosting: Reduces bias by sequential training
+
+**Theorem 7 (Sample Complexity and Bias-Variance - Valiant, 1984):**
+
+For ε-accurate learning with confidence 1-δ:
+
+n = O((VC_dim/ε²) · log(1/δ))
+
+where VC_dim is Vapnik-Chervonenkis dimension (measure of model complexity).
+
+**Bias-variance connection:**
+- High VC_dim → Low bias, High variance → Need more samples
+- Low VC_dim → High bias, Low variance → Fewer samples sufficient
+
+**Examples:**
+- Linear classifier in ℝ^d: VC_dim = d+1
+- Neural network with W weights: VC_dim = O(W log W)
+- Decision tree of depth h: VC_dim = O(2^h)
+
+**Sample complexity implications:**
+- Linear model (d=100): n = O(100/ε²)
+- Neural net (W=10^6): n = O(10^6 log(10^6)/ε²) ≈ O(1.4×10^7/ε²)
+
+For ε = 0.1, δ = 0.05:
+- Linear: n ≈ 10^4 samples
+- Neural net: n ≈ 10^9 samples (without implicit regularization!)
+
+**Theorem 8 (Rademacher Complexity and Generalization - Bartlett & Mendelson, 2002):**
+
+For hypothesis class ℱ, Rademacher complexity:
+
+R_n(ℱ) = E_σ[sup_{f∈ℱ} (1/n) Σ_i σ_i f(x_i)]
+
+where σ_i ∈ {-1, +1} are Rademacher variables.
+
+**Generalization bound:**
+With probability 1-δ:
+
+|E[L(f)] - L̂(f)| ≤ 2R_n(ℱ) + O(√(log(1/δ)/n))
+
+**Bias-variance interpretation:**
+- Large R_n(ℱ): High capacity → Low bias, High variance
+- Small R_n(ℱ): Low capacity → High bias, Low variance
+
+**Examples:**
+- Linear functions with ||w|| ≤ W: R_n ≈ W/√n
+- Neural networks with L layers: R_n ≈ (W·L)/√n
+
+**Theorem 9 (Cross-Validation Estimator for Bias-Variance - Efron & Tibshirani, 1997):**
+
+**Leave-One-Out (LOO) estimates:**
+
+Bias²_LOO ≈ (1/n) Σ_i (ȳ_(-i) - y_i)²
+
+where ȳ_(-i) is average prediction when leaving out fold containing x_i.
+
+Variance_LOO ≈ (1/n) Σ_i (f̂_(-i)(x_i) - f̂(x_i))²
+
+where f̂_(-i) is model trained without x_i.
+
+**K-fold CV approximation:**
+
+Total Error_CV = (1/n) Σ_i (y_i - f̂_(-K_i)(x_i))²
+
+where K_i is fold containing x_i.
+
+**Trade-off in K selection:**
+- Small K (e.g., K=5): High bias, low variance, fast
+- Large K (e.g., K=n, LOO): Low bias, high variance, slow
+- Typical: K=10 balances bias-variance-computation
+
+**Theorem 10 (Optimal Model Complexity - Vapnik, 1998):**
+
+Expected risk decomposes as:
+
+R(h) = R_emp(h) + Ω(h, n)
+
+where:
+- R_emp(h): Empirical risk (training error)
+- Ω(h, n): Complexity penalty (function of model complexity and sample size)
+
+**Structural Risk Minimization (SRM):**
+Select h* = argmin_h [R_emp(h) + Ω(h, n)]
+
+**Complexity penalty forms:**
+- VC theory: Ω(h, n) ≈ √(VC_dim(h) / n)
+- Rademacher: Ω(h, n) ≈ 2R_n(ℱ)
+- PAC-Bayes: Ω(h, n) ≈ √(KL(Q||P) / n)
+
+**Optimal complexity h*:**
+Balances empirical risk (bias) and complexity penalty (variance).
+
+**Example (polynomial regression):**
+- Degree d model: R_emp(d) decreases, Ω(d, n) increases with d
+- Optimal d* minimizes their sum
+
 ### The Mathematical Decomposition
 
 **Formal decomposition** of expected prediction error for a point x:
