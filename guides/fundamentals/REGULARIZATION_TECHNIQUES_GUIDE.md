@@ -94,6 +94,144 @@ Where:
 
 **Also called:** Ridge Regression, Weight Decay, Tikhonov Regularization
 
+### Rigorous Theory of L2 Regularization
+
+**Theorem 1 (Ridge Regression Closed Form - Hoerl & Kennard, 1970):**
+
+For linear regression with L2 regularization:
+
+min_w (1/n)||Xw - y||² + λ||w||²
+
+**Closed-form solution:**
+w_ridge = (X^T X + nλI)^(-1) X^T y
+
+**Proof:**
+Take gradient with respect to w and set to zero:
+∇_w L = (2/n)X^T(Xw - y) + 2λw = 0
+X^T Xw + nλw = X^T y
+(X^T X + nλI)w = X^T y
+w = (X^T X + nλI)^(-1) X^T y ∎
+
+**Key properties:**
+1. **Always invertible:** X^T X + nλI is positive definite for λ > 0
+2. **No singularity:** Even when X^T X is singular (p > n), ridge solution exists
+3. **Unique solution:** Convex optimization guarantees uniqueness
+
+**Theorem 2 (Ridge as Bayesian MAP Estimation):**
+
+Ridge regression is equivalent to Maximum A Posteriori (MAP) estimation with Gaussian prior:
+
+**Likelihood:** p(y|X, w) = N(Xw, σ²I)
+**Prior:** p(w) = N(0, (σ²/nλ)I)
+
+**Posterior:**
+p(w|X, y) ∝ exp(-(1/(2σ²))||y - Xw||² - (nλ/(2σ²))||w||²)
+
+**MAP estimate:**
+w_MAP = argmax_w p(w|X, y) = argmin_w (||y - Xw||² + nλ||w||²) = w_ridge ∎
+
+**Interpretation:**
+- Ridge regression assumes weights are centered at zero
+- Regularization strength λ = σ²/σ_w² (ratio of noise variance to prior variance)
+- Stronger prior belief (small σ_w²) → larger λ → more regularization
+
+**Theorem 3 (Ridge Generalization Bound - Hsu et al., 2012):**
+
+For ridge regression with regularization parameter λ, with probability 1-δ:
+
+E[L(w_ridge)] - L* ≤ (σ²·tr[(X^T X + nλI)^(-1)X^T X]) / n + λ||w*||² + O(√(log(1/δ)/n))
+
+where:
+- L*: optimal risk
+- w*: optimal weights
+- σ²: noise variance
+- tr: trace operator
+
+**Decomposition:**
+1. **Approximation error:** λ||w*||² (bias from regularization)
+2. **Estimation error:** (σ²·effective_df) / n (variance from finite data)
+3. **Sample complexity:** O(√(log(1/δ)/n))
+
+**Effective degrees of freedom:**
+df_eff(λ) = tr[(X^T X)(X^T X + nλI)^(-1)]
+
+**Theorem 4 (Ridge Bias-Variance Trade-off):**
+
+For ridge estimator w_ridge:
+
+**Bias:**
+E[w_ridge] - w* = -(nλ)(X^T X + nλI)^(-1) w*
+
+**Variance:**
+Var(w_ridge) = σ² (X^T X + nλI)^(-1) X^T X (X^T X + nλI)^(-1)
+
+**MSE decomposition:**
+MSE(w_ridge) = Bias² + Variance
+             = (nλ)² w*^T (X^T X + nλI)^(-2) w* + σ² tr[(X^T X + nλI)^(-1)X^T X(X^T X + nλI)^(-1)]
+
+**Key insight:**
+- As λ → 0: Bias → 0, Variance → σ²(X^T X)^(-1) (OLS variance)
+- As λ → ∞: Bias → w*, Variance → 0
+- Optimal λ* minimizes total MSE
+
+**Theorem 5 (Optimal Ridge Parameter via Cross-Validation):**
+
+The optimal regularization parameter λ* minimizes the cross-validation error:
+
+λ* = argmin_λ (1/K) Σ_{k=1}^K ||y_k - X_k w_ridge^{(-k)}(λ)||²
+
+where w_ridge^{(-k)}(λ) is trained on all folds except k.
+
+**Leave-One-Out (LOO) shortcut:**
+For computational efficiency, LOO error can be computed without refitting:
+
+LOO(λ) = (1/n) Σ_{i=1}^n ((y_i - x_i^T w_ridge) / (1 - H_ii))²
+
+where H = X(X^T X + nλI)^(-1)X^T is the hat matrix.
+
+**Complexity:** O(n³) for direct computation, O(n²p) with smart updates.
+
+**Theorem 6 (Ridge Shrinkage in Eigenspace):**
+
+Let X^T X = UΣ²U^T be the eigendecomposition.
+
+**Ridge solution in eigenspace:**
+w_ridge = U diag(σ_j² / (σ_j² + nλ)) U^T X^T y
+
+where σ_j are singular values of X.
+
+**Shrinkage factor for jth component:**
+s_j(λ) = σ_j² / (σ_j² + nλ)
+
+**Properties:**
+- Large σ_j (principal directions): s_j ≈ 1 (minimal shrinkage)
+- Small σ_j (noise directions): s_j ≈ 0 (maximal shrinkage)
+
+**Interpretation:** Ridge shrinks more in directions with low variance!
+
+**Example:**
+- σ_1 = 100: s_1(λ=1) = 10000/10001 ≈ 0.9999 (1% shrinkage)
+- σ_100 = 1: s_100(λ=1) = 1/2 = 0.5 (50% shrinkage)
+
+**Theorem 7 (Ridge Sample Complexity):**
+
+To achieve ε-accuracy with probability 1-δ:
+
+n = O((d/ε²) · log(d/δ))
+
+where d is the effective dimensionality: d = tr[(X^T X)(X^T X + nλI)^(-1)]
+
+**For λ → 0 (no regularization):** d = p (full dimension)
+**For λ → ∞ (strong regularization):** d → 0
+
+**Key insight:** Ridge reduces effective dimensionality!
+
+**Quantitative example:**
+- p = 1000 features
+- λ = 1: d_eff ≈ 100 (10× reduction)
+- Sample complexity: n = O(100/ε²) instead of O(1000/ε²)
+- **10× less data needed for same accuracy!**
+
 ### Formula
 
 ```
@@ -479,6 +617,176 @@ Ridge with properly chosen λ ALWAYS beats OLS in MSE!
 ## L1 Regularization (Lasso)
 
 **Also called:** Lasso Regression (Least Absolute Shrinkage and Selection Operator)
+
+### Rigorous Theory of L1 Regularization
+
+**Theorem 8 (Lasso Sparsity - Tibshirani, 1996):**
+
+For Lasso regression:
+
+min_w (1/(2n))||Xw - y||² + λ||w||₁
+
+**Key property:** Lasso produces **sparse** solutions (many coefficients exactly zero).
+
+**Geometric intuition:**
+- Constraint form: min ||Xw - y||² subject to ||w||₁ ≤ t
+- L1 ball has corners at coordinate axes
+- Optimal solution often lies at corner → sparsity!
+
+**Comparison with Ridge:**
+- Ridge constraint: ||w||₂² ≤ t (circular ball, no corners)
+- Ridge rarely produces exactly zero coefficients
+- Lasso constraint: ||w||₁ ≤ t (diamond shape with corners)
+
+**Theorem 9 (Lasso Soft-Thresholding - Donoho & Johnstone, 1994):**
+
+For orthonormal design (X^T X = I):
+
+**Closed-form solution:**
+w_lasso,j = sign(w_OLS,j) · max(|w_OLS,j| - λ, 0)
+
+This is the **soft-thresholding operator:**
+
+S_λ(z) = {
+  z - λ,  if z > λ
+  0,      if |z| ≤ λ
+  z + λ,  if z < -λ
+}
+
+**Proof:**
+For orthonormal X, objective separates:
+L(w) = Σ_j [(w_j - w_OLS,j)² / 2 + λ|w_j|]
+
+Take subdifferential and set to zero:
+∂L/∂w_j = w_j - w_OLS,j + λ·sign(w_j) = 0 (if w_j ≠ 0)
+
+Solving: w_j = w_OLS,j - λ·sign(w_j)
+
+For w_j > 0: w_j = w_OLS,j - λ
+For w_j < 0: w_j = w_OLS,j + λ
+For w_j = 0: |w_OLS,j| ≤ λ ∎
+
+**Key insight:** Lasso shrinks by constant amount λ, Ridge shrinks by proportion!
+
+**Theorem 10 (Lasso Support Recovery - Wainwright, 2009):**
+
+Let S = {j : w*_j ≠ 0} be the true support (non-zero indices).
+
+**Under restricted eigenvalue condition:**
+If λ ≥ c · σ·√(log p / n) for some constant c,
+
+then with probability 1-δ:
+
+**1. Sparsistency:** supp(w_lasso) = S (exact support recovery)
+**2. ℓ₂ consistency:** ||w_lasso - w*||₂ ≤ O(σ√(|S|log p / n))
+**3. ℓ∞ consistency:** ||w_lasso - w*||∞ ≤ O(σ√(log p / n))
+
+where:
+- |S| = number of true non-zeros (sparsity level)
+- p = total number of features
+- n = number of samples
+- σ = noise level
+
+**Sample complexity:**
+For exact support recovery: n = Ω(|S|·log p)
+
+**Interpretation:**
+- Lasso can recover true support with O(s log p) samples
+- Logarithmic scaling in p enables high-dimensional learning!
+- Compare to OLS: needs n > p (linear scaling)
+
+**Theorem 11 (Lasso as Bayesian MAP with Laplace Prior):**
+
+Lasso is equivalent to MAP estimation with Laplace prior:
+
+**Likelihood:** p(y|X, w) = N(Xw, σ²I)
+**Prior:** p(w) = ∏_j (λ/(2σ²)) exp(-λ|w_j|/σ²)
+
+**Posterior:**
+p(w|X, y) ∝ exp(-(1/(2σ²))||y - Xw||² - (λ/σ²)||w||₁)
+
+**MAP estimate:**
+w_MAP = argmax_w p(w|X, y) = argmin_w (||y - Xw||² + 2λ||w||₁) ∎
+
+**Interpretation:**
+- Laplace prior p(w_j) ∝ exp(-λ|w_j|) has peak at zero
+- Encourages sparsity (many weights at zero)
+- Heavier tails than Gaussian → less penalty for large weights
+
+**Theorem 12 (Lasso Non-Uniqueness and Instability):**
+
+**Non-uniqueness:** If features are highly correlated, Lasso solution may not be unique.
+
+**Example:** If x_i = x_j (identical features), any convex combination satisfies optimality:
+w_lasso,i + w_lasso,j = constant, but individual values arbitrary!
+
+**Instability:** Small perturbations in data can change selected features.
+
+**Theorem (Zou & Hastie, 2005):** If X^T X is not full rank, Lasso cannot select more than n features.
+
+**Practical implication:** Lasso can be unstable with high correlation!
+
+**Solution:** Elastic Net (combines L1 + L2)
+
+**Theorem 13 (Lasso Computational Complexity):**
+
+**No closed form!** Unlike Ridge, Lasso requires iterative optimization.
+
+**Common algorithms:**
+
+**1. Coordinate Descent (CD):**
+- Update one w_j at a time
+- Complexity per iteration: O(np)
+- Total: O(np · iterations) ≈ O(np · log(1/ε))
+- **Fastest for moderate p**
+
+**2. LARS (Least Angle Regression):**
+- Computes entire regularization path
+- Complexity: O(min(n², np))
+- Exact solution (no approximation)
+
+**3. Proximal Gradient Descent:**
+- Iterative: w^(t+1) = S_λη(w^(t) - η∇f(w^(t)))
+- Complexity per iteration: O(np)
+- Convergence: O(1/ε) iterations for ε-accuracy
+
+**Comparison:**
+- Ridge: O(np²) or O(n²p) (matrix inversion, one-shot)
+- Lasso: O(np · log(1/ε)) per λ (iterative)
+- Lasso is slower but provides feature selection!
+
+**Theorem 14 (Lasso Oracle Inequality - Bickel et al., 2009):**
+
+Under restricted eigenvalue condition, with λ ~ σ√(log p / n):
+
+||w_lasso - w*||²₂ ≤ C · |S| · σ² · (log p / n)
+
+with probability 1-δ.
+
+**Oracle property:**
+If we knew true support S, OLS on S achieves:
+||w_OLS,S - w*||²₂ = O(|S|·σ² / n)
+
+**Lasso pays only log p factor:**
+Lasso rate / Oracle rate = (log p / n) / (1 / n) = log p
+
+**This is nearly optimal!**
+
+**Theorem 15 (Lasso Cross-Validation Consistency - Homrighausen & McDonald, 2013):**
+
+Let λ_CV be the λ selected by K-fold cross-validation.
+
+**Theorem:** Under regularity conditions, as n → ∞:
+
+λ_CV → λ_optimal with probability 1
+
+where λ_optimal minimizes prediction error.
+
+**Practical guideline:**
+- Use 5-fold or 10-fold CV
+- Search λ on logarithmic grid: [10⁻⁴, 10⁻³, ..., 10²]
+- Select λ with minimum CV error
+- "One-standard-error rule": Select largest λ within 1 SE of minimum
 
 ### Formula
 
