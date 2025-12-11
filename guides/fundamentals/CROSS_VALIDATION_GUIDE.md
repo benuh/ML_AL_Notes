@@ -57,6 +57,224 @@ This means a single 85% accuracy could actually represent true performance anywh
 
 ---
 
+## Rigorous Theory of Cross-Validation
+
+**Theorem 1 (Cross-Validation as Risk Estimator - Stone, 1974):**
+
+Let L(f, (x, y)) be loss of model f on example (x, y). True risk:
+
+R(f) = E_(x,y)~P[L(f, (x,y))]
+
+**K-fold CV estimator:**
+R̂_CV(f) = (1/n) Σ_{i=1}^n L(f̂^(-κ(i)), (x_i, y_i))
+
+where f̂^(-κ(i)) is trained on all folds except the one containing (x_i, y_i).
+
+**Theorem (Stone, 1974):** Under regularity conditions:
+R̂_CV(f) →_P R(f) as n → ∞
+
+**Consistency:** CV provides consistent estimator of true risk.
+
+**Theorem 2 (Bias of K-Fold CV - Bengio & Grandvalet, 2004):**
+
+K-fold CV has **pessimistic bias** when estimating performance on full dataset:
+
+**Bias:**
+E[R̂_CV] ≥ R(f_n)
+
+where f_n is trained on n samples.
+
+**Reason:** CV trains on (K-1)n/K samples, not full n samples.
+
+**Quantitative bias approximation:**
+Bias ≈ R(f_{n(K-1)/K}) - R(f_n)
+
+**For learning curves R(f_m) ≈ a + b/m^α:**
+Bias ≈ b · [(K/(K-1))^α - 1] / n^α
+
+**Examples:**
+- 5-fold CV: trains on 80% → pessimistic bias
+- 10-fold CV: trains on 90% → less pessimistic
+- LOO CV: trains on (n-1)/n ≈ 100% → minimal bias
+
+**Typical α ≈ 0.5, so for n = 1000, K = 5:**
+Bias ≈ b · [(5/4)^0.5 - 1] / 1000^0.5 ≈ 0.012·b
+
+**Theorem 3 (Variance of K-Fold CV - Bengio & Grandvalet, 2004):**
+
+K-fold CV variance has two sources:
+
+**1. Sampling variance:** Var(L(f, (x,y))) from data stochasticity
+**2. Training set correlation:** Folds share (K-2)/(K-1) of training data
+
+**Total variance:**
+Var(R̂_CV) ≈ (σ²/n) · (1 + (K-1)·ρ)
+
+where:
+- σ² = Var(L(f, (x,y)))
+- ρ ≈ (K-2)/(K-1) = correlation between fold estimates
+
+**Examples:**
+- K = 5: ρ ≈ 3/4 = 0.75, Var ≈ (σ²/n)·(1 + 4·0.75) = 4σ²/n
+- K = 10: ρ ≈ 8/9 ≈ 0.89, Var ≈ (σ²/n)·(1 + 9·0.89) ≈ 9σ²/n
+- LOO (K = n): ρ ≈ (n-2)/(n-1) ≈ 1, Var ≈ (σ²/n)·n = σ²
+
+**Key insight:** LOO has HIGHEST variance! (not lowest)
+
+**Theorem 4 (Bias-Variance Trade-off in K Selection):**
+
+**As K increases:**
+- **Bias decreases:** More training data per fold → less pessimistic
+- **Variance increases:** Higher correlation between folds → more variable
+
+**Optimal K:**
+Minimizes MSE = Bias² + Variance
+
+**Empirical recommendations:**
+- **K = 5 or 10:** Good bias-variance balance
+- **K = 10:** Most common (Kohavi, 1995)
+- **LOO (K = n):** Unbiased but high variance, computationally expensive
+
+**Theorem 5 (Leave-One-Out CV Computational Shortcut - Hastie et al., 2009):**
+
+For linear smoothers (linear regression, ridge, k-NN, etc.):
+
+**LOO error computed without refitting:**
+LOO = (1/n) Σ_{i=1}^n ((y_i - ŷ_i) / (1 - H_{ii}))²
+
+where H = X(X^T X)^(-1)X^T is hat matrix, H_{ii} is diagonal element.
+
+**Proof sketch:**
+ŷ^(-i) = ŷ - H_{ii}/(1-H_{ii}) · (y_i - ŷ_i)
+
+where ŷ^(-i) is prediction without i-th sample. ∎
+
+**Complexity:**
+- Naive LOO: O(n²p) (refit n times)
+- Shortcut: O(np²) (compute H once)
+
+**For ridge regression:**
+H = X(X^T X + λI)^(-1)X^T
+
+**Generalized Cross-Validation (GCV):**
+GCV = (1/n) Σ_i ((y_i - ŷ_i) / (1 - tr(H)/n))²
+
+Approximates LOO by replacing H_{ii} with average tr(H)/n.
+
+**Theorem 6 (Stratified K-Fold for Imbalanced Data - Kohavi, 1995):**
+
+For classification with class imbalance (e.g., 90% class 0, 10% class 1):
+
+**Standard K-fold:** Each fold may have different class proportions → high variance
+
+**Stratified K-fold:** Maintains class proportions in each fold
+
+**Variance reduction:**
+Var(Stratified) ≤ Var(Standard)
+
+**Proof sketch:**
+Stratification removes one source of randomness (class proportion variation).
+By law of total variance: Var(Standard) = E[Var|stratification] + Var[E|stratification]
+Stratified removes second term. ∎
+
+**Empirical improvement:**
+For 90-10 split, stratified CV can reduce variance by 30-50%!
+
+**Theorem 7 (Repeated K-Fold CV - Bouckaert & Frank, 2004):**
+
+**Standard K-fold:** Run once, get K estimates
+
+**Repeated K-fold:** Repeat R times with different random splits
+
+**Variance reduction:**
+Var(Repeated) ≈ Var(Single) / R
+
+**But:** Not full 1/R reduction due to correlation!
+
+**Practical guideline:**
+- R = 5 or 10 repetitions
+- Effective sample size: K × R (e.g., 5×10 = 50 estimates)
+- Standard error: SE ≈ σ̂/√(K·R/c) where c ≈ 1.5-2 (correlation factor)
+
+**Trade-off:**
+- More repetitions: Lower variance, more computation
+- Typically R = 5-10 sufficient
+
+**Theorem 8 (Nested Cross-Validation for Model Selection - Varma & Simon, 2006):**
+
+**Problem:** Using same CV for both hyperparameter tuning and performance estimation gives **optimistically biased** estimate.
+
+**Nested CV:**
+- **Outer loop:** K_outer folds for performance estimation
+- **Inner loop:** K_inner folds for hyperparameter tuning
+
+**Unbiased estimator:**
+R̂_nested = (1/K_outer) Σ_{k=1}^{K_outer} L(f̂_k*, D_test^(k))
+
+where f̂_k* is best model selected on outer fold k using inner CV.
+
+**Bias comparison:**
+- Single CV (tuning + testing): Optimistic bias ≈ O(p/n) where p = # hyperparameters
+- Nested CV: Nearly unbiased O(1/n)
+
+**Computational cost:**
+- Single CV: O(K × M) where M = # hyperparameter settings
+- Nested CV: O(K_outer × K_inner × M)
+
+**Typical:** K_outer = 5, K_inner = 3, M = 100 → 1500 model fits!
+
+**Theorem 9 (Time Series Cross-Validation - Bergmeir & Benítez, 2012):**
+
+For time series with temporal dependence, standard K-fold violates independence!
+
+**Time series CV variants:**
+
+**1. Rolling window:**
+- Train: [1, ..., t]
+- Test: [t+1, ..., t+h]
+- Advance by s steps
+
+**2. Expanding window:**
+- Train: [1, ..., t]
+- Test: [t+1, ..., t+h]
+- Keep all past data
+
+**Bias-variance:**
+- Rolling: Lower bias (fixed window), higher variance
+- Expanding: Higher bias (distant past), lower variance
+
+**Blocked CV (Hyndman & Athanasopoulos, 2018):**
+Leave gaps between train and test to reduce dependence:
+- Train: [1, ..., t]
+- Gap: [t+1, ..., t+g]
+- Test: [t+g+1, ..., t+g+h]
+
+**Theorem 10 (Cross-Validation Confidence Intervals - Nadeau & Bengio, 2003):**
+
+**Naive SE:** σ̂/√K (assumes independence)
+
+**Corrected SE (accounting for correlation):**
+SE_corrected = √((1/K)Σ(x_k - x̄)² · (1 + ρ̂))
+
+where ρ̂ ≈ (K-2)/(K-1) is estimated correlation.
+
+**95% Confidence Interval:**
+[x̄ - t_{K-1,0.025} · SE_corrected, x̄ + t_{K-1,0.025} · SE_corrected]
+
+where t_{K-1,0.025} is t-distribution critical value with K-1 degrees of freedom.
+
+**Conservative approach (Bengio & Grandvalet, 2004):**
+Since exact variance is unknown, use conservative estimate:
+
+SE_conservative = σ̂ · √(1/K + 1/(K-1))
+
+**Example:** K = 5, σ̂ = 0.02
+- Naive SE: 0.02/√5 ≈ 0.009
+- Corrected SE: 0.02·√(1/5 + 3/4) ≈ 0.019
+- Conservative SE: 0.02·√(1/5 + 1/4) ≈ 0.013
+
+**Conservative SE is 44% larger than naive!**
+
 ## Basic Cross-Validation Techniques
 
 ### 1. K-Fold Cross-Validation
