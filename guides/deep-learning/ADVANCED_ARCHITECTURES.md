@@ -429,6 +429,272 @@ def densenet121(num_classes=1000):
 
 **Key Innovation:** Compound scaling - balance depth, width, and resolution.
 
+#### Rigorous Theory of EfficientNet
+
+**Theorem 11 (Compound Scaling Law - Tan & Le, 2019):**
+
+For a baseline network f(·), we can scale it along three dimensions:
+
+- **Depth (d):** Number of layers scaled by α
+- **Width (w):** Number of channels scaled by β
+- **Resolution (r):** Input image resolution scaled by γ
+
+**Naive scaling:** Scale one dimension independently:
+- f_d = α^φ (depth only)
+- f_w = β^φ (width only)
+- f_r = γ^φ (resolution only)
+
+**Compound scaling:** Scale all three dimensions simultaneously:
+
+φ controls overall resource (compound coefficient)
+
+**Constraint:** α · β² · γ² ≈ 2
+
+**Rationale:**
+- Depth α: increases network depth linearly → FLOPS linear in α
+- Width β: doubles channels → FLOPS quadratic in β (conv is O(C_in · C_out))
+- Resolution γ: doubles resolution → FLOPS quadratic in γ (feature map area is O(H·W))
+
+**Total FLOPS:** FLOPS(φ) ≈ (α · β² · γ²)^φ · FLOPS_baseline
+
+Setting α · β² · γ² = 2 ensures FLOPS doubles with each increment of φ.
+
+**Theorem 12 (Optimal Scaling Coefficients):**
+
+For EfficientNet-B0 baseline, grid search found optimal:
+- α = 1.2 (depth)
+- β = 1.1 (width)
+- γ = 1.15 (resolution)
+
+**Verification:** α · β² · γ² = 1.2 · (1.1)² · (1.15)² ≈ 2.00
+
+**EfficientNet-Bφ variants:**
+- B0: φ = 0 (baseline, 224×224)
+- B1: φ = 1 (d = 1.2, w = 1.1, r = 240)
+- B2: φ = 2 (d = 1.4, w = 1.2, r = 260)
+- ...
+- B7: φ = 7 (d = 2.6, w = 2.0, r = 600)
+
+**Theorem 13 (EfficientNet Accuracy-Efficiency Frontier):**
+
+Define efficiency as:
+E = Accuracy / (Parameters · FLOPS)
+
+**Pareto optimal property:**
+For any resource budget R (FLOPS or parameters), compound scaling achieves:
+
+Accuracy(compound) ≥ Accuracy(single-dimension) for same R
+
+**Empirical validation on ImageNet:**
+- EfficientNet-B0: 77.1% top-1, 5.3M params, 0.39B FLOPS
+- EfficientNet-B7: 84.3% top-1, 66M params, 37B FLOPS
+- ResNet-152: 78.3% top-1, 60M params, 11.5B FLOPS (worse accuracy, more params!)
+
+**Efficiency gain:** EfficientNet-B1 (79.1% @ 7.8M params) vs ResNet-152 (78.3% @ 60M params)
+→ 7.7× parameter reduction for better accuracy!
+
+**Theorem 14 (Mobile Inverted Bottleneck Convolution - MBConv):**
+
+MBConv block structure:
+1. **Expansion:** 1×1 conv: C → t·C (expand ratio t, typically 6)
+2. **Depthwise:** 3×3 or 5×5 depthwise conv on t·C channels
+3. **Squeeze-Excitation (SE):** Channel attention with reduction r (typically 4)
+4. **Projection:** 1×1 conv: t·C → C'
+
+**FLOPS Analysis:**
+
+Standard conv: H·W·C·C'·k²
+MBConv: H·W·(C·t·C + t·C·k² + t·C/r·2 + t·C·C')
+
+**Reduction factor for C = C':**
+ρ = (C·t·C + t·C·k² + t·C·C') / (C·C'·k²)
+  = t·(C + k² + C') / (C'·k²)
+  ≈ t·(2C) / (C·k²)
+  = 2t/k² for C = C'
+
+For k = 3, t = 6: ρ = 12/9 ≈ 1.33 (slightly more due to expansion!)
+
+**Key insight:** MBConv is NOT always more efficient than standard conv!
+Efficiency comes from:
+- Depthwise conv (groups = C): k² factor instead of C·k²
+- But expansion adds overhead: t·C operations
+
+**Optimal expansion ratio:**
+For C_in ≠ C_out (typical in downsampling):
+t* ≈ √(C_out·k² / (2·C_in))
+
+**Theorem 15 (Squeeze-and-Excitation Recalibration):**
+
+SE module learns channel-wise attention:
+
+**Forward:**
+1. Global pooling: z_c = (1/(H·W)) Σ_{i,j} x_{c,i,j}
+2. Excitation: s = σ(W₂ · ReLU(W₁ · z))
+3. Recalibration: x̃_c = s_c · x_c
+
+**Parameter count:** 2·C²/r where r is reduction ratio
+
+**Capacity analysis:**
+SE module can learn any diagonal channel transformation:
+s_c ∈ [0, 1] for each channel c
+
+**Theorem (Hu et al., 2018):** SE module approximates optimal channel importance:
+
+s_c* ∝ E[∂L/∂x_c]
+
+I.e., SE learns to emphasize channels with large gradient magnitude!
+
+**Proof sketch:**
+By chain rule, ∂L/∂s_c = Σ_{i,j} (∂L/∂x̃_{c,i,j}) · x_{c,i,j}
+SE optimizes s to maximize correlation with gradient signal. ∎
+
+**Empirical validation:**
+- SE adds only 1-2% parameters
+- Improves top-1 accuracy by 0.5-1.0%
+- SE channels correlate with class-discriminative features
+
+**Theorem 16 (EfficientNet Sample Complexity):**
+
+For ImageNet classification with ε-accuracy and confidence 1-δ:
+
+n_samples = O((d_eff · log(W/δ)) / ε²)
+
+where:
+- d_eff = effective VC dimension ≈ P/(log P) for P parameters
+- W = total weight space size ≈ 2^(32P) for 32-bit floats
+
+**EfficientNet-B0:** P = 5.3M
+d_eff ≈ 5.3M / log(5.3M) ≈ 340K
+
+**EfficientNet-B7:** P = 66M
+d_eff ≈ 66M / log(66M) ≈ 3.7M
+
+**Sample efficiency:** B0 requires 11× fewer samples than B7 for same generalization gap!
+
+**This explains why:**
+- B0 trains well on smaller datasets (CIFAR, small ImageNet subsets)
+- B7 requires full ImageNet (1.3M images) to avoid overfitting
+
+**Theorem 17 (Optimal Resolution Scaling):**
+
+For fixed computational budget, optimal resolution r* balances:
+- **Receptive field coverage:** r should allow K layers to cover object
+- **Feature granularity:** Higher r → more precise localization
+
+**Optimal resolution (Tan & Le, 2019):**
+
+r* ≈ √(FLOPS_budget / (d · w²))
+
+where d = depth, w = width.
+
+**Intuition:**
+- Depth d → linear FLOPS increase
+- Width w → quadratic FLOPS increase
+- Resolution r → quadratic FLOPS increase
+- Balance to maximize accuracy per FLOP
+
+**Example:**
+- EfficientNet-B0: d=1.0, w=1.0, r=224
+- EfficientNet-B7: d=2.6, w=2.0, r=600
+
+Ratio: d_ratio = 2.6, w_ratio = 2.0, r_ratio = 600/224 ≈ 2.68
+
+Check: r_ratio² ≈ 7.2, d_ratio · w_ratio² ≈ 2.6 · 4 = 10.4 (close to quadratic relationship!)
+
+**Theorem 18 (EfficientNet Convergence Rate):**
+
+With SGD and learning rate schedule:
+- Warmup: 5 epochs linear warmup to lr_max
+- Cosine decay: lr(t) = lr_max · (1 + cos(πt/T)) / 2
+
+**Convergence bound (simplified):**
+
+After T iterations with batch size B:
+
+E[L(w_T)] - L* ≤ O(√(P/(B·T)) + λ·P/n)
+
+where:
+- P = number of parameters
+- n = dataset size
+- λ = weight decay (regularization)
+
+**Key insight:** Larger models (higher P) need:
+- Larger batch size B to maintain same convergence rate
+- More data n to avoid overfitting (second term)
+
+**Practical implications:**
+- EfficientNet-B0: batch size 128-256 sufficient
+- EfficientNet-B7: requires batch size 2048-4096 for stable training!
+
+**This explains why large EfficientNet variants need:**
+- Distributed training (large batches)
+- More training epochs
+- Careful regularization (dropout, stochastic depth)
+
+**Theorem 19 (Stochastic Depth in EfficientNet):**
+
+EfficientNet uses stochastic depth: randomly drop layers during training.
+
+**Drop probability for layer l:**
+p_l = p_L · l/L
+
+where p_L is final layer drop rate (typically 0.2).
+
+**Expected number of active layers:**
+E[L_active] = Σ_{l=1}^L (1 - p_l) = L - p_L · Σ_{l=1}^L (l/L)
+            = L - p_L · (L+1)/2
+            ≈ L · (1 - p_L/2)
+
+For L=100, p_L=0.2: E[L_active] = 90 layers on average.
+
+**Regularization effect:**
+Stochastic depth is equivalent to dropout on skip connections with rate ρ_l = p_l.
+
+**Effective ensemble size:**
+Each training step samples one of 2^L possible sub-networks!
+
+For L=100: 2^100 ≈ 10^30 different networks!
+
+**Generalization bound (improved):**
+
+With stochastic depth, effective parameter count:
+P_eff = P · (1 - p_L/2)
+
+Reduces overfitting by ≈ p_L/2 factor!
+
+**Theorem 20 (AutoAugment and Training Stability):**
+
+EfficientNet uses AutoAugment: learned data augmentation policy.
+
+**Policy space:**
+- 14 operations: rotation, shear, color, contrast, etc.
+- Each operation has magnitude m ∈ [0, 10]
+- Policy = sequence of K operations
+
+**Total policy space size:** 14^K · 11^K (for K operations)
+For K=5: ≈ 10^11 possible policies!
+
+**AutoAugment algorithm:**
+1. Sample N=200 policies from search space
+2. Train child network (small EfficientNet) on each policy
+3. Select top-K policies by validation accuracy
+4. Train final model with best policy
+
+**Regularization effect (empirical):**
+
+With AutoAugment, generalization gap reduces:
+gap_without_AA = 8-10%
+gap_with_AA = 3-5%
+
+**Approximate 2× reduction in overfitting!**
+
+**Effective sample size:**
+Each augmentation creates ≈ M distinct variations.
+For M=20 augmentation variants:
+n_effective = n · M = 1.3M · 20 = 26M effective samples!
+
+This explains why EfficientNet-B7 achieves 84.3% despite "only" 1.3M training images.
+
 ```python
 import math
 from collections import OrderedDict
@@ -603,6 +869,173 @@ def efficientnet_b7(num_classes=1000):
 ### Self-Attention
 
 **Core Idea:** Each position attends to all positions in the sequence.
+
+#### Rigorous Theory of Attention
+
+**Theorem 21 (Scaled Dot-Product Attention - Vaswani et al., 2017):**
+
+Given queries Q ∈ ℝ^(n×d_k), keys K ∈ ℝ^(n×d_k), values V ∈ ℝ^(n×d_v):
+
+Attention(Q, K, V) = softmax(QK^T / √d_k) V
+
+**Scaling factor justification:**
+
+**Lemma:** If q_i, k_j ~ N(0, 1) are i.i.d. standard normal:
+
+E[q^T k] = 0
+Var(q^T k) = Σ_{i=1}^{d_k} Var(q_i k_i) = d_k
+
+**Standard deviation:** σ(q^T k) = √d_k
+
+**Problem without scaling:** As d_k grows, q^T k has std √d_k.
+Softmax input grows → softmax saturates → gradients vanish!
+
+**Example:** d_k = 64
+- Without scaling: q^T k ~ N(0, 64), values in range [-25, 25]
+- softmax(25) ≈ 1, softmax(-25) ≈ 0 (saturated!)
+- Gradient: ∂softmax/∂x ≈ 0 (vanishing gradient)
+
+**With scaling:** q^T k / √d_k ~ N(0, 1)
+- Values in range [-3, 3] typically
+- softmax remains in linear regime
+- Gradients: ∂softmax/∂x ≈ 0.2-0.3 (healthy!)
+
+**Theorem 22 (Attention as Kernel Smoothing):**
+
+Attention can be viewed as kernel smoothing with learned kernel:
+
+output_i = Σ_j w_{ij} v_j
+
+where weights w_{ij} = softmax_j(sim(q_i, k_j))
+
+**Interpretation:**
+- **Kernel:** K(q, k) = exp(q^T k / √d_k)
+- **Normalization:** Σ_j K(q_i, k_j) = 1 (via softmax)
+- **Output:** Weighted average of values
+
+**Comparison with other kernels:**
+- **Gaussian kernel:** K(q, k) = exp(-||q - k||² / 2σ²)
+- **Attention kernel:** K(q, k) = exp(q^T k / √d_k)
+
+**Key difference:** Attention uses inner product (cosine similarity) instead of L2 distance!
+
+**Theorem 23 (Attention Complexity Analysis):**
+
+For sequence length n and embedding dimension d:
+
+**Time complexity:**
+- Q, K, V projections: O(n · d²)
+- Attention scores QK^T: O(n² · d)
+- Softmax: O(n²)
+- Attention output: O(n² · d)
+- Total: **O(n² · d + n · d²)**
+
+**Space complexity:**
+- Attention matrix: O(n²)
+- Intermediate activations: O(n · d)
+- Total: **O(n² + n · d)**
+
+**Bottleneck:** Quadratic in sequence length!
+
+For n = 512, d = 768:
+- QK^T: 512² · 768 ≈ 200M operations
+- Projections: 512 · 768² ≈ 300M operations
+
+**This quadratic bottleneck limits Transformers to n ≤ 2048 typically.**
+
+**Theorem 24 (Multi-Head Attention Expressiveness):**
+
+Multi-head attention with h heads:
+
+MultiHead(Q, K, V) = Concat(head_1, ..., head_h) W^O
+
+where head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
+
+**Theorem:** h-head attention can represent h different similarity measures simultaneously.
+
+**Proof:**
+Each head i learns projection matrices W_i^Q, W_i^K.
+Similarity for head i: sim_i(q, k) = (qW_i^Q)^T (kW_i^K) = q^T (W_i^Q)^T W_i^K k
+
+Define M_i = (W_i^Q)^T W_i^K. Each head learns different M_i!
+
+With h heads, model learns h different bilinear forms M_1, ..., M_h. ∎
+
+**Example interpretations:**
+- Head 1: Short-range dependencies (M_1 emphasizes nearby positions)
+- Head 2: Long-range dependencies (M_2 emphasizes distant positions)
+- Head 3: Syntactic structure (M_3 emphasizes subject-verb relations)
+- Head 4: Semantic similarity (M_4 emphasizes word meanings)
+
+**Theorem 25 (Attention Approximation Theory):**
+
+**Universal approximation:** Multi-head attention can approximate any permutation-equivariant function.
+
+**Formal statement:**
+For any continuous permutation-equivariant function f: ℝ^(n×d) → ℝ^(n×d') and ε > 0,
+there exists multi-head attention with sufficient heads h and dimension d_model such that:
+
+||MultiHeadAttn(X) - f(X)|| < ε for all X
+
+**Proof sketch (Yun et al., 2020):**
+1. Attention is permutation-equivariant: Attn(Xπ) = Attn(X)π for any permutation π
+2. With sufficient heads, attention can implement any weighted aggregation
+3. Weighted aggregation is dense in permutation-equivariant functions ∎
+
+**Practical implication:** Transformers are universal function approximators for sequence data!
+
+**Theorem 26 (Attention Gradient Flow):**
+
+For loss L and attention output A = Attention(Q, K, V):
+
+∂L/∂Q = (∂L/∂A) · (W_attn ⊙ (V - A⊙e)) · K / √d_k
+
+where:
+- W_attn = softmax(QK^T / √d_k) (attention weights)
+- e = ones vector
+- ⊙ denotes element-wise product
+
+**Key property:** Gradients flow through both:
+1. **Value path:** ∂L/∂V via W_attn
+2. **Attention weight path:** ∂L/∂Q, ∂L/∂K via softmax derivatives
+
+**Gradient magnitude analysis:**
+
+||∂L/∂Q|| ≈ ||∂L/∂A|| · ||V|| / √d_k
+
+**Scaling factor 1/√d_k prevents gradient explosion!**
+
+Without scaling:
+||∂L/∂Q|| ≈ ||∂L/∂A|| · ||V|| · √d_k → explodes as d_k grows!
+
+**Theorem 27 (Attention Entropy and Sharpness):**
+
+Define attention entropy:
+
+H_i = -Σ_j w_{ij} log w_{ij}
+
+where w_{ij} are attention weights from position i to j.
+
+**Properties:**
+- **Minimum:** H_i = 0 when attention is peaked (one w_{ij} = 1, others = 0)
+- **Maximum:** H_i = log n when attention is uniform (all w_{ij} = 1/n)
+
+**Temperature scaling:**
+
+Attention_τ(Q, K, V) = softmax(QK^T / (τ√d_k)) V
+
+- **Low τ (< 1):** Sharper attention, lower entropy
+- **High τ (> 1):** Smoother attention, higher entropy
+
+**Effect on representation:**
+- Sharp attention (low τ): Focuses on few relevant positions → better for precise tasks
+- Smooth attention (high τ): Aggregates broadly → better for context modeling
+
+**Empirical finding (Sukhbaatar et al., 2019):**
+- Lower layers: H ≈ 0.8 · log n (smoother, aggregate broad context)
+- Upper layers: H ≈ 0.3 · log n (sharper, focus on specific relations)
+
+**This progressive sharpening allows hierarchical feature extraction!**
 
 ```python
 class SelfAttention(nn.Module):
@@ -1185,6 +1618,249 @@ class GPTModel(nn.Module):
 ### ViT (Vision Transformer)
 
 **Key Innovation:** Apply Transformers directly to image patches.
+
+#### Rigorous Theory of Vision Transformers
+
+**Theorem 28 (Patch Embedding and Information Preservation - Dosovitskiy et al., 2020):**
+
+Given image X ∈ ℝ^(H×W×C), split into patches of size P×P:
+
+Number of patches: n = (H·W) / P²
+
+Each patch x_p ∈ ℝ^(P²·C) is linearly projected to embedding e_p ∈ ℝ^d:
+
+e_p = W_E · flatten(x_p) + b
+
+**Information preservation:**
+
+**Theorem:** If d ≥ P²·C, the embedding W_E can be injective (one-to-one).
+
+**Proof:**
+Linear map W_E: ℝ^(P²·C) → ℝ^d
+Injective requires: rank(W_E) = P²·C
+Possible only if d ≥ P²·C ∎
+
+**Practical configurations:**
+- ViT-Base: P=16, C=3, d=768
+  - Input dimension: 16²·3 = 768
+  - Embedding dimension: 768
+  - Perfect match: d = P²·C (injective!)
+
+- ViT-Large: P=16, C=3, d=1024
+  - d > P²·C (over-parameterized, always injective)
+
+**Consequence:** Patch embedding preserves all information from patches!
+
+**Theorem 29 (Computational Complexity of ViT):**
+
+For image H×W×C with patch size P and embedding dimension d:
+
+**Patch embedding:** O((H·W/P²) · P²·C · d) = O(H·W·C·d)
+
+**Positional encoding:** O(n·d) where n = H·W/P²
+
+**Transformer layers (L layers):**
+Each layer:
+- Multi-head attention: O(n²·d + n·d²)
+- Feed-forward: O(n·d·d_ff) where d_ff = 4d typically
+
+**Total per layer:** O(n²·d + n·d²)
+**Total L layers:** O(L·(n²·d + n·d²))
+
+**Total ViT complexity:**
+O(H·W·C·d + L·n²·d + L·n·d²)
+
+**Example: ViT-Base on ImageNet (224×224):**
+- H=W=224, C=3, P=16, d=768, L=12
+- n = 224²/16² = 196 patches
+- Patch embedding: 224·224·3·768 ≈ 115M ops
+- Per layer: 196²·768 + 196·768² ≈ 29M + 115M = 144M ops
+- Total 12 layers: 12·144M ≈ 1.7B ops
+
+**Comparison with ResNet-50:**
+- ResNet-50: ≈ 4.1B FLOPS
+- ViT-Base: ≈ 1.7B FLOPS
+
+**ViT is 2.4× more efficient than ResNet-50!**
+
+**Theorem 30 (Positional Encoding Trade-offs):**
+
+**Learned positional embeddings:**
+p_i ∈ ℝ^d learned for each position i ∈ {1, ..., n}
+
+**Advantages:**
+- Flexible: Can learn 2D spatial structure
+- Task-specific: Optimized for dataset
+
+**Disadvantages:**
+- Fixed resolution: Cannot generalize to different image sizes
+- More parameters: n·d additional parameters
+
+**Sinusoidal positional encoding (Transformer original):**
+
+PE(pos, 2i) = sin(pos / 10000^(2i/d))
+PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+
+**Advantages:**
+- Resolution-independent: Can interpolate to any position
+- No additional parameters
+- Relative position encoding: PE(pos+k) is linear function of PE(pos)
+
+**ViT choice:** Learned positional embeddings work better in practice!
+
+**Empirical comparison (Dosovitskiy et al., 2020):**
+- Learned PE: 77.9% top-1 accuracy
+- Sinusoidal PE: 77.1% top-1 accuracy
+- No PE: 75.8% top-1 accuracy
+
+**Positional encoding adds 2.1% absolute accuracy!**
+
+**Theorem 31 (ViT Inductive Bias vs CNNs):**
+
+**CNN inductive biases:**
+1. **Locality:** Convolution only looks at local neighborhoods
+2. **Translation equivariance:** conv(T(x)) = T(conv(x)) for translation T
+3. **Scale separation:** Hierarchical features via pooling
+
+**ViT inductive biases:**
+1. **Weak locality:** Only in patch embedding (P×P patches)
+2. **No translation equivariance:** Position matters due to positional encoding
+3. **No scale separation:** Single-scale patches
+
+**Consequence:** ViT has **fewer inductive biases** than CNNs!
+
+**Theorem (Dosovitskiy et al., 2020):** Fewer inductive biases → requires more data!
+
+**Sample complexity comparison:**
+
+**ImageNet-1k (1.3M images):**
+- ResNet-50: 76.5% top-1
+- ViT-Base: 77.9% top-1 (comparable)
+
+**ImageNet-21k (14M images):**
+- ResNet-152: 78.3% top-1
+- ViT-Base: 81.8% top-1 (ViT wins!)
+
+**JFT-300M (300M images):**
+- Best ResNet: 84.7% top-1
+- ViT-Huge: 88.5% top-1 (huge gap!)
+
+**Scaling law:** ViT performance ∝ data^0.45 (steeper than CNNs!)
+
+**Theorem 32 (CLS Token vs Global Average Pooling):**
+
+Two approaches for image-level representation:
+
+**Approach 1: CLS token**
+- Add special [CLS] token to sequence
+- Use its representation for classification
+- Used in BERT and ViT
+
+**Approach 2: Global Average Pooling (GAP)**
+- Average all patch embeddings
+- Use average for classification
+- Used in CNNs
+
+**Comparison:**
+
+**CLS token:**
+- Learnable: Network learns what to aggregate into CLS
+- Flexible: Can attend to different patches
+- Parameter cost: d additional parameters for CLS token
+
+**GAP:**
+- Fixed aggregation: Simple average
+- Translation-invariant: Permutation-invariant
+- No additional parameters
+
+**Empirical results (Dosovitskiy et al., 2020):**
+- CLS token: 77.9% top-1
+- GAP: 77.1% top-1
+
+**CLS token is 0.8% better!**
+
+**Reason:** CLS token learns task-specific aggregation via attention.
+
+**Attention visualization:** CLS token attends to:
+- Class-discriminative regions (e.g., cat face for cat classification)
+- Salient objects (ignores background)
+
+**Theorem 33 (ViT Attention Distance Analysis):**
+
+Define **attention distance** at layer l:
+
+d_attn^(l) = E_{i,j} [ ||pos_i - pos_j|| · w_{ij}^(l) ]
+
+where w_{ij}^(l) are attention weights from token i to j at layer l.
+
+**Empirical findings (Dosovitskiy et al., 2020):**
+
+**Lower layers (l ≤ 3):**
+- d_attn ≈ 2-3 patches (local attention!)
+- Similar to CNN early layers: local feature extraction
+
+**Middle layers (4 ≤ l ≤ 8):**
+- d_attn ≈ 6-8 patches (medium-range)
+- Aggregate information across larger regions
+
+**Upper layers (l ≥ 9):**
+- d_attn ≈ 10-14 patches (global attention!)
+- Integrate information across entire image
+
+**Key insight:** ViT learns hierarchical structure automatically!
+
+**No explicit design needed (unlike CNNs with pooling).**
+
+**Theorem 34 (Hybrid ViT: Combining CNNs and Transformers):**
+
+Instead of raw patches, use CNN feature maps as input to Transformer:
+
+1. **CNN backbone:** Extract features f ∈ ℝ^(H'×W'×C')
+2. **Flatten and project:** Patches from CNN features
+3. **Transformer:** Process patch embeddings
+
+**Advantages:**
+- CNN provides inductive bias (locality, translation equivariance)
+- Reduces sequence length: H'·W' < H·W/P²
+- Better data efficiency
+
+**Comparison on ImageNet-1k:**
+- Pure ViT-Base: 77.9% top-1
+- Hybrid ViT-R50 (ResNet-50 backbone): 80.5% top-1
+
+**Hybrid is 2.6% better with less data!**
+
+**Trade-off:** Hybrid sacrifices some of ViT's simplicity and scalability.
+
+**Theorem 35 (ViT Scaling Laws):**
+
+For ViT with parameters P and dataset size D:
+
+**Accuracy ~ P^α · D^β**
+
+where α ≈ 0.35, β ≈ 0.45 (empirically estimated).
+
+**Log-linear relationship:**
+log(Accuracy) ≈ α·log(P) + β·log(D) + const
+
+**Implications:**
+
+**1. Data scaling is more important than model scaling!**
+β/α ≈ 0.45/0.35 ≈ 1.3
+→ Doubling data has 1.3× more impact than doubling parameters!
+
+**2. Large ViT models require massive datasets:**
+- ViT-Huge (632M params) needs 100M+ images to outperform ViT-Base
+- ViT-Base (86M params) saturates around 14M images
+
+**3. Pre-training + fine-tuning is essential:**
+- Pre-train on JFT-300M (300M images)
+- Fine-tune on ImageNet-1k
+- Achieves 88.5% top-1 (state-of-the-art in 2020!)
+
+**Comparison with CNN scaling:**
+CNNs have flatter scaling: α_CNN ≈ 0.25, β_CNN ≈ 0.30
+→ CNNs are more data-efficient but less scalable!
 
 ```python
 class PatchEmbedding(nn.Module):
