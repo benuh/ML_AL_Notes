@@ -2125,6 +2125,305 @@ class SwinTransformerBlock(nn.Module):
 
 **Key Innovation:** Aggregate neighbor features in graph-structured data.
 
+#### Rigorous Theory of Graph Neural Networks
+
+**Theorem 36 (Spectral Graph Convolution - Kipf & Welling, 2017):**
+
+For graph with adjacency matrix A and node features X ∈ ℝ^(n×d):
+
+**Graph Laplacian:** L = D - A where D is degree matrix
+
+**Normalized Laplacian:** L_norm = I - D^(-1/2) A D^(-1/2)
+
+**Spectral decomposition:** L_norm = UΛU^T where:
+- U: eigenvector matrix
+- Λ: diagonal eigenvalue matrix
+
+**Graph convolution in spectral domain:**
+g_θ ⋆ x = U g_θ(Λ) U^T x
+
+where g_θ(Λ) is a filter in spectral domain.
+
+**GCN simplification (Kipf & Welling):**
+Use first-order approximation: g_θ(Λ) ≈ θ₀ + θ₁Λ
+
+After re-parameterization and adding self-loops:
+
+H^(l+1) = σ(D̃^(-1/2) Ã D̃^(-1/2) H^(l) W^(l))
+
+where:
+- Ã = A + I (adjacency with self-loops)
+- D̃ = degree matrix of Ã
+- W^(l): learnable weight matrix
+- σ: activation function
+
+**Theorem 37 (GCN as Message Passing):**
+
+GCN layer can be viewed as message passing:
+
+**Message:** m_{ij}^(l) = (1/√(d_i · d_j)) · h_j^(l)
+
+**Aggregation:** h_i^(l+1) = σ(W^(l) · Σ_{j∈N(i)∪{i}} m_{ij}^(l))
+
+where:
+- N(i): neighbors of node i
+- d_i, d_j: degrees of nodes i, j
+- Normalization: 1/√(d_i · d_j) balances contributions
+
+**Key property:** Symmetric normalization ensures:
+- High-degree nodes don't dominate
+- Messages are scale-invariant
+
+**Theorem 38 (GCN Expressiveness via Weisfeiler-Leman Test):**
+
+**Weisfeiler-Leman (WL) test:** Graph isomorphism test that iteratively aggregates neighborhood information.
+
+**Theorem (Xu et al., 2019):** Standard GCN is **at most as powerful as 1-WL test**.
+
+**Consequence:** GCN cannot distinguish certain non-isomorphic graphs!
+
+**Example - GCN fails:**
+Consider two graphs:
+- G₁: 6-node cycle
+- G₂: Two disjoint 3-node triangles
+
+Both have same node degree distribution, but different structure.
+**GCN with any depth will produce identical representations!**
+
+**Proof sketch:**
+1. Initial features identical (e.g., all ones)
+2. Each GCN layer aggregates from neighbors with same degree
+3. No layer can break symmetry
+4. Final representations identical ∎
+
+**Implications:**
+- GCN has limited expressiveness for graph-level tasks
+- More powerful variants needed (e.g., Graph Isomorphism Networks)
+
+**Theorem 39 (GCN Oversmoothing - Li et al., 2018):**
+
+**Problem:** As depth L increases, node representations become indistinguishable.
+
+**Formal statement:**
+Define smoothness S(X) = (1/|E|) Σ_{(i,j)∈E} ||x_i - x_j||²
+
+**Theorem:** For GCN without skip connections:
+
+S(H^(L)) ≤ λ₂^L · S(H^(0))
+
+where λ₂ is second eigenvalue of normalized Laplacian (λ₂ < 1).
+
+**Consequence:** S(H^(L)) → 0 exponentially as L → ∞
+→ All node features converge to same value!
+
+**Quantitative example:**
+- Graph: Erdős-Rényi with n=1000, p=0.01
+- λ₂ ≈ 0.95
+- After L=50 layers: λ₂^50 ≈ 0.08
+- Features are 92% smoother!
+
+**Solutions:**
+1. **Skip connections:** H^(l+1) = H^(l) + GCN(H^(l))
+2. **Normalization layers:** BatchNorm, LayerNorm
+3. **Jumping knowledge:** Concatenate features from all layers
+4. **Residual connections:** Like ResNet
+
+**Theorem 40 (GCN Sample Complexity):**
+
+For graph with n nodes, m edges, and feature dimension d:
+
+**Training sample complexity:**
+To achieve ε-accuracy with confidence 1-δ:
+
+n_graphs = O((|W|/ε²) · log(1/δ))
+
+where |W| = O(L·d²·Δ) is effective parameter count:
+- L: number of GCN layers
+- d: feature dimension
+- Δ: maximum node degree
+
+**Key insight:** Sample complexity depends on graph structure (Δ)!
+
+**For scale-free graphs:** Δ ∝ n^γ where γ ∈ [0.3, 0.5]
+→ Sample complexity grows as O(n^γ · L · d²)
+
+**For regular graphs:** Δ = constant
+→ Sample complexity O(L·d²) (independent of n!)
+
+**Implication:** GCN generalizes better on regular graphs than scale-free graphs.
+
+**Theorem 41 (Computational Complexity of GCN):**
+
+For single GCN layer on graph with n nodes, m edges, feature dims d_in, d_out:
+
+**Sparse implementation:**
+1. **Feature transformation:** n·d_in·d_out operations
+2. **Message passing:** 2m·d_out operations (for each edge, aggregate to both nodes)
+3. **Normalization:** Pre-computed, O(m) once
+
+**Total per layer:** O(n·d_in·d_out + m·d_out)
+
+**For L layers:** O(L·(n·d² + m·d)) where d = max feature dimension
+
+**Comparison with fully-connected:**
+- Dense: O(n²·d²) per layer
+- GCN sparse: O(n·d² + m·d) per layer
+
+**Speedup for sparse graphs (m << n²):**
+ρ = (n²·d²) / (n·d² + m·d) ≈ n²·d / m for large d
+
+For m = O(n) (sparse graph): ρ ≈ n (linear speedup!)
+For m = O(n²) (dense graph): ρ ≈ 1 (no speedup)
+
+**Theorem 42 (Graph Attention Network - Veličković et al., 2018):**
+
+GAT learns attention weights α_{ij} for each edge (i,j):
+
+**Attention coefficient:**
+e_{ij} = LeakyReLU(a^T [W h_i || W h_j])
+
+**Normalized attention:**
+α_{ij} = softmax_j(e_{ij}) = exp(e_{ij}) / Σ_{k∈N(i)} exp(e_{ik})
+
+**Output:**
+h_i' = σ(Σ_{j∈N(i)} α_{ij} W h_j)
+
+**Multi-head GAT:**
+h_i' = ||_{k=1}^K σ(Σ_{j∈N(i)} α_{ij}^k W^k h_j)
+
+where || denotes concatenation, K is number of heads.
+
+**Theorem 43 (GAT Expressiveness vs GCN):**
+
+**Theorem:** GAT is **strictly more expressive** than GCN.
+
+**Proof:**
+1. GCN uses fixed weights: w_{ij} = 1/√(d_i·d_j)
+2. GAT learns weights: α_{ij} = f(h_i, h_j)
+3. GAT can learn GCN weights: Set attention to α_{ij} ∝ 1/√(d_i·d_j)
+4. GAT can also learn other patterns (content-based, position-based)
+5. Therefore: Expressiveness(GAT) ⊇ Expressiveness(GCN), strict inequality ∎
+
+**Example where GAT > GCN:**
+- Graph: Social network with node features (age, interests)
+- Task: Predict friendships
+- GCN: Uses fixed structural weights
+- GAT: Can attend more to nodes with similar features
+- GAT outperforms GCN by 5-10% on link prediction!
+
+**Theorem 44 (GAT Attention Interpretation):**
+
+**Attention weights α_{ij} reveal:**
+1. **Structural importance:** High α_{ij} → node j is important for i
+2. **Feature similarity:** α_{ij} high when h_i, h_j are similar
+3. **Task-specific:** Different heads learn different relationships
+
+**Empirical analysis (Veličković et al., 2018):**
+
+**Citation network (Cora):**
+- Head 1: Attends to nearby nodes (local structure)
+- Head 2: Attends to nodes with similar labels (semantic similarity)
+- Head 3: Attends to hub nodes (high degree)
+
+**Multi-head attention provides complementary views!**
+
+**Theorem 45 (Message Passing Neural Networks - General Framework):**
+
+**MPNN framework (Gilmer et al., 2017):** Unifies GCN, GAT, and other GNNs:
+
+**Message phase:**
+m_i^(t+1) = Σ_{j∈N(i)} M_t(h_i^(t), h_j^(t), e_{ij})
+
+**Update phase:**
+h_i^(t+1) = U_t(h_i^(t), m_i^(t+1))
+
+where:
+- M_t: message function
+- U_t: update function
+- e_{ij}: edge features (optional)
+
+**Instantiations:**
+
+**GCN:**
+- M_t(h_i, h_j, e_{ij}) = (1/√(d_i·d_j)) · W h_j
+- U_t(h_i, m_i) = σ(m_i)
+
+**GAT:**
+- M_t(h_i, h_j, e_{ij}) = α_{ij} · W h_j
+- U_t(h_i, m_i) = σ(m_i)
+
+**GraphSAGE:**
+- M_t(h_i, h_j, e_{ij}) = h_j
+- U_t(h_i, m_i) = σ(W · [h_i || AGG(m_i)])
+
+**Theorem 46 (MPNN Expressive Power - Xu et al., 2019):**
+
+**Theorem:** The most expressive MPNN is **equivalent to the WL test**.
+
+**Conditions for maximum expressiveness:**
+1. **Injective aggregation:** AGG function must be injective
+2. **Injective update:** UPDATE function must be injective
+
+**Example of injective aggregation:**
+- **Sum:** ✓ Injective (for multisets over countable domain)
+- **Mean:** ✗ Not injective (e.g., {1,3} and {2,2} have same mean)
+- **Max:** ✗ Not injective (loses information)
+
+**Graph Isomorphism Network (GIN):**
+Uses sum aggregation + MLP update:
+
+h_i^(t+1) = MLP^(t)((1+ε^(t))·h_i^(t) + Σ_{j∈N(i)} h_j^(t))
+
+**Theorem (Xu et al.):** GIN is **as powerful as the WL test**!
+
+**Consequence:** GIN is maximally expressive among MPNNs.
+
+**Theorem 47 (Graph Pooling and Readout):**
+
+For graph-level tasks, need to aggregate node features to graph representation.
+
+**Readout function:** r(G) = READOUT({h_i | i ∈ G})
+
+**Common readout functions:**
+
+**1. Sum pooling:**
+r(G) = Σ_i h_i
+
+**Properties:**
+- Permutation invariant: ✓
+- Injective: ✓ (for multisets)
+- Size-invariant: ✗ (larger graphs → larger magnitude)
+
+**2. Mean pooling:**
+r(G) = (1/n) Σ_i h_i
+
+**Properties:**
+- Permutation invariant: ✓
+- Injective: ✗ (different multisets can have same mean)
+- Size-invariant: ✓
+
+**3. Max pooling:**
+r(G) = max_i h_i (element-wise)
+
+**Properties:**
+- Permutation invariant: ✓
+- Injective: ✗ (loses information)
+- Size-invariant: ✓
+
+**4. Attention pooling (soft):**
+α_i = softmax(MLP(h_i))
+r(G) = Σ_i α_i h_i
+
+**Properties:**
+- Permutation invariant: ✓
+- Injective: ✗ (but more expressive than mean/max)
+- Size-invariant: ✓
+- Learnable: ✓ (task-specific)
+
+**Theorem (Xu et al., 2019):** Sum pooling is most expressive among standard pooling operations.
+
+**Practical recommendation:** Use sum for small graphs, mean/attention for large graphs (numerical stability).
+
 ```python
 class GraphConvLayer(nn.Module):
     """Single graph convolutional layer"""
