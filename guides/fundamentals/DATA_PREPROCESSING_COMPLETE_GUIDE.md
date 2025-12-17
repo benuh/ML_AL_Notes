@@ -1082,6 +1082,274 @@ df['is_senior_citizen'] = (df['age'] >= 65) & (df['country'] == 'USA')
 
 ## Encoding Categorical Variables
 
+### Rigorous Theory of Categorical Encoding
+
+**Theorem 1 (Information-Theoretic Foundation of Encoding):**
+
+Let C be a categorical variable with k categories {c₁, ..., c_k} and Y be the target variable.
+
+**Mutual information:**
+I(C; Y) = H(Y) - H(Y|C)
+
+where H(Y) = -Σ_y p(y)log p(y) is entropy of Y.
+
+**Goal of encoding:** Preserve I(C; Y) while converting C to numerical representation.
+
+**Key property:** Any encoding that preserves P(Y|C) preserves I(C; Y).
+
+**Theorem 2 (One-Hot Encoding Completeness):**
+
+One-hot encoding is **information-complete**: it preserves all information in C.
+
+**Encoding:** C → [I(C=c₁), I(C=c₂), ..., I(C=c_k)] ∈ {0,1}^k
+
+where I(·) is indicator function.
+
+**Proof:**
+One-hot encoding is injective: distinct categories map to distinct binary vectors.
+Therefore, original category can be perfectly reconstructed from encoding.
+Hence, no information is lost: I(C_onehot; Y) = I(C; Y) ∎
+
+**Dimensionality:**
+- Full encoding: k dimensions
+- Drop-first encoding: k-1 dimensions (sufficient for linear models)
+
+**Dropping first category prevents multicollinearity:**
+For linear model: y = β₀ + Σ_i β_i x_i
+
+With full one-hot: Σ_i x_i = 1 always → perfect multicollinearity
+With k-1 encoding: dropped category becomes baseline (absorbed in intercept)
+
+**Theorem 3 (Label Encoding Information Loss):**
+
+Label encoding C → {0, 1, ..., k-1} introduces **artificial ordering**.
+
+**Problem:** Distance d(i, j) = |i - j| has no meaning for nominal categories.
+
+**Information distortion:**
+Let d_true(c_i, c_j) be true dissimilarity between categories.
+Label encoding imposes d_label(i, j) = |i - j|.
+
+**Correlation with truth:** E[d_true · d_label] is arbitrary (depends on label assignment).
+
+**When label encoding is valid:**
+Only for **ordinal** variables where order exists:
+- Education: {Elementary, High School, College, Graduate}
+- Size: {S, M, L, XL}
+
+**Quantitative example:**
+Categories: {Red, Blue, Green}
+True dissimilarity: all pairs equally dissimilar
+Label encoding: {0, 1, 2}
+- d(Red, Blue) = 1
+- d(Blue, Green) = 1
+- d(Red, Green) = 2 (artificially larger!)
+
+**Theorem 4 (Target Encoding Bias-Variance Trade-off):**
+
+Target encoding maps category c to E[Y|C=c].
+
+**Naive estimator:**
+ŷ_c = (1/n_c) Σ_{i:C_i=c} Y_i
+
+where n_c = number of samples with C=c.
+
+**Bias-Variance analysis:**
+
+**Bias:** E[ŷ_c] = E[Y|C=c] (unbiased!)
+
+**Variance:** Var(ŷ_c) = σ²/n_c where σ² = Var(Y|C=c)
+
+**Problem:** High variance for rare categories (small n_c)!
+
+**Shrinkage estimator (James-Stein):**
+ŷ_c^shrink = λ_c · ŷ_c + (1-λ_c) · ȳ_global
+
+where:
+- λ_c = n_c/(n_c + m) (shrinkage factor)
+- m > 0 (smoothing parameter)
+- ȳ_global = global mean of Y
+
+**Bias-Variance for shrinkage:**
+
+Bias²: (1-λ_c)² · (E[Y|C=c] - ȳ_global)²
+Variance: λ_c² · σ²/n_c
+
+**MSE:** MSE(c) = (1-λ_c)² · (E[Y|C=c] - ȳ_global)² + λ_c² · σ²/n_c
+
+**Optimal m:**
+Minimizes expected MSE across all categories.
+
+**Example:** n_c = 10, σ² = 1, |E[Y|C=c] - ȳ| = 0.5, m = 10
+- λ = 10/20 = 0.5
+- Bias² = (0.5)² · (0.5)² = 0.0625
+- Variance = (0.5)² · 1/10 = 0.025
+- MSE = 0.0875
+
+**Without shrinkage (m=0):**
+- Bias² = 0
+- Variance = 1/10 = 0.1
+- MSE = 0.1
+
+**Shrinkage reduces MSE by 12.5%!**
+
+**Theorem 5 (Target Encoding Overfitting Risk - Micci-Barreca, 2001):**
+
+**Leave-one-out target encoding:**
+For sample i with category c:
+ŷ_c^(-i) = (Σ_{j≠i:C_j=c} Y_j) / (n_c - 1)
+
+**Prevents data leakage:** Sample i doesn't use its own Y_i in encoding.
+
+**Cross-validation target encoding:**
+Use K-fold CV: encode validation fold using training fold statistics only.
+
+**Overfitting quantification:**
+
+**Without leave-one-out:**
+Correlation(ŷ_c, Y_i | C_i=c) includes spurious 1/n_c component from Y_i itself.
+
+**Overfitting bias:**
+E[(ŷ_c - ŷ_c^(-i))²] = σ²/(n_c(n_c-1))
+
+**For rare categories (n_c small), overfitting is severe!**
+
+**Example:** n_c = 2
+- Regular encoding: Each sample uses itself → perfect separation!
+- LOO encoding: Uses only other sample → reduces overfitting
+
+**Theorem 6 (High Cardinality Encoding Complexity):**
+
+For categorical variable with k categories:
+
+**One-hot encoding:**
+- Parameters: k (or k-1 with drop-first)
+- Sample complexity: O(k·log(k/δ))
+- Sparsity: High (only 1 non-zero per sample)
+- Computational cost: O(n·k) space
+
+**Target encoding:**
+- Parameters: k values (encodings)
+- Sample complexity: O(k)
+- Sparsity: None (dense encoding)
+- Computational cost: O(n) space
+
+**Curse of dimensionality for one-hot:**
+For k = 1000 categories:
+- One-hot: 1000 dimensions → need n >> 1000 samples
+- Target: 1 dimension → need n >> 1 samples
+
+**Sample complexity ratio:**
+One-hot needs ~k× more samples than target encoding for same performance!
+
+**Theorem 7 (Frequency Encoding as Approximation):**
+
+Frequency encoding maps category c to frequency: f_c = n_c/n
+
+**Relationship to target encoding:**
+Under certain conditions, frequency correlates with target.
+
+**Theorem:** If P(Y=1|C=c) ∝ √n_c (more frequent categories have higher target rate):
+
+Then Corr(f_c, E[Y|C=c]) > 0
+
+**Example domains:**
+- City population correlates with demand
+- Product popularity correlates with quality
+- Word frequency correlates with importance
+
+**Advantages of frequency encoding:**
+- No data leakage risk (doesn't use Y)
+- No overfitting (computed on entire dataset)
+- Fast to compute
+- No need for cross-validation
+
+**Disadvantages:**
+- Loses category-specific information
+- Multiple categories can have same frequency
+- May not preserve I(C; Y) well
+
+**Theorem 8 (Binary Encoding for Ordinal Variables):**
+
+Binary encoding represents ordinal category index in binary.
+
+**Example:** k = 8 categories {c₀, c₁, ..., c₇}
+- c₀ → [0, 0, 0]
+- c₁ → [0, 0, 1]
+- ...
+- c₇ → [1, 1, 1]
+
+**Dimensionality:** ⌈log₂ k⌉ dimensions
+
+**Information preservation:**
+Binary encoding is injective → preserves I(C; Y) completely
+
+**Distance property:**
+Hamming distance d_H(i, j) = # bits different
+
+**For ordinal variables with natural ordering:**
+Adjacent categories differ in ≤ log₂ k bits
+Far categories differ in ~log₂ k / 2 bits (average)
+
+**Comparison with one-hot for k=16:**
+- One-hot: 16 dimensions
+- Binary: 4 dimensions (4× compression!)
+
+**Trade-off:**
+- One-hot: Each category independent
+- Binary: Categories share bits → may capture hierarchical structure
+
+**Theorem 9 (Helmert Encoding for Statistical Testing):**
+
+Helmert encoding compares each category to mean of subsequent categories.
+
+**Encoding matrix for k categories:**
+```
+Category 1: Compare c₁ vs mean(c₂, ..., c_k)
+Category 2: Compare c₂ vs mean(c₃, ..., c_k)
+...
+Category k-1: Compare c_{k-1} vs c_k
+```
+
+**Statistical interpretation:**
+Each coefficient tests hypothesis: "Does this category differ from remaining categories?"
+
+**Orthogonality property:**
+Helmert contrasts are orthogonal: Σ_i contrast_i · contrast_j = 0 for i≠j
+
+**Use case:**
+When categories have temporal or natural ordering, and you want to test sequential differences.
+
+**Theorem 10 (Optimal Encoding Selection - Brown et al., 2012):**
+
+**Decision criteria based on data characteristics:**
+
+**1. Cardinality k:**
+- k ≤ 10: One-hot encoding (interpretable, sufficient samples)
+- 10 < k ≤ 100: Consider target encoding with smoothing
+- k > 100: Target encoding or frequency encoding essential
+
+**2. Sample size per category (n_c):**
+- n_c < 10: High overfitting risk → use shrinkage heavily
+- 10 ≤ n_c < 50: Use leave-one-out target encoding
+- n_c ≥ 50: Simple target encoding sufficient
+
+**3. Relationship with target:**
+- Strong relationship (I(C;Y) high): Target encoding captures more information
+- Weak relationship (I(C;Y) low): One-hot safer (less overfitting risk)
+
+**4. Model type:**
+- Linear models: Prefer one-hot (avoid implicit non-linearity)
+- Tree-based: Prefer target encoding (handles non-linearity well)
+- Neural networks: Either works (can learn non-linearity)
+
+**Optimal smoothing parameter m:**
+For classification with binary Y:
+
+m* ≈ σ² · k / Σ_c (E[Y|C=c] - ȳ)²
+
+Typical range: m ∈ [5, 20] works well empirically.
+
 ### One-Hot Encoding
 
 ```python
