@@ -16,6 +16,269 @@
 
 Anomaly detection identifies unusual patterns that deviate from expected behavior.
 
+### Rigorous Theory of Anomaly Detection
+
+**Theorem 1 (Formal Definition of Anomaly - Chandola et al., 2009):**
+
+Let X ~ P be data from distribution P. An anomaly is a sample x such that:
+
+P(x) < τ
+
+where τ is a threshold determined by:
+- Type I error rate α (false positive rate)
+- Type II error rate β (false negative rate)
+
+**Decision-theoretic formulation:**
+
+Cost function: C(x, decision)
+- C(x, normal) = 0 if x is normal, c₁ if x is anomaly
+- C(x, anomaly) = c₂ if x is normal, 0 if x is anomaly
+
+**Optimal threshold:** τ* = argmin_τ E[C]
+
+**Neyman-Pearson Lemma:** For fixed false positive rate α:
+Maximize detection power 1-β by setting τ such that P(P(x) < τ | x normal) = α
+
+**Theorem 2 (Anomaly Detection as Hypothesis Testing):**
+
+**Null hypothesis:** H₀: x ~ P_normal (x is normal)
+**Alternative hypothesis:** H₁: x ~ P_anomaly (x is anomaly)
+
+**Likelihood ratio test:**
+Λ(x) = P_anomaly(x) / P_normal(x)
+
+**Decision rule:**
+- If Λ(x) > λ_threshold: Declare anomaly
+- Otherwise: Declare normal
+
+**Type I error (false positive):**
+α = P(Λ(x) > λ | H₀) = P(declare anomaly | x normal)
+
+**Type II error (false negative):**
+β = P(Λ(x) ≤ λ | H₁) = P(declare normal | x anomaly)
+
+**Power:** 1 - β = P(detect anomaly | x anomaly)
+
+**ROC curve:** Plot (α, 1-β) for varying λ
+**AUC:** Area under ROC curve, perfect detector has AUC = 1
+
+**Theorem 3 (Statistical Anomaly Score - Extreme Value Theory):**
+
+For univariate data x ~ N(μ, σ²):
+
+**Z-score:** z = (x - μ) / σ
+
+**Anomaly:** |z| > k where k typically = 2, 3, or 4
+
+**Probability of false positive:**
+P(|z| > k) = 2·(1 - Φ(k))
+
+where Φ is standard normal CDF.
+
+**Examples:**
+- k = 2: P(|z| > 2) ≈ 0.05 (5% false positive)
+- k = 3: P(|z| > 3) ≈ 0.003 (0.3% false positive)
+- k = 4: P(|z| > 4) ≈ 0.00006 (0.006% false positive)
+
+**Generalized Extreme Value Distribution:**
+
+For maximum of n samples: M_n = max(x₁, ..., x_n)
+
+**Fisher-Tippett-Gnedenko Theorem:**
+As n → ∞, M_n converges to one of three types:
+1. **Gumbel:** exp(-exp(-(x-μ)/β))
+2. **Fréchet:** exp(-(x/s)^(-α)) for x > 0
+3. **Weibull:** exp(-|x/s|^α) for x < 0
+
+**Use case:** Model tails of distribution for extreme anomaly detection
+
+**Theorem 4 (Mahalanobis Distance for Multivariate Anomalies):**
+
+For multivariate data x ∈ ℝ^d with mean μ and covariance Σ:
+
+**Mahalanobis distance:**
+D_M(x) = √((x - μ)^T Σ^(-1) (x - μ))
+
+**Property:** Accounts for correlations between features
+
+**Under normality:** D_M²(x) ~ χ²_d (chi-squared with d degrees of freedom)
+
+**Anomaly threshold:** D_M²(x) > χ²_d(1-α)
+
+where χ²_d(1-α) is (1-α) quantile of χ²_d distribution.
+
+**Example:** d = 10, α = 0.01
+χ²_10(0.99) ≈ 23.2
+Anomaly if D_M²(x) > 23.2
+
+**Comparison with Euclidean distance:**
+- Euclidean: d(x) = ||x - μ||
+- Treats all dimensions equally (wrong if features have different scales/correlations!)
+- Mahalanobis: Accounts for scale and correlation
+
+**Quantitative example:**
+Features: [height, weight]
+Correlation: ρ = 0.8 (tall people tend to be heavier)
+
+Point: [170cm, 100kg]
+- Euclidean: May seem far from mean
+- Mahalanobis: Accounts for correlation → may be normal
+
+**Theorem 5 (Contamination Rate and Sample Complexity):**
+
+Let ε be contamination rate (proportion of anomalies in data).
+
+**Sample complexity for reliable detection:**
+
+To achieve error probability δ:
+n = O((1/ε²) · log(1/δ))
+
+**Interpretation:** Need ~1/ε² samples to reliably detect anomalies.
+
+**Examples:**
+- ε = 0.01 (1% anomalies): n = O(10,000)
+- ε = 0.001 (0.1% anomalies): n = O(1,000,000)
+
+**Rare anomaly problem:** As ε → 0, need exponentially more data!
+
+**Class imbalance:** Typical anomaly detection has ε ∈ [0.001, 0.05]
+→ Severe class imbalance (99.9% to 95% normal samples)
+
+**Theorem 6 (One-Class SVM Theory - Schölkopf et al., 2001):**
+
+**Objective:** Find hyperplane that separates normal data from origin with maximum margin.
+
+**Optimization:**
+min_{w,ρ,ξ} (1/2)||w||² - ρ + (1/(νn))Σ_i ξ_i
+
+subject to: w^T φ(x_i) ≥ ρ - ξ_i, ξ_i ≥ 0
+
+where:
+- φ(x): Feature map (kernel trick)
+- ρ: Margin from origin
+- ξ_i: Slack variables
+- ν ∈ (0,1): Upper bound on fraction of outliers, lower bound on fraction of support vectors
+
+**Decision function:**
+f(x) = sign(w^T φ(x) - ρ)
+
+**Anomaly:** f(x) = -1
+
+**Kernel trick:**
+k(x, x') = φ(x)^T φ(x')
+
+**Common kernels:**
+- Linear: k(x, x') = x^T x'
+- RBF: k(x, x') = exp(-γ||x - x'||²)
+- Polynomial: k(x, x') = (γx^T x' + r)^d
+
+**Theorem (Schölkopf et al.):**
+With probability 1:
+- Fraction of training points classified as anomaly ≤ ν
+- Fraction of support vectors ≥ ν
+
+**Theorem 7 (Isolation Forest Score - Liu et al., 2008):**
+
+**Idea:** Anomalies are easier to isolate (fewer splits needed).
+
+**Path length h(x):**
+Number of splits to isolate x in random tree
+
+**Average path length:**
+E[h(x)] = c(n) = 2H(n-1) - 2(n-1)/n
+
+where H(k) is harmonic number.
+
+**Anomaly score:**
+s(x) = 2^(-E[h(x)]/c(n))
+
+**Properties:**
+- s(x) → 1: Anomaly (short path length)
+- s(x) → 0.5: Normal (path length ≈ average)
+- s(x) → 0: Normal interior point (long path length)
+
+**Theorem (Liu et al., 2008):** Expected path length for normal points:
+
+E[h(x_normal)] ≈ c(n) = O(log n)
+
+E[h(x_anomaly)] ≈ 0 or 1 (isolated immediately)
+
+**Ratio:** h(anomaly)/h(normal) ≈ 1/log(n) → 0 as n → ∞
+
+**For n = 1000:** c(1000) ≈ 13.8
+Anomaly detected in ~1-2 splits vs ~13-14 for normal points
+
+**Theorem 8 (Local Outlier Factor - Breunig et al., 2000):**
+
+**Idea:** Compare local density of x to densities of its neighbors.
+
+**k-distance:** Distance to k-th nearest neighbor
+d_k(x) = d(x, kNN(x))
+
+**Reachability distance:**
+reach-dist_k(x, y) = max{d_k(y), d(x, y)}
+
+**Local reachability density:**
+lrd_k(x) = 1 / (E_{y∈kNN(x)}[reach-dist_k(x, y)])
+
+**Local outlier factor:**
+LOF_k(x) = (E_{y∈kNN(x)}[lrd_k(y)]) / lrd_k(x)
+
+**Interpretation:**
+- LOF ≈ 1: x has similar density to neighbors (normal)
+- LOF >> 1: x has much lower density than neighbors (anomaly)
+- LOF < 1: x has higher density than neighbors (cluster center)
+
+**Typical threshold:** LOF > 1.5 or 2.0
+
+**Theorem 9 (Reconstruction Error for Autoencoders):**
+
+**Autoencoder:** Encoder f_enc: ℝ^d → ℝ^k, Decoder f_dec: ℝ^k → ℝ^d
+
+**Reconstruction:** x̂ = f_dec(f_enc(x))
+
+**Reconstruction error:**
+R(x) = ||x - x̂||²
+
+**Training objective:** min E_x~P_normal[R(x)]
+
+**Anomaly detection:**
+- Normal data: R(x) small (well reconstructed)
+- Anomaly: R(x) large (poorly reconstructed)
+
+**Theorem:** If autoencoder is trained only on normal data:
+
+E[R(x_normal)] < E[R(x_anomaly)]
+
+with high probability.
+
+**Threshold selection:** τ = percentile(R(x_train), 95) or 99
+
+**Theorem 10 (Probabilistic Anomaly Score via Likelihood):**
+
+**Generative model:** Learn P_θ(x) on normal data
+
+**Anomaly score:**
+A(x) = -log P_θ(x)
+
+**Lower likelihood → Higher anomaly score**
+
+**Methods:**
+1. **Gaussian Mixture Model (GMM):**
+   P(x) = Σ_k π_k N(x | μ_k, Σ_k)
+
+2. **Variational Autoencoder (VAE):**
+   P(x) = ∫ P(x|z)P(z)dz ≈ P(x|z*)
+
+3. **Normalizing Flows:**
+   P(x) = P(z) |det(∂f/∂z)|
+   where x = f(z)
+
+**Threshold:** τ = -log(α) where α is desired false positive rate
+
+**Example:** α = 0.01 → τ = -log(0.01) ≈ 4.6
+Anomaly if -log P(x) > 4.6
+
 ### Types of Anomalies
 
 ```python
